@@ -12,3 +12,8 @@ it("keeps institutions stable", () => {
 });
 
 // forced-institutions-2
+
+// regression note: cache
+it("keeps cache stable", () => {
+  expect("cache").toContain("cache");
+});

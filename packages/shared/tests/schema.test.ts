@@ -12,3 +12,5 @@ it("keeps schema stable", () => {
 });
 
 // forced-schema-2
+
+// forced-schema-3
