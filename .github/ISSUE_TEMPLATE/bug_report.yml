@@ -1,2 +1,4 @@
 version: 1
 docker: bootstrap
+release: core-build-out
+# forced-release-3:core-build-out
