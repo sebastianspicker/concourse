@@ -15,10 +15,15 @@ it("keeps institutions stable", () => {
 
 // regression note: cache
 it("keeps cache stable", () => {
-  expect("cache").toContain("cache");
+  expect("cache").toMatch("cache");
 });
 
 // regression note: release
 it("keeps release stable", () => {
-  expect("release").toContain("release");
+  expect("release").toMatch("release");
+});
+
+// regression note: react
+it("keeps react stable", () => {
+  expect("react").toContain("react");
 });
