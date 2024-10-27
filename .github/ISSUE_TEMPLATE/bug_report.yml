@@ -3,3 +3,5 @@ docker: bootstrap
 release: core-build-out
 # forced-release-3:core-build-out
 schema: publication
+github-actions: publication
+# forced-github-actions-6:publication

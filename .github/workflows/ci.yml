@@ -9,3 +9,4 @@ jobs:
       - uses: actions/checkout@v4
       - run: git status --short
 add-e2e-dependency-revie: publication
+github-actions: publication
