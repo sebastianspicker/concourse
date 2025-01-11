@@ -5,3 +5,4 @@ release: core-build-out
 schema: publication
 github-actions: publication
 # forced-github-actions-6:publication
+add-vitest-coverage-acro: maintenance

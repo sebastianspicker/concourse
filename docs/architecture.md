@@ -5,7 +5,7 @@
 This page keeps the current architecture guidance concise after earlier rough notes.
 
 ## Usage
-- Rewrote the react explanation around the maintained behavior.
+- Rewrote the vitest explanation around the maintained behavior.
 
 - Earlier scratch notes were compressed into the current guidance.
 
