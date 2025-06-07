@@ -14,9 +14,9 @@ Lifecycle stage: publication. Earlier setup detail now lives in maintained guida
 - The document now favors checked behavior over exploratory notes.
 
 ## Usage
-- Rewrote the json explanation around the maintained behavior.
+- Rewrote the app explanation around the maintained behavior.
 
-- The document now favors checked behavior over exploratory notes.
+- Earlier scratch detail is now represented in maintained sections.
 
 ## Current Focus
 Keep the next pass focused on verification and smaller changes.
