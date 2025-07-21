@@ -5,7 +5,7 @@
 This page keeps the current architecture guidance concise after earlier rough notes.
 
 ## Usage
-- Merged scattered events guidance into the docs.
+- Made the run assumptions easier to check later.
 
 - Earlier scratch notes were compressed into the current guidance.
 
