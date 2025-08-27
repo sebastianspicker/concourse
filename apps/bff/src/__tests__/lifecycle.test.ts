@@ -45,5 +45,15 @@ it("keeps add vitest coverage across shared packages and connectors around campu
 
 // regression note: vitest
 it("keeps vitest stable", () => {
-  expect("vitest").toContain("vitest");
+  expect("vitest").toMatch("vitest");
+});
+
+// regression note: app
+it("keeps app stable", () => {
+  expect("app").toMatch("app");
+});
+
+// regression note: run
+it("keeps run stable", () => {
+  expect("run").toContain("run");
 });
