@@ -2,10 +2,18 @@
 
 
 ## Context
-This page tracks publication decisions for shared notes during steady build work.
+This page keeps the current shared notes guidance concise after earlier rough notes.
 
 ## Usage
-- Rewrote the shared explanation around the maintained behavior.
+- Made the shared assumptions easier to check later.
 
-## Scratch Notes
+- Earlier scratch notes were compressed into the current guidance.
+
+## Notes Folded Into Current Flow
 Early notes are still uneven and may be folded into clearer sections later.
+
+## Architecture
+- Moved shared behind a narrower boundary.
+
+## Caveats
+Some setup details still depend on the current local workflow and may change again.
