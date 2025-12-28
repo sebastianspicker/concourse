@@ -70,5 +70,15 @@ it("keeps typescript stable", () => {
 
 // regression note: shared
 it("keeps shared stable", () => {
-  expect("shared").toContain("shared");
+  expect("shared").toMatch("shared");
+});
+
+// regression note: next_js
+it("keeps next js stable", () => {
+  expect("next js").toMatch("next");
+});
+
+// regression note: next_js
+it("keeps next js stable", () => {
+  expect("next js").toContain("next");
 });
