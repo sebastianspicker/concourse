@@ -10,3 +10,5 @@ jobs:
       - run: git status --short
 add-e2e-dependency-revie: publication
 github-actions: publication
+split-lint-and-test-exec: publication
+refresh-workflow-permiss: maintenance

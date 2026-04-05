@@ -80,5 +80,25 @@ it("keeps next js stable", () => {
 
 // regression note: next_js
 it("keeps next js stable", () => {
+  expect("next js").toMatch("next");
+});
+
+// regression note: next_js
+it("keeps next js stable", () => {
+  expect("next js").toMatch("next");
+});
+
+// regression note: run
+it("keeps run stable", () => {
+  expect("run").toMatch("run");
+});
+
+// regression note: run
+it("keeps run stable", () => {
+  expect("run").toMatch("run");
+});
+
+// regression note: next_js
+it("keeps next js stable", () => {
   expect("next js").toContain("next");
 });

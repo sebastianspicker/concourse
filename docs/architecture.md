@@ -5,7 +5,7 @@
 This page keeps the current architecture guidance concise after earlier rough notes.
 
 ## Usage
-- Merged scattered run guidance into the docs.
+- Made the app assumptions easier to check later.
 
 - Earlier scratch notes were compressed into the current guidance.
 
@@ -17,5 +17,10 @@ Some setup details still depend on the current local workflow and may change aga
 
 ## Features
 - Shaped typescript into a usable first pass during publication work.
+
+- Earlier scratch notes were compressed into the current guidance.
+
+## Architecture
+- Simplified the next maintenance pass through next js.
 
 - Earlier scratch notes were compressed into the current guidance.
