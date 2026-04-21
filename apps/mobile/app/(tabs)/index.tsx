@@ -8,10 +8,33 @@ import { Screen } from "@/ui/Screen";
 import { scaledFont, scaledRadius, spacing, typography, withOpacity } from "@/ui/theme";
 import { useTheme } from "@/ui/ThemeContext";
 import { formatEventDate, formatRelativeTime, formatScheduleTime, formatTimeRange } from "@/utils/dateFormat";
+import { serializeRouteItem } from "@/utils/routeItem";
 import type { PublicEvent } from "@campus/shared";
 import type { ScheduleItem } from "@campus/shared";
 
 type SortDirection = "asc" | "desc";
+
+function getLocalDayRange(): { from: string; to: string } {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(start);
+  end.setHours(23, 59, 59, 999);
+
+  return {
+    from: start.toISOString(),
+    to: end.toISOString()
+  };
+}
+
+function isScheduleUnavailable(error: string | null): boolean {
+  if (!error) {
+    return false;
+  }
+
+  const lower = error.toLowerCase();
+  return lower.includes("no schedules configured") || lower.includes("schedule not found");
+}
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -30,16 +53,27 @@ function getFormattedDate(): string {
 
 export default function TodayScreen(): JSX.Element {
   const { data, error, loading, refreshing, refresh } = useToday();
-  const scheduleState = useSchedule();
+  // Re-compute at midnight: key on the current calendar day
+  const today = new Date().toDateString();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const scheduleFilter = useMemo(() => getLocalDayRange(), [today]);
+  const scheduleState = useSchedule(scheduleFilter);
   const [scheduleSortDirection, setScheduleSortDirection] = useState<SortDirection>("asc");
   const theme = useTheme();
   const ui = theme.ui;
+  const scheduleUnavailable = isScheduleUnavailable(scheduleState.error);
+  const showScheduleSection = !scheduleUnavailable;
 
   const refreshingAll = refreshing || scheduleState.refreshing;
   const scheduleRefresh = scheduleState.refresh;
   const refreshAll = useCallback(async () => {
+    if (scheduleUnavailable) {
+      await refresh();
+      return;
+    }
+
     await Promise.all([refresh(), scheduleRefresh()]);
-  }, [refresh, scheduleRefresh]);
+  }, [refresh, scheduleRefresh, scheduleUnavailable]);
 
   const rawEvents = data?.events;
   const events = useMemo(() => rawEvents ?? [], [rawEvents]);
@@ -59,7 +93,7 @@ export default function TodayScreen(): JSX.Element {
 
   const eventsKeyExtractor = useCallback((e: PublicEvent) => e.id, []);
   const eventsHref = useCallback(
-    (e: PublicEvent) => ({ pathname: "/events/[id]" as const, params: { id: e.id } }),
+    (e: PublicEvent) => ({ pathname: "/events/[id]" as const, params: { id: e.id, item: serializeRouteItem(e) } }),
     []
   );
   const eventsRenderCard = useCallback(
@@ -76,7 +110,7 @@ export default function TodayScreen(): JSX.Element {
 
   const scheduleKeyExtractor = useCallback((s: ScheduleItem) => s.id, []);
   const scheduleHref = useCallback(
-    (s: ScheduleItem) => ({ pathname: "/schedule/[id]" as const, params: { id: s.id } }),
+    (s: ScheduleItem) => ({ pathname: "/schedule/[id]" as const, params: { id: s.id, item: serializeRouteItem(s) } }),
     []
   );
   const scheduleRenderCard = useCallback(
@@ -143,22 +177,24 @@ export default function TodayScreen(): JSX.Element {
                 {eventCount === 1 ? "event" : "events"}
               </Text>
             </View>
-            <View
-              style={[
-                styles.statPill,
-                {
-                  backgroundColor: withOpacity(theme.colors.info, theme.isDark ? 0.15 : 0.08),
-                  borderRadius: scaledRadius(12, ui),
-                },
-              ]}
-            >
-              <Text style={[styles.statNumber, { color: theme.colors.info }]}>
-                {scheduleCount}
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.colors.muted }]}>
-                {scheduleCount === 1 ? "class" : "classes"}
-              </Text>
-            </View>
+            {showScheduleSection ? (
+              <View
+                style={[
+                  styles.statPill,
+                  {
+                    backgroundColor: withOpacity(theme.colors.info, theme.isDark ? 0.15 : 0.08),
+                    borderRadius: scaledRadius(12, ui),
+                  },
+                ]}
+              >
+                <Text style={[styles.statNumber, { color: theme.colors.info }]}>
+                  {scheduleCount}
+                </Text>
+                <Text style={[styles.statLabel, { color: theme.colors.muted }]}>
+                  {scheduleCount === 1 ? "class" : "classes"}
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -179,40 +215,44 @@ export default function TodayScreen(): JSX.Element {
         accessibilityLabel={eventsAccessibilityLabel}
         onRetry={refreshAll}
       />
-      <View style={styles.scheduleHeader}>
-        <Pressable
-          onPress={toggleScheduleSort}
-          style={({ pressed }) => [
-            styles.sortButton,
-            {
-              borderColor: theme.colors.border,
-              borderWidth: theme.ui.borderWidth,
-              borderRadius: scaledRadius(8, ui),
-            },
-            pressed && styles.pressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={`Sort schedule ${scheduleSortDirection === "asc" ? "latest first" : "earliest first"}`}
-        >
-          <Text style={[styles.sortText, { color: theme.colors.text }]}>
-            {scheduleSortDirection === "asc" ? "↑ Earliest first" : "↓ Latest first"}
-          </Text>
-        </Pressable>
-      </View>
-      <ResourceListSection
-        title="Schedule"
-        loading={scheduleState.loading}
-        error={scheduleState.error}
-        items={sortedSchedule}
-        emptyMessage="No classes scheduled today."
-        emptyHint="Your schedule will appear here once a public calendar feed is configured."
-        emptyIcon={"📋"}
-        keyExtractor={scheduleKeyExtractor}
-        href={scheduleHref}
-        renderCard={scheduleRenderCard}
-        accessibilityLabel={scheduleAccessibilityLabel}
-        onRetry={refreshAll}
-      />
+      {showScheduleSection ? (
+        <>
+          <View style={styles.scheduleHeader}>
+            <Pressable
+              onPress={toggleScheduleSort}
+              style={({ pressed }) => [
+                styles.sortButton,
+                {
+                  borderColor: theme.colors.border,
+                  borderWidth: theme.ui.borderWidth,
+                  borderRadius: scaledRadius(8, ui),
+                },
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Sort schedule ${scheduleSortDirection === "asc" ? "latest first" : "earliest first"}`}
+            >
+              <Text style={[styles.sortText, { color: theme.colors.text }]}>
+                {scheduleSortDirection === "asc" ? "↑ Earliest first" : "↓ Latest first"}
+              </Text>
+            </Pressable>
+          </View>
+          <ResourceListSection
+            title="Schedule"
+            loading={scheduleState.loading}
+            error={scheduleState.error}
+            items={sortedSchedule}
+            emptyMessage="No classes scheduled today."
+            emptyHint="Your schedule will appear here once a public calendar feed is configured."
+            emptyIcon={"📋"}
+            keyExtractor={scheduleKeyExtractor}
+            href={scheduleHref}
+            renderCard={scheduleRenderCard}
+            accessibilityLabel={scheduleAccessibilityLabel}
+            onRetry={refreshAll}
+          />
+        </>
+      ) : null}
     </Screen>
   );
 }

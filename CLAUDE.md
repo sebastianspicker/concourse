@@ -52,3 +52,4 @@ Build order: `shared` and `institutions` must build before `bff` and `mobile`.
 - Build `shared` + `institutions` before running `typecheck` or `test` (Turbo handles this via `dependsOn: ["^build"]`)
 - Mobile vitest needs the PostCSS override in `apps/mobile/vitest.config.ts` or tests fail on CSS imports
 - The `pnpm verify` script also checks for leftover task markers in source files
+- `EXPO_PUBLIC_BFF_BASE_URL` must be set in `apps/mobile/.env` before running the mobile app in development — there is no automatic `localhost:4000` fallback

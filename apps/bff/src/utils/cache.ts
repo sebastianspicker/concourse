@@ -88,7 +88,7 @@ export async function getCached<T>(
   key: string,
   loader: () => Promise<T>,
   ttlMs: number,
-  options?: { inFlightTimeoutMs?: number; force?: boolean }
+  options?: { inFlightTimeoutMs?: number; force?: boolean; shouldCache?: (value: T) => boolean }
 ): Promise<T> {
   const now = Date.now();
 
@@ -122,6 +122,7 @@ export async function getCached<T>(
   }
 
   const inFlightTimeoutMs = options?.inFlightTimeoutMs ?? DEFAULT_IN_FLIGHT_TIMEOUT_MS;
+  const shouldCache = options?.shouldCache ?? (() => true);
   const promiseRef: { current: Promise<unknown> | null } = { current: null };
   const { promise: timeout, timer } = timeoutPromise(inFlightTimeoutMs);
   const promise = (async (): Promise<T> => {
@@ -130,8 +131,10 @@ export async function getCached<T>(
         loader(),
         timeout
       ]).finally(() => clearTimeout(timer));
-      cache.set(key, { value, expiresAt: Date.now() + ttlMs, lastAccessedAt: Date.now() });
-      evictIfOverCap();
+      if (shouldCache(value)) {
+        cache.set(key, { value, expiresAt: Date.now() + ttlMs, lastAccessedAt: Date.now() });
+        evictIfOverCap();
+      }
       return value;
     } finally {
       if (inFlight.get(key) === promiseRef.current) inFlight.delete(key);

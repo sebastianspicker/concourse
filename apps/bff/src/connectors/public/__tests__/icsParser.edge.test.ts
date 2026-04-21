@@ -55,8 +55,20 @@ END:VEVENT
 END:VCALENDAR`;
     const events = parseIcs(ics);
     expect(events).toHaveLength(1);
-    // The current parser normalizes floating TZID values to UTC wall-clock time.
-    expect(events[0].startsAt).toBe("2026-06-15T14:00:00.000Z");
+    expect(events[0].startsAt).toBe("2026-06-15T12:00:00.000Z");
+  });
+
+  it("handles DTSTART with explicit numeric offset", () => {
+    const ics = `BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:offset-test
+SUMMARY:Offset Event
+DTSTART:20260615T140000+0200
+END:VEVENT
+END:VCALENDAR`;
+    const events = parseIcs(ics);
+    expect(events).toHaveLength(1);
+    expect(events[0].startsAt).toBe("2026-06-15T12:00:00.000Z");
   });
 
   it("handles DTSTART with VALUE=DATE parameter", () => {

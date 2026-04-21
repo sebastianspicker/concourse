@@ -16,7 +16,7 @@ import {
 } from "@campus/shared";
 import { getBffBaseUrl } from "../utils/env";
 import { getCached } from "./cache";
-import { fetchWithOfflineSupport } from "./persistedCache";
+import { fetchNetworkFirstWithFallback } from "./persistedCache";
 
 const DEFAULT_TTL_MS = 60_000;
 
@@ -63,7 +63,7 @@ async function getCachedJson<T>(
     : "";
   
   if (options?.offlineMode) {
-    const result = await fetchWithOfflineSupport<T>(
+    const result = await fetchNetworkFirstWithFallback<T>(
       cacheKey,
       () => getJson<T>(`${path}${queryString}`, (data) => safeParse(data, schema), { signal: options?.signal })
     );
@@ -131,8 +131,23 @@ export function fetchRooms(options?: RoomsFilterOptions): Promise<RoomsResponse>
   });
 }
 
-export function fetchToday(options?: { force?: boolean; signal?: AbortSignal; offlineMode?: boolean }): Promise<TodayResponse> {
-  return getCachedJson("/today", TodayResponseSchema, "today", options);
+export type TodayFetchOptions = {
+  force?: boolean;
+  signal?: AbortSignal;
+  offlineMode?: boolean;
+  date?: string;
+};
+
+export function fetchToday(options?: TodayFetchOptions): Promise<TodayResponse> {
+  const queryParams: Record<string, string> = {};
+  if (options?.date) queryParams.date = options.date;
+
+  return getCachedJson("/today", TodayResponseSchema, "today", {
+    force: options?.force,
+    signal: options?.signal,
+    queryParams,
+    offlineMode: options?.offlineMode
+  });
 }
 
 export type ScheduleFilterOptions = {

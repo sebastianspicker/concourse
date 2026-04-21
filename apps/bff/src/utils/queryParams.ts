@@ -5,9 +5,8 @@ import type { IncomingMessage } from "node:http";
  */
 export function parseQueryParams(req: IncomingMessage): URLSearchParams {
   const url = req.url ?? "";
-  const host = req.headers?.host ?? "localhost";
   try {
-    const fullUrl = new URL(url, `http://${host}`);
+    const fullUrl = new URL(url, "http://localhost");
     return fullUrl.searchParams;
   } catch {
     return new URLSearchParams();

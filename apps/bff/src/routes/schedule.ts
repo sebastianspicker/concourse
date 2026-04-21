@@ -21,10 +21,12 @@ export const handleSchedule = createJsonRoute(
       filteredSchedule = filteredSchedule.filter((item) => item.campusId === filter.campusId);
     }
     filteredSchedule = applySearch(filteredSchedule, filter.search, (item) => item.title);
+    const _total = filteredSchedule.length;
     filteredSchedule = applyPagination(filteredSchedule, filter.offset ?? 0, filter.limit);
 
     return {
       schedule: filteredSchedule,
+      _total,
       _sourcesConfigured: true
     };
   },

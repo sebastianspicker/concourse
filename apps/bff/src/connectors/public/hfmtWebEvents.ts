@@ -1,17 +1,31 @@
 import type { InstitutionPack } from "../../config/loader";
 import type { PublicEvent } from "@campus/shared";
-import { getCached, clearCache } from "../../utils/cache";
-import { createCircuitBreaker } from "../../utils/circuitBreaker";
+import { getCached } from "../../utils/cache";
+import { createCircuitBreaker, type CircuitBreaker } from "../../utils/circuitBreaker";
 import { fetchTextWithTimeout } from "../../utils/fetch";
 import { log } from "../../utils/logger";
+import { parseDateTimeInTimeZone } from "../../utils/timeZone";
 import { buildEventId } from "./eventId";
 import { BFF_ENV } from "../../config/env";
 
-const eventsBreaker = createCircuitBreaker({
-  name: "public-events",
-  failureThreshold: 5,
-  cooldownMs: 30_000,
-});
+const DEFAULT_TIME_ZONE = "Europe/Berlin";
+const MAX_EVENTS_PER_SOURCE = 8;
+const eventsBreakers = new Map<string, CircuitBreaker>();
+
+function getEventsBreaker(sourceUrl: string): CircuitBreaker {
+  const existing = eventsBreakers.get(sourceUrl);
+  if (existing) {
+    return existing;
+  }
+
+  const breaker = createCircuitBreaker({
+    name: `public-events:${sourceUrl}`,
+    failureThreshold: 5,
+    cooldownMs: 30_000,
+  });
+  eventsBreakers.set(sourceUrl, breaker);
+  return breaker;
+}
 
 // Import mock fixtures for mock mode
 import mockuniEventsFixture from "../../__fixtures__/mockuni-events.json";
@@ -52,10 +66,11 @@ export async function fetchPublicEvents(
       }
 
       let anyFailed = false;
+      const timeZone = institution.timezone ?? DEFAULT_TIME_ZONE;
       const settlement = await Promise.allSettled(
         sources.map(async (source: { url: string; label: string }) => {
-          const html = await eventsBreaker.call(() => fetchTextWithTimeout(source.url));
-          return extractEventsFromHtml(html, source.url);
+          const html = await getEventsBreaker(source.url).call(() => fetchTextWithTimeout(source.url));
+          return extractEventsFromHtml(html, source.url, timeZone);
         })
       );
 
@@ -74,7 +89,7 @@ export async function fetchPublicEvents(
 
       const deduped = dedupeAndSortEvents(parsedEvents);
       if (deduped.length > 0) {
-        return { events: deduped.slice(0, 8), degraded: anyFailed };
+        return { events: deduped.slice(0, MAX_EVENTS_PER_SOURCE), degraded: anyFailed };
       }
 
       const fallbackEvents = sources.map((source: { url: string; label: string }) => {
@@ -88,20 +103,20 @@ export async function fetchPublicEvents(
       });
 
       const degradedResult: FetchPublicEventsResult = { events: fallbackEvents, degraded: true };
-      // Don't cache degraded results — allow retry on next request
-      clearCache(cacheKey);
       return degradedResult;
     },
-    ttlMs
+    ttlMs,
+    { shouldCache: (result) => !result.degraded }
   );
 }
 
 function extractEventsFromHtml(
   html: string,
   sourceUrl: string,
+  timeZone: string,
 ): PublicEvent[] {
   if (sourceUrl.includes("hfmt-koeln.de")) {
-    return extractHfmtEvents(html, sourceUrl);
+    return extractHfmtEvents(html, sourceUrl, timeZone);
   }
 
   return extractGenericEvents(html, sourceUrl);
@@ -110,6 +125,7 @@ function extractEventsFromHtml(
 function extractHfmtEvents(
   html: string,
   sourceUrl: string,
+  timeZone: string,
 ): PublicEvent[] {
   const events: PublicEvent[] = [];
   const blocks = html.match(/<article[\s\S]*?<\/article>/gi) ?? [];
@@ -120,7 +136,7 @@ function extractHfmtEvents(
       continue;
     }
 
-    const date = extractDate(block) ?? "1970-01-01T00:00:00.000Z";
+    const date = extractDate(block, timeZone) ?? "1970-01-01T00:00:00.000Z";
     const url = extractHref(block, sourceUrl);
 
     if (!url) {
@@ -134,7 +150,7 @@ function extractHfmtEvents(
       sourceUrl: url
     });
 
-    if (events.length >= 8) {
+    if (events.length >= MAX_EVENTS_PER_SOURCE) {
       break;
     }
   }
@@ -147,7 +163,7 @@ function extractHfmtEvents(
     html.match(/<div[^>]*class="[^"]*event[^"]*"[\s\S]*?<\/div>/gi) ?? [];
   for (const block of tiles) {
     const title = extractTitle(block);
-    const date = extractDate(block) ?? "1970-01-01T00:00:00.000Z";
+    const date = extractDate(block, timeZone) ?? "1970-01-01T00:00:00.000Z";
     const url = extractHref(block, sourceUrl);
 
     if (!title || !url) {
@@ -161,7 +177,7 @@ function extractHfmtEvents(
       sourceUrl: url
     });
 
-    if (events.length >= 8) {
+    if (events.length >= MAX_EVENTS_PER_SOURCE) {
       break;
     }
   }
@@ -206,7 +222,7 @@ function extractGenericEvents(
       sourceUrl: resolvedUrl
     });
 
-    if (events.length >= 8) {
+    if (events.length >= MAX_EVENTS_PER_SOURCE) {
       break;
     }
   }
@@ -255,7 +271,7 @@ function extractTitle(block: string): string | null {
   return null;
 }
 
-function extractDate(block: string): string | null {
+function extractDate(block: string, timeZone: string): string | null {
   const datetimeMatch = block.match(/datetime="([^"]+)"/i);
   if (datetimeMatch) {
     const parsed = new Date(datetimeMatch[1]);
@@ -267,19 +283,32 @@ function extractDate(block: string): string | null {
   const dateTimeMatch =
     block.match(/(\d{2})\.(\d{2})\.(\d{4})\s*(\d{2}):(\d{2})/);
   if (dateTimeMatch) {
-    // German date-time strings represent local time, not UTC.
-    // Omit the Z suffix so Date parses as local time.
-    const iso = `${dateTimeMatch[3]}-${dateTimeMatch[2]}-${dateTimeMatch[1]}T${dateTimeMatch[4]}:${dateTimeMatch[5]}:00.000`;
-    const date = new Date(iso);
-    if (!Number.isNaN(date.valueOf())) return date.toISOString();
+    return parseDateTimeInTimeZone(
+      {
+        year: Number(dateTimeMatch[3]),
+        month: Number(dateTimeMatch[2]),
+        day: Number(dateTimeMatch[1]),
+        hour: Number(dateTimeMatch[4]),
+        minute: Number(dateTimeMatch[5]),
+        second: 0
+      },
+      timeZone
+    );
   }
 
   const dateMatch = block.match(/(\d{2})\.(\d{2})\.(\d{4})/);
   if (dateMatch) {
-    // Date-only: treat as local midnight (no Z suffix)
-    const iso = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}T00:00:00.000`;
-    const date = new Date(iso);
-    if (!Number.isNaN(date.valueOf())) return date.toISOString();
+    return parseDateTimeInTimeZone(
+      {
+        year: Number(dateMatch[3]),
+        month: Number(dateMatch[2]),
+        day: Number(dateMatch[1]),
+        hour: 0,
+        minute: 0,
+        second: 0
+      },
+      timeZone
+    );
   }
 
   return null;

@@ -31,7 +31,7 @@ export async function getJson<T>(
       }
       throw err;
     }
-  });
+  }, { signal: options?.signal });
 
   return parse ? parse(data) : (data as T);
 }

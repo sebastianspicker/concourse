@@ -175,6 +175,20 @@ export function formatShortRelativeTime(date: string, locale?: string): string {
   return formatter.format(value, unit);
 }
 
+/**
+ * Format a campus ID for human-readable display.
+ * Replaces hyphens and underscores with spaces and capitalizes each word.
+ *
+ * @param id - Campus ID string (e.g., "cologne-zzt")
+ * @returns Display string (e.g., "Cologne Zzt")
+ */
+export function formatCampusId(id: string): string {
+  if (!id) return "";
+  return id
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function isToday(date: string): boolean {
   const today = new Date().toISOString().split("T")[0];
   return date.startsWith(today);

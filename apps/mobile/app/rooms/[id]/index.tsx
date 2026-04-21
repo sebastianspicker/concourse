@@ -3,16 +3,21 @@ import React from "react";
 import { useRooms } from "@/hooks/useRooms";
 import { MetaRow } from "@/ui/MetaRow";
 import { ResourceDetailScreen } from "@/ui/ResourceDetailScreen";
+import { parseRouteItem } from "@/utils/routeItem";
+import type { Room } from "@campus/shared";
 
 export default function RoomDetailScreen(): JSX.Element {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, item } = useLocalSearchParams<{ id: string; item?: string }>();
+  const routedRoom = parseRouteItem<Room>(item);
+  const hasRoutedItem = routedRoom?.id === id;
   const { data, loading, error, refreshing, refresh } = useRooms();
-  const room = data?.rooms.find((entry) => entry.id === id);
+  const room = hasRoutedItem ? routedRoom : (data?.rooms.find((entry) => entry.id === id) ?? null);
+  const effectiveLoading = hasRoutedItem ? false : loading;
 
   return (
     <ResourceDetailScreen
       title="Room Details"
-      loading={loading}
+      loading={effectiveLoading}
       error={error}
       item={room ?? null}
       notFoundMessage="Room not found."

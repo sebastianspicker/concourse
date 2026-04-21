@@ -369,4 +369,93 @@ END:VCALENDAR
       expect(events[2].title).toBe("Event 3");
     });
   });
+
+  describe("description field", () => {
+    it("parses DESCRIPTION property", () => {
+      const ics = `
+BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:desc-test-1
+SUMMARY:Event with Description
+DTSTART:20260101T100000Z
+DESCRIPTION:This is a test description with some details.
+END:VEVENT
+END:VCALENDAR
+`;
+      const events = parseIcs(ics);
+      expect(events[0].description).toBe("This is a test description with some details.");
+    });
+
+    it("leaves description undefined when DESCRIPTION is absent", () => {
+      const ics = `
+BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:desc-test-2
+SUMMARY:Event without Description
+DTSTART:20260101T100000Z
+END:VEVENT
+END:VCALENDAR
+`;
+      const events = parseIcs(ics);
+      expect(events[0].description).toBeUndefined();
+    });
+
+    it("unescapes special characters in DESCRIPTION", () => {
+      const ics = `
+BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:desc-test-3
+SUMMARY:Escape Test
+DTSTART:20260101T100000Z
+DESCRIPTION:Line 1\\nLine 2\\, with comma
+END:VEVENT
+END:VCALENDAR
+`;
+      const events = parseIcs(ics);
+      expect(events[0].description).toBe("Line 1\nLine 2, with comma");
+    });
+  });
+
+  describe("recurringInstanceId stability", () => {
+    it("produces identical recurringInstanceIds when parsed twice", () => {
+      const ics = `
+BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:stable-id-test
+SUMMARY:Recurring Stable
+DTSTART:20260201T090000Z
+DTEND:20260201T093000Z
+RRULE:FREQ=DAILY;COUNT=3
+END:VEVENT
+END:VCALENDAR
+`;
+      const run1 = parseIcs(ics, { rruleHorizonDays: 30 });
+      const run2 = parseIcs(ics, { rruleHorizonDays: 30 });
+
+      expect(run1).toHaveLength(3);
+      expect(run2).toHaveLength(3);
+
+      for (let i = 0; i < run1.length; i++) {
+        expect(run1[i].recurringInstanceId).toBe(run2[i].recurringInstanceId);
+      }
+    });
+
+    it("produces different recurringInstanceIds for different start times", () => {
+      const ics = `
+BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:distinct-id-test
+SUMMARY:Recurring Distinct
+DTSTART:20260201T090000Z
+DTEND:20260201T093000Z
+RRULE:FREQ=DAILY;COUNT=3
+END:VEVENT
+END:VCALENDAR
+`;
+      const events = parseIcs(ics, { rruleHorizonDays: 30 });
+      const ids = events.map((e) => e.recurringInstanceId);
+      const unique = new Set(ids);
+      expect(unique.size).toBe(events.length);
+    });
+  });
 });

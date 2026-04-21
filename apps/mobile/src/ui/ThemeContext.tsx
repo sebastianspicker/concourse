@@ -25,7 +25,7 @@ export type Theme = {
 type ThemeContextValue = {
   theme: Theme;
   preference: ThemePreference;
-  setPreference: (preference: ThemePreference) => void;
+  setPreference: (preference: ThemePreference) => Promise<void>;
   toggleTheme: () => void;
 };
 
@@ -83,7 +83,7 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
   const toggleTheme = () => {
     // Toggle between light and dark (not system)
     const newPreference: ThemePreference = resolvedScheme === "dark" ? "light" : "dark";
-    setPreference(newPreference);
+    void setPreference(newPreference);
   };
 
   // Provide default theme during initial load
@@ -120,7 +120,7 @@ export function useTheme(): Theme {
 
 export function useThemePreference(): {
   preference: ThemePreference;
-  setPreference: (preference: ThemePreference) => void;
+  setPreference: (preference: ThemePreference) => Promise<void>;
   toggleTheme: () => void;
 } {
   const context = useContext(ThemeContext);

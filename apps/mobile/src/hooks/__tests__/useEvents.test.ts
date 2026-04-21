@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "./testUtils";
 import { useEvents } from "../useEvents";
 import { clearCache } from "../../data/cache";
+import { clearPersistedCache } from "../../data/persistedCache";
 import { _resetBffBaseUrlMemoForTests } from "../../utils/bffConfig";
 
 const mockEvents = {
@@ -16,7 +17,7 @@ const mockEvents = {
 };
 
 describe("useEvents", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.EXPO_PUBLIC_BFF_BASE_URL = "http://localhost:4000";
     _resetBffBaseUrlMemoForTests();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
@@ -26,11 +27,13 @@ describe("useEvents", () => {
       headers: { get: () => null },
     }));
     clearCache();
+    await clearPersistedCache();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.unstubAllGlobals();
     delete process.env.EXPO_PUBLIC_BFF_BASE_URL;
+    await clearPersistedCache();
   });
 
   it("loads events", async () => {

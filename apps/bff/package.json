@@ -1,7 +1,7 @@
 {
   "name": "@campus/bff",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "predev": "pnpm --filter @campus/shared build && pnpm --filter @campus/institutions build",

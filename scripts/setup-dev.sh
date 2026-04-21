@@ -11,21 +11,21 @@ echo "======================================"
 echo ""
 echo "📋 Checking prerequisites..."
 
-if ! command -v node &> /dev/null; then
-    echo "❌ Node.js is not installed. Please install Node.js 20+"
-    exit 1
+if ! command -v node &>/dev/null; then
+  echo "❌ Node.js is not installed. Please install Node.js 20+"
+  exit 1
 fi
 
 NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
 if [ "$NODE_VERSION" -lt 20 ]; then
-    echo "❌ Node.js version 20+ is required. Current: $(node -v)"
-    exit 1
+  echo "❌ Node.js version 20+ is required. Current: $(node -v)"
+  exit 1
 fi
 echo "✅ Node.js $(node -v)"
 
-if ! command -v pnpm &> /dev/null; then
-    echo "❌ pnpm is not installed. Installing..."
-    npm install -g pnpm@9
+if ! command -v pnpm &>/dev/null; then
+  echo "❌ pnpm is not installed. Installing..."
+  npm install -g pnpm@9
 fi
 echo "✅ pnpm $(pnpm -v)"
 
@@ -39,17 +39,17 @@ echo ""
 echo "⚙️  Setting up environment files..."
 
 if [ ! -f .env ]; then
-    echo "Creating .env from .env.example..."
-    cp .env.example .env
+  echo "Creating .env from .env.example..."
+  cp .env.example .env
 else
-    echo "✅ .env already exists"
+  echo "✅ .env already exists"
 fi
 
 if [ ! -f apps/mobile/.env ]; then
-    echo "Creating apps/mobile/.env from apps/mobile/.env.example..."
-    cp apps/mobile/.env.example apps/mobile/.env
+  echo "Creating apps/mobile/.env from apps/mobile/.env.example..."
+  cp apps/mobile/.env.example apps/mobile/.env
 else
-    echo "✅ apps/mobile/.env already exists"
+  echo "✅ apps/mobile/.env already exists"
 fi
 
 # Build packages
@@ -67,8 +67,9 @@ echo "✅ Setup complete!"
 echo ""
 echo "📝 Next steps:"
 echo "   1. Edit .env and set INSTITUTION_ID (default: hfmt)"
-echo "   2. Run 'pnpm dev' to start BFF and mobile app"
-echo "   3. Open the mobile app with Expo Go or a dev client"
+echo "   2. Set EXPO_PUBLIC_BFF_BASE_URL for the mobile app if you are using a physical device"
+echo "   3. Run 'pnpm dev' to start BFF and the mobile dev-client workflow"
+echo "   4. For Expo Go, run 'pnpm --filter @campus/mobile start' instead"
 echo ""
 echo "📚 Documentation:"
 echo "   - README.md for quick start"

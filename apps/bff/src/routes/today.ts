@@ -1,8 +1,11 @@
 import type { TodayResponse } from "@campus/shared";
 import { TodayResponseSchema } from "@campus/shared";
 import { fetchPublicEvents } from "../connectors/public/hfmtWebEvents";
+import { getDateKeyInTimeZone } from "../utils/timeZone";
 import { parseQueryParams, getStringParam } from "../utils/queryParams";
 import { createJsonRoute } from "./createJsonRoute";
+
+const DEFAULT_TIME_ZONE = "Europe/Berlin";
 
 /** Validate that a string is a YYYY-MM-DD date */
 function isValidDateParam(value: string): boolean {
@@ -23,6 +26,8 @@ export const handleToday = createJsonRoute(
       : { events: [], degraded: false };
     const { events, degraded } = eventsResult;
 
+    const timeZone = institution.timezone ?? DEFAULT_TIME_ZONE;
+
     // Date scoping: filter to today.
     // Accept an optional `date` query param from the client so the mobile app can
     // send its local date instead of relying on server UTC.
@@ -37,11 +42,17 @@ export const handleToday = createJsonRoute(
     } else if (envDate) {
       let now = new Date(envDate);
       if (isNaN(now.getTime())) now = new Date();
-      todayStr = now.toISOString().split("T")[0];
+      todayStr = getDateKeyInTimeZone(now, timeZone);
     } else {
-      todayStr = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+      todayStr = getDateKeyInTimeZone(new Date(), timeZone);
     }
-    const todayEvents = events.filter(e => e.date.startsWith(todayStr));
+    const todayEvents = events.filter((event) => {
+      try {
+        return getDateKeyInTimeZone(event.date, timeZone) === todayStr;
+      } catch {
+        return false;
+      }
+    });
 
     return {
       events: todayEvents,

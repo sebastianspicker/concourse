@@ -136,7 +136,7 @@ pnpm typecheck
 - **GET /today** – Aggregate home view: events filtered to “today” plus `rooms`. Accepts an optional `date=YYYY-MM-DD` query parameter so the mobile app can send its local date instead of relying on server UTC. Also respects `PUBLIC_EVENTS_DATE` env var for test fixtures.
 - **GET /rooms**, **GET /schedule** – Rooms and schedule from institution config.
 
-Responses may include optional `_sourcesConfigured: false` when no sources are configured; `_degraded: true` / header `x-data-degraded` when data is partial or fallback. Event IDs are derived from URL + title + date; when the source page has no date, the BFF uses a server-time fallback and IDs can change across requests.
+Responses may include `_degraded: true` / header `x-data-degraded` when data is partial or fallback. When a route has no configured sources, the BFF returns `404 not_found` with a descriptive message instead of an empty payload.
 
 ### BFF request flow
 
@@ -162,19 +162,19 @@ flowchart TD
 
 ## Empty or missing data
 
-If `/events`, `/rooms`, or `/schedule` return 200 with empty arrays, check:
+If `/events`, `/rooms`, or `/schedule` return `404 not_found` or unexpectedly empty arrays, check:
 
-- **BFF:** `publicSources.events`, `publicSources.schedules`, and `publicRooms` in the institution pack (e.g. `packages/institutions/src/packs/*.ts` and `apps/bff/src/config/institutions/*.json`). Missing or empty config yields empty data.
+- **BFF:** `publicSources.events`, `publicSources.schedules`, and `publicRooms` in the institution pack (e.g. `packages/institutions/src/packs/*.ts`). Missing or empty config yields `404 not_found` for the affected route.
 - **Environment:** `INSTITUTION_ID` must match a pack that defines those sources.
 - **Upstream:** Public connectors fetch from external URLs; if those fail, the BFF may return partial or empty data. Check BFF logs for fetch/parse errors.
 
 ## NativeWind / Tailwind CSS
 
-The mobile app uses **Tailwind CSS v4** with **NativeWind v5** and **react-native-css** for optional utility-based styling alongside the existing theme and StyleSheet components.
+The mobile app uses **Tailwind CSS v3** with **NativeWind v4** for optional utility-based styling alongside the existing theme and StyleSheet components.
 
 - Import CSS-wrapped components from `@/tw` (View, Text, ScrollView, Pressable, etc.) and use `className`.
 - Screens in `src/ui/` still use the theme and StyleSheet from `@/ui/theme`. You can mix both approaches.
-- Config: `metro.config.js` (withNativewind), `postcss.config.mjs` (@tailwindcss/postcss), `src/global.css` (Tailwind layers + platform fonts).
+- Config: `metro.config.js`, `postcss.config.mjs` (`tailwindcss` plugin), `src/global.css` (Tailwind layers + platform fonts).
 
 ## OTA Code Signing (EAS Update)
 
@@ -187,7 +187,7 @@ If you use EAS Update, enable code signing and keep private keys out of this rep
 
 ## Troubleshooting
 
-- If the mobile app cannot reach the BFF, set `EXPO_PUBLIC_BFF_BASE_URL` to the BFF URL.
+- If the mobile app cannot reach the BFF, set `EXPO_PUBLIC_BFF_BASE_URL` to the BFF URL. The mobile app now requires this in both development and production.
 - If `pnpm` fails due to lockfile drift, re-run `pnpm install --frozen-lockfile` from the repo root.
 - If TypeScript builds fail, ensure each package is built in dependency order by running `pnpm build` from the repo root.
 - To skip install or the TODO/FIXME marker scan during verify: `SKIP_INSTALL=1 pnpm verify` or `SKIP_MARKER_CHECK=1 pnpm verify`.

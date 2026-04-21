@@ -50,6 +50,7 @@ HARNESS_PRINCIPLES.md
 code_review.md
 docs/agent/
 docs/source-audit/
+docs/function-audit.md
 scripts/topology_inventory.sh
 plans/
 progress.md

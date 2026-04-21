@@ -82,4 +82,23 @@ describe("fetchPublicEvents", () => {
     expect(events[0].title).toBe("Official Events");
     expect(degraded).toBe(true);
   });
+
+  it("does not cache degraded results", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("timeout")).mockResolvedValueOnce({
+      ok: true,
+      headers: { get: () => null },
+      body: null,
+      text: async () => readFileSync(
+        new URL("../../../__fixtures__/hfmt-events.html", import.meta.url),
+        "utf8"
+      )
+    }));
+
+    const degraded = await fetchPublicEvents(institution);
+    const recovered = await fetchPublicEvents(institution);
+
+    expect(degraded.degraded).toBe(true);
+    expect(recovered.degraded).toBe(false);
+    expect(recovered.events.length).toBe(2);
+  });
 });

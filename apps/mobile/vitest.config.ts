@@ -8,8 +8,8 @@ export default defineConfig({
   },
   css: {
     // Override PostCSS config to use an empty plugin list for tests.
-    // The build-time postcss.config.mjs requires @tailwindcss/postcss (v4)
-    // which is not installed (project uses tailwindcss v3). React Native
+    // The build-time postcss.config.mjs uses the tailwindcss plugin.
+    // React Native
     // tests don't need PostCSS transforms.
     postcss: { plugins: [] },
   },

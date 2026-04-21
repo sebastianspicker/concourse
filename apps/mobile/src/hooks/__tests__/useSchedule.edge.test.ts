@@ -2,18 +2,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "./testUtils";
 import { useSchedule } from "../useSchedule";
 import { clearCache } from "../../data/cache";
+import { clearPersistedCache } from "../../data/persistedCache";
 import { _resetBffBaseUrlMemoForTests } from "../../utils/bffConfig";
 
 describe("useSchedule — edge cases", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.EXPO_PUBLIC_BFF_BASE_URL = "http://localhost:4000";
     _resetBffBaseUrlMemoForTests();
     clearCache();
+    await clearPersistedCache();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.unstubAllGlobals();
     delete process.env.EXPO_PUBLIC_BFF_BASE_URL;
+    await clearPersistedCache();
   });
 
   it("returns error state on network failure", async () => {

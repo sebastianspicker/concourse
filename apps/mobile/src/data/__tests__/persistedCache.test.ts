@@ -9,7 +9,7 @@ import {
   getPersistedCache,
   setPersistedCache,
   clearPersistedCache,
-  fetchWithOfflineSupport,
+  fetchNetworkFirstWithFallback,
   getCacheStats,
   isCacheStale,
 } from "../persistedCache";
@@ -55,13 +55,13 @@ describe("persistedCache", () => {
   });
 });
 
-describe("fetchWithOfflineSupport", () => {
+describe("fetchNetworkFirstWithFallback", () => {
   afterEach(async () => {
     await clearPersistedCache();
   });
 
   it("returns fresh data on success", async () => {
-    const result = await fetchWithOfflineSupport("online-key", async () => ({
+    const result = await fetchNetworkFirstWithFallback("online-key", async () => ({
       value: "fresh",
     }));
     expect(result.data).toEqual({ value: "fresh" });
@@ -70,7 +70,7 @@ describe("fetchWithOfflineSupport", () => {
   });
 
   it("caches data after successful fetch", async () => {
-    await fetchWithOfflineSupport("cached-key", async () => "stored");
+    await fetchNetworkFirstWithFallback("cached-key", async () => "stored");
     const cached = await getPersistedCache<string>("cached-key");
     expect(cached).toBe("stored");
   });
@@ -80,7 +80,7 @@ describe("fetchWithOfflineSupport", () => {
     await setPersistedCache("fallback-key", { items: ["cached"] });
 
     // Second: loader fails
-    const result = await fetchWithOfflineSupport<{ items: string[] }>(
+    const result = await fetchNetworkFirstWithFallback<{ items: string[] }>(
       "fallback-key",
       async () => {
         throw new Error("network error");
@@ -94,7 +94,7 @@ describe("fetchWithOfflineSupport", () => {
 
   it("throws when no cache and network fails", async () => {
     await expect(
-      fetchWithOfflineSupport("empty-key", async () => {
+      fetchNetworkFirstWithFallback("empty-key", async () => {
         throw new Error("offline");
       })
     ).rejects.toThrow("offline");

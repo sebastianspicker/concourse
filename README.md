@@ -19,7 +19,9 @@ pnpm install --frozen-lockfile
 INSTITUTION_ID=hfmt pnpm dev
 ```
 
-Then open the mobile app with Expo Go or a dev client.
+Then open the mobile app with a dev client.
+
+For Expo Go, run `pnpm --filter @campus/mobile start` instead of `pnpm dev`.
 
 **Prerequisites:** Node.js 20, pnpm 9. See [Runbook](docs/runbook.md) for detailed setup.
 

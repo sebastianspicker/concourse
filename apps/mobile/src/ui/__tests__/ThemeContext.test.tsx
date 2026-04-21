@@ -8,6 +8,7 @@ import {
   useThemeColors,
   useThemeUi,
   useIsDarkMode,
+  type ThemePreference,
 } from "../ThemeContext";
 
 const mockUseColorScheme = vi.fn().mockReturnValue("light");
@@ -240,5 +241,58 @@ describe("ThemeContext", () => {
     }).toThrow("useTheme must be used within a ThemeProvider");
 
     console.error = originalError;
+  });
+
+  it("setPreference returns a Promise", async () => {
+    let capturedSetPreference: ((p: ThemePreference) => Promise<void>) | undefined;
+
+    function CaptureComponent(): JSX.Element {
+      const { setPreference: sp } = useThemePreference();
+      capturedSetPreference = sp;
+      return <div />;
+    }
+
+    await act(async () => {
+      TestRenderer.create(
+        <ThemeProvider>
+          <CaptureComponent />
+        </ThemeProvider>
+      );
+    });
+
+    await flushAsync();
+
+    expect(capturedSetPreference).toBeDefined();
+    const result = capturedSetPreference!("light");
+    expect(result).toBeInstanceOf(Promise);
+    await result;
+    expect(mockSetItem).toHaveBeenCalledWith("@campus-app/theme-preference", "light");
+  });
+
+  it("setPreference calls AsyncStorage.setItem with the chosen preference", async () => {
+    let capturedSetPreference: ((p: ThemePreference) => Promise<void>) | undefined;
+
+    function CaptureComponent(): JSX.Element {
+      const { setPreference: sp } = useThemePreference();
+      capturedSetPreference = sp;
+      return <div />;
+    }
+
+    TestRenderer.create(
+      <ThemeProvider>
+        <CaptureComponent />
+      </ThemeProvider>
+    );
+
+    await flushAsync();
+
+    await act(async () => {
+      await capturedSetPreference!("accessibility");
+    });
+
+    expect(mockSetItem).toHaveBeenCalledWith(
+      "@campus-app/theme-preference",
+      "accessibility"
+    );
   });
 });

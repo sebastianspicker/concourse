@@ -61,4 +61,13 @@ describe("GET /schedule", () => {
     expect(getStatus()).toBe(200);
     expect(JSON.parse(getBody() ?? "{}")).toEqual(scheduleFixture);
   });
+
+  it("includes _total equal to schedule array length", async () => {
+    const { response, getBody } = createMockResponse();
+
+    await handleSchedule({} as IncomingMessage, response, institution);
+
+    const body = JSON.parse(getBody() ?? "{}");
+    expect(body._total).toBe(body.schedule.length);
+  });
 });

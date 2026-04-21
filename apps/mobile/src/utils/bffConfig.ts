@@ -9,21 +9,14 @@ export function resolveBffBaseUrl(): string {
   if (memoizedBffBaseUrl) return memoizedBffBaseUrl;
 
   const result = ((): string => {
-    // Try various ways to get the BFF URL
     const fromConfig = process.env.EXPO_PUBLIC_BFF_BASE_URL;
 
-    // Always prefer the env var when set, even in dev mode
     if (fromConfig) {
       return normalizeBaseUrl(fromConfig);
     }
 
-    // For development, fall back to localhost:4000 when env var is not set
-    if (typeof __DEV__ !== "undefined" && __DEV__) {
-      return "http://localhost:4000";
-    }
-
     throw new Error(
-      "Missing BFF base URL. Set EXPO_PUBLIC_BFF_BASE_URL for the mobile app build."
+      "Missing BFF base URL. Set EXPO_PUBLIC_BFF_BASE_URL for the mobile app in development and production."
     );
   })();
 

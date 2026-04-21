@@ -18,10 +18,12 @@ export const handleRooms = createJsonRoute(
       filteredRooms = filteredRooms.filter((r) => r.campusId === filter.campus);
     }
     filteredRooms = applySearch(filteredRooms, filter.search, (r) => r.name);
+    const _total = filteredRooms.length;
     filteredRooms = applyPagination(filteredRooms, filter.offset ?? 0, filter.limit);
 
     return {
       rooms: filteredRooms,
+      _total,
       _sourcesConfigured: true
     };
   },

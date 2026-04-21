@@ -52,6 +52,7 @@ export const hfmtPublicPack = {
       name: "Auditorium",
       campusId: "cologne"
     }
-  ]
+  ],
+  timezone: "Europe/Berlin"
 } as const;
 

@@ -32,9 +32,9 @@ INSTITUTION_ID=hfmt pnpm --filter @campus/bff dev
 pnpm --filter @campus/mobile start
 ```
 
-If you want the mobile app to call a running BFF, set:
-
-- `EXPO_PUBLIC_BFF_BASE_URL` (see `apps/mobile/src/utils/bffConfig.ts`)
+If you want the mobile app to call a running BFF, set `EXPO_PUBLIC_BFF_BASE_URL` in
+`apps/mobile/.env` (copy from `apps/mobile/.env.example`). This is required in both
+development and production — there is no automatic fallback.
 
 ## What we accept
 

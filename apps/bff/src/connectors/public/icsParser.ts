@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { RRule, RRuleSet, rrulestr } from "rrule";
+import { parseDateTimeInTimeZone } from "../../utils/timeZone";
 
 export type ParsedIcsEvent = {
   id: string;
@@ -8,6 +9,7 @@ export type ParsedIcsEvent = {
   endsAt?: string;
   location?: string;
   campusId?: string;
+  description?: string;
   isRecurring?: boolean;
   recurringInstanceId?: string;
 };
@@ -54,31 +56,62 @@ function unfoldLines(input: string): string[] {
   return unfolded;
 }
 
-function parseIcsDate(value: string, _tzid?: string): string {
-  let date: Date;
+function parseIcsDate(value: string, tzid?: string): string {
   // DATE (all-day)
   if (/^\d{8}$/.test(value)) {
     const year = value.slice(0, 4);
     const month = value.slice(4, 6);
     const day = value.slice(6, 8);
     // For all-day events, use UTC
-    date = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
-  } else {
-    const normalized = value.replace(/Z$/, "").replace(/[+-]\d{2}:\d{2}$/, "");
-    const year = normalized.slice(0, 4);
-    const month = normalized.slice(4, 6);
-    const day = normalized.slice(6, 8);
-    const hour = normalized.slice(9, 11);
-    const minute = normalized.slice(11, 13);
-    const second = normalized.slice(13, 15) || "00";
-    const iso = `${year}-${month}-${day}T${hour}:${minute}:${second}.000`;
-
-    // Always interpret as UTC. When TZID is present the offset was already stripped
-    // in the normalization above, leaving a floating datetime. Appending Z ensures
-    // consistent UTC interpretation regardless of the server's local timezone.
-    date = new Date(`${iso}Z`);
+    const date = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime()) || date.getTime() === 0) {
+      throw new Error(`Invalid ICS date: ${value}`);
+    }
+    return date.toISOString();
   }
 
+  const match = value.match(
+    /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z|[+-]\d{4}|[+-]\d{2}:\d{2})?$/
+  );
+  if (!match) {
+    throw new Error(`Invalid ICS date: ${value}`);
+  }
+
+  const [, year, month, day, hour, minute, second = "00", suffix] = match;
+  if (suffix === "Z") {
+    const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}.000Z`);
+    if (Number.isNaN(date.getTime()) || date.getTime() === 0) {
+      throw new Error(`Invalid ICS date: ${value}`);
+    }
+    return date.toISOString();
+  }
+
+  if (suffix && suffix !== "Z") {
+    const normalizedOffset = suffix.includes(":")
+      ? suffix
+      : `${suffix.slice(0, 3)}:${suffix.slice(3)}`;
+    const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}${normalizedOffset}`);
+    if (Number.isNaN(date.getTime()) || date.getTime() === 0) {
+      throw new Error(`Invalid ICS date: ${value}`);
+    }
+    return date.toISOString();
+  }
+
+  if (tzid) {
+    return parseDateTimeInTimeZone(
+      {
+        year: Number(year),
+        month: Number(month),
+        day: Number(day),
+        hour: Number(hour),
+        minute: Number(minute),
+        second: Number(second)
+      },
+      tzid
+    );
+  }
+
+  const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}.000Z`);
   if (Number.isNaN(date.getTime()) || date.getTime() === 0) {
     throw new Error(`Invalid ICS date: ${value}`);
   }
@@ -152,7 +185,7 @@ function expandRecurringEvent(
     }
 
     // Create an event for each occurrence
-    return limitedOccurrences.map((occurrence, index) => {
+    return limitedOccurrences.map((occurrence) => {
       const instanceStartsAt = occurrence.toISOString();
       const duration = baseEvent.endsAt 
         ? new Date(baseEvent.endsAt).getTime() - new Date(baseEvent.startsAt).getTime()
@@ -166,7 +199,7 @@ function expandRecurringEvent(
           ? new Date(occurrence.getTime() + duration).toISOString()
           : baseEvent.endsAt,
         isRecurring: true,
-        recurringInstanceId: `${baseEvent.id}-${index}`
+        recurringInstanceId: generateRecurringInstanceId(baseEvent.id, instanceStartsAt)
       };
     });
   } catch {
@@ -220,7 +253,8 @@ export function parseIcs(ics: string, options?: ParseIcsOptions): ParsedIcsEvent
             campusId:
               current["X-CAMPUS-ID"]?.value?.trim() ||
               current["X-CAMPUS"]?.value?.trim() ||
-              undefined
+              undefined,
+            description: current.DESCRIPTION?.value ? unescapeIcsValue(current.DESCRIPTION.value.trim()) : undefined
           };
 
           // Handle RRULE (recurring events)

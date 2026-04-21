@@ -41,5 +41,15 @@ describe("GET /rooms", () => {
     expect(getStatus()).toBe(200);
     expect(JSON.parse(getBody() ?? "{}")).toEqual(roomsFixture);
   });
+
+  it("includes _total equal to rooms array length", async () => {
+    const { response, getBody, getStatus } = createMockResponse();
+
+    await handleRooms({} as IncomingMessage, response, institution);
+
+    expect(getStatus()).toBe(200);
+    const body = JSON.parse(getBody() ?? "{}");
+    expect(body._total).toBe(body.rooms.length);
+  });
 });
 

@@ -8,6 +8,7 @@ flowchart LR
     E[/events]
     T[/today]
     S[/schedule]
+    R[/rooms]
   end
   subgraph Public["Public connectors"]
     Events[fetchPublicEvents]
@@ -16,9 +17,13 @@ flowchart LR
   subgraph Stubs["Private stubs"]
     Bookings[fetchBookings]
   end
+  subgraph Pack["Institution pack"]
+    Rooms[publicRooms config]
+  end
   E --> Events
   T --> Events
   S --> Schedule
+  R --> Rooms
   Events --> Web[Websites / HTML]
   Schedule --> ICS[ICS feeds]
   Bookings -.->|empty []| -

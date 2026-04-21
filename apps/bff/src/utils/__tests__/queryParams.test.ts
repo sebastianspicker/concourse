@@ -30,6 +30,14 @@ describe("parseQueryParams", () => {
     const params = parseQueryParams(mockReq("/events"));
     expect(params.get("search")).toBeNull();
   });
+
+  it("ignores a malformed host header while parsing the URL", () => {
+    const params = parseQueryParams({
+      url: "/events?search=concert",
+      headers: { host: "bad host%%%" }
+    } as unknown as IncomingMessage);
+    expect(params.get("search")).toBe("concert");
+  });
 });
 
 describe("getStringParam", () => {

@@ -23,6 +23,7 @@ export function useRooms(options?: RoomsFilterOptions): {
       fetchRooms({
         force: fetchOptions.force,
         signal: fetchOptions.signal,
+        offlineMode: true,
         campus: options?.campus,
         search: options?.search,
         limit: options?.limit,

@@ -55,11 +55,11 @@ describe("resolveBffBaseUrl", () => {
     expect(() => resolveBffBaseUrl()).toThrow("Invalid BFF base URL protocol");
   });
 
-  it("defaults to localhost in development", () => {
+  it("throws in development without a base URL", () => {
     setEnv(undefined, "expoPublic");
     (globalThis as { __DEV__?: unknown }).__DEV__ = true;
 
-    expect(resolveBffBaseUrl()).toBe("http://localhost:4000");
+    expect(() => resolveBffBaseUrl()).toThrow("Missing BFF base URL");
   });
 
   it("throws in production without a base URL", () => {

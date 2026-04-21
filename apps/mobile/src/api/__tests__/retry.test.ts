@@ -204,4 +204,22 @@ describe("withRetry — exponential backoff", () => {
     await expect(withRetry(fn, { retries: 2, baseDelayMs: 100 })).rejects.toThrow("final failure");
     expect(fn).toHaveBeenCalledTimes(3); // 1 initial + 2 retries
   });
+
+  it("aborts while waiting to retry", async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const fn = vi.fn().mockRejectedValue(new TypeError("network"));
+
+    const result = withRetry(fn, {
+      retries: 2,
+      baseDelayMs: 1000,
+      signal: controller.signal
+    });
+
+    controller.abort();
+    vi.runAllTimers();
+
+    await expect(result).rejects.toMatchObject({ name: "AbortError" });
+    vi.useRealTimers();
+  });
 });

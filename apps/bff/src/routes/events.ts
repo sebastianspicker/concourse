@@ -19,10 +19,12 @@ export const handleEvents = createJsonRoute(
 
     let filteredEvents = applySearch(events, filter.search, (e) => e.title);
     filteredEvents = applyDateRange(filteredEvents, filter.fromDate, filter.toDate, (e) => e.date);
+    const _total = filteredEvents.length;
     filteredEvents = applyPagination(filteredEvents, filter.offset ?? 0, filter.limit);
 
     return {
       events: filteredEvents,
+      _total,
       _degraded: degraded,
       _sourcesConfigured: true
     };

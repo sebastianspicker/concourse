@@ -4,40 +4,43 @@ import { useSchedule } from "@/hooks/useSchedule";
 import { MetaRow } from "@/ui/MetaRow";
 import { ResourceDetailScreen } from "@/ui/ResourceDetailScreen";
 import { formatEventDate, formatScheduleTime } from "@/utils/dateFormat";
+import { parseRouteItem } from "@/utils/routeItem";
+import type { ScheduleItem } from "@campus/shared";
 
 export default function ScheduleDetailScreen(): JSX.Element {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, item } = useLocalSearchParams<{ id: string; item?: string }>();
   const { data, loading, error, refreshing, refresh } = useSchedule();
-  const item = data?.schedule.find((entry) => entry.id === id);
+  const routedItem = parseRouteItem<ScheduleItem>(item);
+  const scheduleItem = data?.schedule.find((entry) => entry.id === id) ?? (routedItem?.id === id ? routedItem : null);
 
   return (
     <ResourceDetailScreen
       title="Schedule Entry"
       loading={loading}
       error={error}
-      item={item ?? null}
+      item={scheduleItem ?? null}
       notFoundMessage="Schedule entry not found."
-      cardTitle={item ? item.title : "Schedule item"}
+      cardTitle={scheduleItem ? scheduleItem.title : "Schedule item"}
       cardSubtitle={
-        item
-          ? formatScheduleTime(item.startsAt)
+        scheduleItem
+          ? formatScheduleTime(scheduleItem.startsAt)
           : `Schedule ID: ${id}`
       }
       renderMeta={
-        item
+        scheduleItem
           ? () => (
               <>
                 <MetaRow
                   label="Starts"
-                  value={formatEventDate(item.startsAt)}
+                  value={formatEventDate(scheduleItem.startsAt)}
                 />
                 <MetaRow
                   label="Ends"
-                  value={item.endsAt ? formatEventDate(item.endsAt) : "TBA"}
+                  value={scheduleItem.endsAt ? formatEventDate(scheduleItem.endsAt) : "TBA"}
                 />
-                <MetaRow label="Location" value={item.location ?? "TBA"} />
-                {item.campusId ? (
-                  <MetaRow label="Campus" value={item.campusId} />
+                <MetaRow label="Location" value={scheduleItem.location ?? "TBA"} />
+                {scheduleItem.campusId ? (
+                  <MetaRow label="Campus" value={scheduleItem.campusId} />
                 ) : null}
               </>
             )

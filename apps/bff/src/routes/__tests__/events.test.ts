@@ -48,4 +48,14 @@ describe("GET /events", () => {
     expect(getStatus()).toBe(200);
     expect(JSON.parse(getBody() ?? "{}")).toEqual(eventsFixture);
   });
+
+  it("includes _total equal to events array length", async () => {
+    const { response, getBody, getStatus } = createMockResponse();
+
+    await handleEvents({} as IncomingMessage, response, institution);
+
+    expect(getStatus()).toBe(200);
+    const body = JSON.parse(getBody() ?? "{}");
+    expect(body._total).toBe(body.events.length);
+  });
 });

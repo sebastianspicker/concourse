@@ -93,4 +93,22 @@ describe("cache — TTL and eviction", () => {
     // Safe to call multiple times
     destroyCache();
   });
+
+  it("can skip caching selected results", async () => {
+    type CacheableValue = { value: string; cacheable: boolean };
+    const loader = vi.fn<() => Promise<CacheableValue>>()
+      .mockResolvedValueOnce({ value: "first", cacheable: false })
+      .mockResolvedValueOnce({ value: "second", cacheable: false });
+
+    const first = await getCached("skip-cache", loader, 5000, {
+      shouldCache: (result) => result.cacheable
+    });
+    const second = await getCached("skip-cache", loader, 5000, {
+      shouldCache: (result) => result.cacheable
+    });
+
+    expect(first.value).toBe("first");
+    expect(second.value).toBe("second");
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
 });

@@ -1,30 +1,48 @@
 import type { InstitutionPack } from "../../config/loader";
 import { getCached } from "../../utils/cache";
-import { createCircuitBreaker } from "../../utils/circuitBreaker";
+import { createCircuitBreaker, type CircuitBreaker } from "../../utils/circuitBreaker";
 import { fetchTextWithTimeout } from "../../utils/fetch";
 import { log } from "../../utils/logger";
 import type { ScheduleItem } from "@campus/shared";
-import { existsSync, readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { parseIcs, type ParsedIcsEvent } from "./icsParser";
 
 import { BFF_ENV } from "../../config/env";
 
-const scheduleBreaker = createCircuitBreaker({
-  name: "public-schedule",
-  failureThreshold: 5,
-  cooldownMs: 30_000,
-});
+const scheduleBreakers = new Map<string, CircuitBreaker>();
 
-function resolveFixturePath(filename: string): string {
+function getScheduleBreaker(sourceUrl: string): CircuitBreaker {
+  const existing = scheduleBreakers.get(sourceUrl);
+  if (existing) {
+    return existing;
+  }
+
+  const breaker = createCircuitBreaker({
+    name: `public-schedule:${sourceUrl}`,
+    failureThreshold: 5,
+    cooldownMs: 30_000,
+  });
+  scheduleBreakers.set(sourceUrl, breaker);
+  return breaker;
+}
+
+async function resolveFixturePath(filename: string): Promise<string> {
   const candidates = [
     resolve(process.cwd(), "src/__fixtures__", filename),
     resolve(process.cwd(), "apps/bff/src/__fixtures__", filename),
   ];
 
-  const match = candidates.find((candidate) => existsSync(candidate));
-  return match ?? candidates[0];
+  for (const candidate of candidates) {
+    try {
+      await readFile(candidate);
+      return candidate;
+    } catch {
+      // try next candidate
+    }
+  }
+  return candidates[0];
 }
 
 function toScheduleItem(p: ParsedIcsEvent): ScheduleItem {
@@ -35,6 +53,7 @@ function toScheduleItem(p: ParsedIcsEvent): ScheduleItem {
     endsAt: p.endsAt,
     location: p.location,
     campusId: p.campusId,
+    description: p.description,
   };
 }
 
@@ -52,8 +71,8 @@ export async function fetchPublicSchedule(
       // Mock mode: load from fixture file for mockuni
       if (mode === "mock" && institution.id === "mockuni") {
         try {
-          const fixturePath = resolveFixturePath("mockuni-schedule.ics");
-          const icsContent = readFileSync(fixturePath, "utf-8");
+          const fixturePath = await resolveFixturePath("mockuni-schedule.ics");
+          const icsContent = await readFile(fixturePath, "utf-8");
           const parsed = parseIcs(icsContent, { rruleHorizonDays: BFF_ENV.rruleExpansionHorizonDays });
           return parsed.map(toScheduleItem);
         } catch (err: unknown) {
@@ -68,7 +87,7 @@ export async function fetchPublicSchedule(
 
       const settlement = await Promise.allSettled(
         sources.map(async (source: { url: string }) => {
-          const text = await scheduleBreaker.call(() => fetchTextWithTimeout(source.url));
+          const text = await getScheduleBreaker(source.url).call(() => fetchTextWithTimeout(source.url));
           return parseIcs(text, { rruleHorizonDays: BFF_ENV.rruleExpansionHorizonDays });
         })
       );

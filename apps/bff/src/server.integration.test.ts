@@ -10,6 +10,7 @@ describe("BFF server integration", () => {
 
   afterEach(() => {
     clearRateLimitBuckets();
+    delete process.env.BFF_REQUIRE_AUTH;
     vi.unstubAllGlobals();
   });
 
@@ -306,6 +307,28 @@ describe("BFF server integration", () => {
       expect(res.body).toHaveProperty("checks");
       expect(res.body.checks).toHaveProperty("institutionPack");
       expect(res.body.checks).toHaveProperty("memory");
+    });
+  });
+
+  describe("auth guard", () => {
+    it("returns 401 when auth is required and no bearer token is provided", async () => {
+      process.env.BFF_REQUIRE_AUTH = "1";
+      const app = createRequestListener();
+
+      const res = await request(app).get("/health").expect(401);
+      expect(res.body.error.code).toBe("unauthorized");
+    });
+
+    it("allows requests when auth is required and a bearer token is present", async () => {
+      process.env.BFF_REQUIRE_AUTH = "1";
+      const app = createRequestListener();
+
+      const res = await request(app)
+        .get("/health")
+        .set("Authorization", "Bearer test-token")
+        .expect(200);
+
+      expect(res.body.status).toBe("ok");
     });
   });
 

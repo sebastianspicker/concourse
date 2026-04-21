@@ -4,6 +4,7 @@ import {
   formatScheduleTime,
   formatDateOnly,
   formatTimeRange,
+  formatCampusId,
   isToday,
 } from "../dateFormat";
 
@@ -47,6 +48,32 @@ describe("formatTimeRange", () => {
   it("returns only start time when no end provided", () => {
     const result = formatTimeRange("2026-03-22T14:30:00.000Z", undefined, "en-GB");
     expect(result).not.toContain(" - ");
+  });
+});
+
+describe("formatCampusId", () => {
+  it('formats "cologne" → "Cologne"', () => {
+    expect(formatCampusId("cologne")).toBe("Cologne");
+  });
+
+  it('formats "suedcampus" → "Suedcampus"', () => {
+    expect(formatCampusId("suedcampus")).toBe("Suedcampus");
+  });
+
+  it('formats "cologne-zzt" → "Cologne Zzt"', () => {
+    expect(formatCampusId("cologne-zzt")).toBe("Cologne Zzt");
+  });
+
+  it('formats "hauptcampus" → "Hauptcampus"', () => {
+    expect(formatCampusId("hauptcampus")).toBe("Hauptcampus");
+  });
+
+  it('formats "pc-pool-1" → "Pc Pool 1"', () => {
+    expect(formatCampusId("pc-pool-1")).toBe("Pc Pool 1");
+  });
+
+  it('returns "" for empty string', () => {
+    expect(formatCampusId("")).toBe("");
   });
 });
 

@@ -93,5 +93,6 @@ export const mockuniPublicPack = {
       name: "Mensa",
       campusId: "suedcampus"
     }
-  ]
+  ],
+  timezone: "Europe/Berlin"
 } as const;

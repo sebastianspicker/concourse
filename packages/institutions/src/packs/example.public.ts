@@ -31,6 +31,7 @@ export const examplePublicPack = {
       name: "Auditorium",
       campusId: "main"
     }
-  ]
+  ],
+  timezone: "America/New_York"
 } as const;
 

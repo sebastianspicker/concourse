@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "./testUtils";
 import { useToday } from "../useToday";
 import { clearCache } from "../../data/cache";
+import { clearPersistedCache } from "../../data/persistedCache";
 import { _resetBffBaseUrlMemoForTests } from "../../utils/bffConfig";
 
 const mockToday = {
@@ -17,7 +18,7 @@ const mockToday = {
 };
 
 describe("useToday", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.EXPO_PUBLIC_BFF_BASE_URL = "http://localhost:4000";
     _resetBffBaseUrlMemoForTests();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
@@ -27,11 +28,13 @@ describe("useToday", () => {
       headers: { get: () => null },
     }));
     clearCache();
+    await clearPersistedCache();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.unstubAllGlobals();
     delete process.env.EXPO_PUBLIC_BFF_BASE_URL;
+    await clearPersistedCache();
   });
 
   it("loads today", async () => {
@@ -42,6 +45,7 @@ describe("useToday", () => {
 
     expect(getResult().loading).toBe(false);
     expect(getResult().data?.events.length).toBe(1);
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toContain("/today?date=");
     unmount();
   });
 });

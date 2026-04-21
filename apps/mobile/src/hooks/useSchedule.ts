@@ -23,6 +23,7 @@ export function useSchedule(options?: ScheduleFilterOptions): {
       fetchSchedule({
         force: fetchOptions.force,
         signal: fetchOptions.signal,
+        offlineMode: true,
         search: options?.search,
         from: options?.from,
         to: options?.to,

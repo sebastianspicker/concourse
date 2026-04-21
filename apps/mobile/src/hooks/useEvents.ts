@@ -25,6 +25,7 @@ export function useEvents(filter?: {
       fetchEvents({
         force: options.force,
         signal: options.signal,
+        offlineMode: true,
         search: filter?.search,
         from: filter?.from,
         to: filter?.to,

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] - 2026-04-19
+
+### Added
+
+- Unit tests for `authGuard` middleware (all auth paths: pass-through, valid Bearer, missing header, malformed scheme)
+
 ### Fixed
 
 - Timezone handling: ICS parser and HTML event scraper now treat times as local instead of UTC when TZID is present or dates are in German format
@@ -22,11 +30,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - IPv6 zone IDs stripped for consistent client key comparison
 - `getRelativeTimeUnit` avoids returning 0 values by falling back to the next smaller unit
 - `persistedCache` JSDoc corrected: function uses network-first strategy, not offline-first
+- Today screen day-range filter now recomputes when calendar day changes (was stale past midnight)
+- Replace blocking `readFileSync`/`existsSync` with async `fs/promises.readFile` in schedule mock loader
 
 ### Changed
 
 - `createJsonRoute` now sets `x-request-id` response header
 - Removed internal audit artifacts (`.claude/`, `plans/`, `progress.md`) from version control
+- Removed spurious `await` on sync `loadInstitutionPack` calls in BFF server startup
+- Removed unused `FilterPanel` component from mobile app
+- Removed scaffold placeholder `hello+api.ts` Expo API route
+- Rooms list now displays formatted campus names instead of raw IDs (e.g. `"Suedcampus"` instead of `"suedcampus"`)
+- Zod schemas for `PublicEvent.date`, `ScheduleItem.startsAt`, and `ScheduleItem.endsAt` now enforce ISO 8601 datetime format
 
 ---
 

@@ -20,17 +20,7 @@ export type CachedEntry<T> = {
 export const OFFLINE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 async function getStorage(): Promise<StorageLike> {
-  // Try to use AsyncStorage directly (native)
-  if (
-    AsyncStorage &&
-    typeof AsyncStorage === "object" &&
-    typeof AsyncStorage.getItem === "function"
-  ) {
-    return AsyncStorage as StorageLike;
-  }
-
-  // Fall back to in-memory storage (useful for tests and web)
-  return {
+  const fallbackStorage: StorageLike = {
     getItem: async (key) => memory.get(key) ?? null,
     setItem: async (key, value) => {
       memory.set(key, value);
@@ -43,6 +33,23 @@ async function getStorage(): Promise<StorageLike> {
       for (const key of keys) memory.delete(key);
     }
   };
+
+  // Try to use AsyncStorage directly (native), but fall back if the JS object
+  // exists without a working native backing implementation.
+  if (
+    AsyncStorage &&
+    typeof AsyncStorage === "object" &&
+    typeof AsyncStorage.getItem === "function"
+  ) {
+    try {
+      await AsyncStorage.getItem(`${KEY_PREFIX}__probe__`);
+      return AsyncStorage as StorageLike;
+    } catch {
+      return fallbackStorage;
+    }
+  }
+
+  return fallbackStorage;
 }
 
 export async function getPersistedCache<T>(key: string): Promise<T | null> {
@@ -131,10 +138,10 @@ export type OfflineFetchResult<T> = {
  * If the network call fails and cached data exists, the cached data is
  * returned (marked as offline). If no cache exists, the error is re-thrown.
  *
- * This is NOT offline-first (which would return cache immediately and
- * refresh in the background). Renaming is deferred to avoid breaking callers.
+ * This is a network-first strategy with cache fallback, not offline-first
+ * (which would return cache immediately and refresh in the background).
  */
-export async function fetchWithOfflineSupport<T>(
+export async function fetchNetworkFirstWithFallback<T>(
   key: string,
   loader: () => Promise<T>
 ): Promise<OfflineFetchResult<T>> {

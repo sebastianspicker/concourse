@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { InstitutionPack } from "./config/loader";
 import http from "node:http";
 import { loadInstitutionPack } from "./config/loader";
+import { guardAuth } from "./middleware/authGuard";
 import { guardMethods } from "./middleware/methodGuard";
 import { handleEvents } from "./routes/events";
 import { handleHealth } from "./routes/health";
@@ -38,7 +39,7 @@ export function createRequestListener(): (req: IncomingMessage, res: ServerRespo
 
       let url: URL;
       try {
-        url = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
+        url = new URL(req.url, "http://localhost");
       } catch {
         setRequestIdHeader(res, requestId);
         sendError(res, 400, "bad_request", "Invalid request URL");
@@ -56,6 +57,15 @@ export function createRequestListener(): (req: IncomingMessage, res: ServerRespo
         res.setHeader("Allow", "GET, OPTIONS");
         res.writeHead(204);
         res.end();
+        return;
+      }
+
+      if (!guardAuth(req, res, requestId)) {
+        log("info", "auth_required", {
+          requestId,
+          method: req.method,
+          path: url.pathname
+        });
         return;
       }
 
@@ -86,7 +96,7 @@ export function createRequestListener(): (req: IncomingMessage, res: ServerRespo
       if (dataHandler) {
         let institution: InstitutionPack;
         try {
-          institution = await loadInstitutionPack(BFF_ENV.institutionId);
+          institution = loadInstitutionPack(BFF_ENV.institutionId);
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           log("error", "institution_load_failed", {
@@ -133,8 +143,7 @@ async function startServer(): Promise<void> {
   });
 
   try {
-    // #55: Startup validation dry-run
-    await loadInstitutionPack(BFF_ENV.institutionId);
+    loadInstitutionPack(BFF_ENV.institutionId);
     log("info", "startup_validation_ok");
   } catch (err: unknown) {
     log("error", "startup_validation_failed", {

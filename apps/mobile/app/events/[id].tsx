@@ -7,11 +7,16 @@ import { ResourceDetailScreen } from "@/ui/ResourceDetailScreen";
 import { spacing, typography } from "@/ui/theme";
 import { useTheme } from "@/ui/ThemeContext";
 import { formatEventDate } from "@/utils/dateFormat";
+import { parseRouteItem } from "@/utils/routeItem";
+import type { PublicEvent } from "@campus/shared";
 
 export default function EventDetailScreen(): JSX.Element {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, item } = useLocalSearchParams<{ id: string; item?: string }>();
+  const routedEvent = parseRouteItem<PublicEvent>(item);
+  const hasRoutedItem = routedEvent?.id === id;
   const { data, loading, error, refreshing, refresh } = useEvents();
-  const event = data?.events.find((entry) => entry.id === id);
+  const event = hasRoutedItem ? routedEvent : (data?.events.find((entry) => entry.id === id) ?? null);
+  const effectiveLoading = hasRoutedItem ? false : loading;
   const theme = useTheme();
 
   const handleShare = useCallback(async () => {
@@ -25,7 +30,7 @@ export default function EventDetailScreen(): JSX.Element {
   return (
     <ResourceDetailScreen
       title="Event Details"
-      loading={loading}
+      loading={effectiveLoading}
       error={error}
       item={event ?? null}
       notFoundMessage="Event not found."
