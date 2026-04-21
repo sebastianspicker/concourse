@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "Campus App Kit",
+    "slug": "campus-app-kit",
+    "scheme": "campusapp",
+    "version": "0.1.0",
+    "plugins": ["expo-router"]
+  }
+}

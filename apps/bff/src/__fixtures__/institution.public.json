@@ -1,0 +1,40 @@
+{
+  "id": "hfmt",
+  "name": "University for Music and Dance (HfMT Cologne)",
+  "type": "music-and-dance",
+  "campuses": [
+    {
+      "id": "cologne",
+      "name": "Cologne",
+      "city": "Cologne",
+      "address": "Unter Krahnenbaumen 87, 50668 Cologne",
+      "labels": ["main", "performance", "administration"]
+    }
+  ],
+  "publicSources": {
+    "events": [
+      {
+        "label": "Official Events",
+        "url": "https://www.hfmt-koeln.de/veranstaltungen"
+      }
+    ],
+    "schedules": [
+      {
+        "label": "Public Calendar",
+        "url": "https://example.org/schedule.ics"
+      }
+    ]
+  },
+  "publicRooms": [
+    {
+      "id": "cologne-101",
+      "name": "Room 101",
+      "campusId": "cologne"
+    },
+    {
+      "id": "cologne-auditorium",
+      "name": "Auditorium",
+      "campusId": "cologne"
+    }
+  ]
+}

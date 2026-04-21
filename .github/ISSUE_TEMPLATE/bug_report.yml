@@ -1,12 +1,51 @@
-version: 1
-docker: bootstrap
-release: core-build-out
-# forced-release-3:core-build-out
-schema: publication
-github-actions: publication
-# forced-github-actions-6:publication
-add-vitest-coverage-acro: maintenance
-run: publication
-# forced-run-9:publication
-# forced-run-10:publication
-app: publication
+name: Bug report
+description: Report something that’s broken or misleading in the template
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Provide a minimal reproduction.
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Paste relevant logs (redact secrets).
+      render: shell
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node, pnpm, Expo version (if relevant)
+      placeholder: macOS 14, Node 20.11.1, pnpm 9.x, Expo SDK …
+    validations:
+      required: false
+

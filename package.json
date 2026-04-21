@@ -1,14 +1,33 @@
 {
   "name": "campus-app-kit",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "build": "tsc --noEmit",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit",
-    "verify": "pnpm typecheck && pnpm test"
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "verify": "./scripts/verify-production-ready.sh",
+    "setup:dev": "./scripts/setup-dev.sh"
   },
-  "keywords": [
-    "docker"
-  ]
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/react-test-renderer": "^18.0.7",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "react-test-renderer": "^18.2.0",
+    "tsx": "^4.19.2",
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.8"
+  },
+  "pnpm": {
+    "overrides": {
+      "lightningcss": "1.30.1"
+    }
+  }
 }

@@ -1,0 +1,64 @@
+{
+  "events": [
+    {
+      "id": "evt_mockuni_001",
+      "title": "Vorlesung: Mathematik I",
+      "date": "2026-02-25T10:00:00.000Z",
+      "sourceUrl": "https://mock.local/events/mathematik-i"
+    },
+    {
+      "id": "evt_mockuni_002",
+      "title": "Vorlesung: Physik für Ingenieure",
+      "date": "2026-02-25T14:00:00.000Z",
+      "sourceUrl": "https://mock.local/events/physik-ing"
+    },
+    {
+      "id": "evt_mockuni_003",
+      "title": "Seminar: Künstliche Intelligenz",
+      "date": "2026-02-26T09:00:00.000Z",
+      "sourceUrl": "https://mock.local/events/ki-seminar"
+    },
+    {
+      "id": "evt_mockuni_004",
+      "title": "Konzert: Sinfonieorchester",
+      "date": "2026-02-26T19:30:00.000Z",
+      "sourceUrl": "https://mock.local/events/sinfonieorchester"
+    },
+    {
+      "id": "evt_mockuni_005",
+      "title": "Vortrag: Nachhaltige Energie",
+      "date": "2026-02-27T16:00:00.000Z",
+      "sourceUrl": "https://mock.local/events/nachhaltige-energie"
+    },
+    {
+      "id": "evt_mockuni_006",
+      "title": "Workshop: Wissenschaftliches Schreiben",
+      "date": "2026-02-28T10:00:00.000Z",
+      "sourceUrl": "https://mock.local/events/wiss-schreiben"
+    },
+    {
+      "id": "evt_mockuni_007",
+      "title": "Prüfung: Algorithmen und Datenstrukturen",
+      "date": "2026-03-02T09:00:00.000Z",
+      "sourceUrl": "https://mock.local/events/algo-pruefung"
+    },
+    {
+      "id": "evt_mockuni_008",
+      "title": "Infoveranstaltung: Auslandssemester",
+      "date": "2026-03-03T14:00:00.000Z",
+      "sourceUrl": "https://mock.local/events/auslandssemester"
+    },
+    {
+      "id": "evt_mockuni_009",
+      "title": "Vorlesung: Datenbanken und Informationssysteme",
+      "date": "2026-03-04T11:00:00.000Z",
+      "sourceUrl": "https://mock.local/events/datenbanken"
+    },
+    {
+      "id": "evt_mockuni_010",
+      "title": "Ringvorlesung: Digitalisierung in der Gesellschaft",
+      "date": "2026-03-05T18:00:00.000Z",
+      "sourceUrl": "https://mock.local/events/digitalisierung"
+    }
+  ]
+}

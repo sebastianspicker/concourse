@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+
+      - name: Enable corepack (pnpm@9.0.0)
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run CI checks
+        run: SKIP_INSTALL=1 ./scripts/verify-production-ready.sh
+
+  create-release:
+    name: Create GitHub Release
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | head -n -2 > release-notes.md
+          {
+            echo "RELEASE_NOTES<<EOF"
+            cat release-notes.md
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+        with:
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+
+  build-bff-docker:
+    name: Build BFF Docker Image
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: ./apps/bff
+          file: ./apps/bff/Dockerfile.prod
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/bff:latest
+            ghcr.io/${{ github.repository }}/bff:${{ steps.version.outputs.VERSION }}
+
+  notify:
+    name: Notify on Release
+    needs: [create-release, build-bff-docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Release Summary
+        env:
+          TAG_REF: ${{ github.ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          VERSION="${TAG_REF#refs/tags/v}"
+          {
+            echo "## Release Created!"
+            echo ""
+            echo "Version: ${VERSION}"
+            echo ""
+            echo "### Artifacts"
+            echo "- GitHub Release: Published"
+            echo "- Docker Image: ghcr.io/${REPO}/bff:${VERSION}"
+          } >> "$GITHUB_STEP_SUMMARY"

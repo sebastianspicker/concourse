@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  bff:
+    build:
+      context: ..
+      dockerfile: apps/bff/Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - BFF_PORT=4000
+      - INSTITUTION_ID=hfmt
+      - CORS_ORIGINS=http://localhost:8081,http://localhost:19006

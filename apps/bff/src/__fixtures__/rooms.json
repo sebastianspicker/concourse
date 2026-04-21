@@ -1,0 +1,16 @@
+{
+  "rooms": [
+    {
+      "id": "cologne-101",
+      "name": "Room 101",
+      "campusId": "cologne"
+    },
+    {
+      "id": "cologne-auditorium",
+      "name": "Auditorium",
+      "campusId": "cologne"
+    }
+  ],
+  "_sourcesConfigured": true
+}
+

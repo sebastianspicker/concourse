@@ -1,0 +1,44 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /repo
+RUN corepack enable
+
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json turbo.json ./
+COPY apps/bff/package.json apps/bff/tsconfig*.json ./apps/bff/
+COPY apps/bff/src ./apps/bff/src
+COPY packages/shared/package.json packages/shared/tsconfig*.json ./packages/shared/
+COPY packages/shared/src ./packages/shared/src
+COPY packages/institutions/package.json packages/institutions/tsconfig*.json ./packages/institutions/
+COPY packages/institutions/src ./packages/institutions/src
+
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @campus/shared build
+RUN pnpm --filter @campus/institutions build
+RUN pnpm --filter @campus/bff build
+RUN pnpm prune --prod
+
+FROM node:20-alpine AS runner
+
+RUN apk add --no-cache dumb-init \
+ && addgroup -S appgroup \
+ && adduser -S appuser -G appgroup
+
+WORKDIR /repo
+ENV NODE_ENV=production
+
+COPY --from=builder --chown=appuser:appgroup /repo/package.json /repo/pnpm-workspace.yaml /repo/pnpm-lock.yaml /repo/
+COPY --from=builder --chown=appuser:appgroup /repo/node_modules /repo/node_modules
+
+COPY --from=builder --chown=appuser:appgroup /repo/apps/bff/package.json /repo/apps/bff/package.json
+COPY --from=builder --chown=appuser:appgroup /repo/apps/bff/dist /repo/apps/bff/dist
+
+COPY --from=builder --chown=appuser:appgroup /repo/packages/shared/package.json /repo/packages/shared/package.json
+COPY --from=builder --chown=appuser:appgroup /repo/packages/shared/dist /repo/packages/shared/dist
+
+COPY --from=builder --chown=appuser:appgroup /repo/packages/institutions/package.json /repo/packages/institutions/package.json
+COPY --from=builder --chown=appuser:appgroup /repo/packages/institutions/dist /repo/packages/institutions/dist
+
+USER appuser
+EXPOSE 4000
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "apps/bff/dist/server.js"]

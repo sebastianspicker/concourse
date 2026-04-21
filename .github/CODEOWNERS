@@ -1,0 +1,5 @@
+# Require review for CI/CD and security-sensitive files
+.github/                @campus-app-kit/maintainers
+SECURITY.md             @campus-app-kit/maintainers
+.gitleaks.toml          @campus-app-kit/maintainers
+apps/bff/Dockerfile*    @campus-app-kit/maintainers

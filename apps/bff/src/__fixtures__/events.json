@@ -1,0 +1,12 @@
+{
+  "events": [
+    {
+      "id": "evt_69ce0a5fdb7353f6d819ebca",
+      "title": "Official Events",
+      "date": "2020-01-01T00:00:00.000Z",
+      "sourceUrl": "https://www.hfmt-koeln.de/veranstaltungen"
+    }
+  ],
+  "_degraded": false,
+  "_sourcesConfigured": true
+}
