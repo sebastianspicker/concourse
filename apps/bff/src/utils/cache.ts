@@ -18,14 +18,14 @@ const inFlight = new Map<string, Promise<unknown>>();
 
 const DEFAULT_IN_FLIGHT_TIMEOUT_MS = 25_000;
 const MAX_CACHE_ENTRIES = 1000;
-const MAX_IN_FLIGHT = 500; // #65: Hard limit for memory safety
+const MAX_IN_FLIGHT = 500;
 const CLEANUP_INTERVAL_MS = 60_000;
 
 let hits = 0;
 let misses = 0;
 let evictions = 0;
 
-// Periodic sweep via setInterval
+// Expire entries even when no request happens to revisit their keys.
 let sweepInterval: ReturnType<typeof setInterval> | null = setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of cache.entries()) {
@@ -35,7 +35,7 @@ let sweepInterval: ReturnType<typeof setInterval> | null = setInterval(() => {
     }
   }
 
-  // Safety check for stuck in-flight promises (leaked or hung upstream)
+  // Warn before the hard cap so hung upstream requests are visible in logs.
   if (inFlight.size > 200) {
     log("warn", "cache_inflight_potentially_leaked", { count: inFlight.size });
   }
@@ -115,7 +115,8 @@ export async function getCached<T>(
     return existing as Promise<T>;
   }
 
-  // #65: Enforce hard limit on concurrent loaders
+  // The cache coalesces duplicate keys, but distinct slow upstream requests can
+  // still pile up. Keep a hard cap so one source cannot exhaust server memory.
   if (inFlight.size >= MAX_IN_FLIGHT) {
     log("error", "cache_inflight_limit_reached", { count: inFlight.size, key });
     throw new Error("Server busy: too many concurrent data requests");

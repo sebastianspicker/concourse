@@ -40,6 +40,18 @@ export function getNumberParam(
   return parsed;
 }
 
+// Invalid limits are rejected instead of clamped so callers notice broken
+// pagination requests and the BFF cannot accidentally serve huge payloads.
+function getBoundedLimitParam(params: URLSearchParams, key: string): number | undefined {
+  const value = params.get(key);
+  if (value === null) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1000) {
+    throw new Error(`INVALID_QUERY_PARAM: ${key} must be an integer between 1 and 1000`);
+  }
+  return parsed;
+}
+
 /**
  * Get a date query parameter (ISO 8601 format).
  * Returns undefined if the parameter is not present or not a valid date.
@@ -75,12 +87,12 @@ export interface EventsFilterOptions {
  * Parse filter options from query parameters for events endpoint.
  */
 export function parseEventsFilter(params: URLSearchParams): EventsFilterOptions {
-  const limit = getNumberParam(params, "limit");
+  const limit = getBoundedLimitParam(params, "limit");
   return {
     search: getStringParam(params, "search")?.slice(0, 200),
     fromDate: getDateParam(params, "from"),
     toDate: getDateParam(params, "to"),
-    limit: limit !== undefined ? Math.min(Math.max(0, Math.floor(limit)), 1000) : undefined,
+    limit,
     offset: Math.max(0, Math.floor(getNumberParam(params, "offset") ?? 0))
   };
 }
@@ -107,13 +119,13 @@ export interface ScheduleFilterOptions {
  * Parse filter options from query parameters for schedule endpoint.
  */
 export function parseScheduleFilter(params: URLSearchParams): ScheduleFilterOptions {
-  const limit = getNumberParam(params, "limit");
+  const limit = getBoundedLimitParam(params, "limit");
   return {
     search: getStringParam(params, "search")?.slice(0, 200),
     fromDate: getDateParam(params, "from"),
     toDate: getDateParam(params, "to"),
     campusId: getStringParam(params, "campus")?.slice(0, 100),
-    limit: limit !== undefined ? Math.min(Math.max(0, Math.floor(limit)), 1000) : undefined,
+    limit,
     offset: Math.max(0, Math.floor(getNumberParam(params, "offset") ?? 0))
   };
 }
@@ -136,11 +148,11 @@ export interface RoomsFilterOptions {
  * Parse filter options from query parameters for rooms endpoint.
  */
 export function parseRoomsFilter(params: URLSearchParams): RoomsFilterOptions {
-  const limit = getNumberParam(params, "limit");
+  const limit = getBoundedLimitParam(params, "limit");
   return {
     campus: getStringParam(params, "campus")?.slice(0, 100),
     search: getStringParam(params, "search")?.slice(0, 200),
-    limit: limit !== undefined ? Math.min(Math.max(0, Math.floor(limit)), 1000) : undefined,
+    limit,
     offset: Math.max(0, Math.floor(getNumberParam(params, "offset") ?? 0))
   };
 }

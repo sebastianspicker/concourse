@@ -37,18 +37,20 @@ pnpm --filter @campus/mobile dev
 BFF:
 - `INSTITUTION_ID` (required; available ids live in `packages/institutions/src/packs/`)
 - `BFF_PORT` (optional; default `4000`)
+- `BFF_REQUIRE_AUTH` (optional; unset/`0`/`false`/`no`/`off` disables bearer auth, `1`/`true`/`yes`/`on` requires it; invalid non-empty values fail closed)
+- `BFF_AUTH_TOKEN` (required when `BFF_REQUIRE_AUTH` enables bearer auth; use a long random secret from private infrastructure)
 - `CORS_ORIGINS` (optional; comma-separated; use `*` for development)
-- `BFF_TRUST_PROXY` (optional; default `auto`). Controls which source the BFF uses for the client IP (rate limiting, logs):
+- `BFF_TRUST_PROXY` (optional; default `never`). Controls which source the BFF uses for the client IP (rate limiting, logs):
+  - `never`: ignore forwarded headers; use `socket.remoteAddress` only
   - `auto`: trust `X-Forwarded-For`/`Forwarded` only when the direct peer is a private/loopback address (e.g. a reverse proxy on the same host)
   - `always`: always use the forwarded client IP — only use this when the BFF is behind a trusted proxy
-  - `never`: ignore forwarded headers; use `socket.remoteAddress` only
 
-  Forwarded values are validated as IPv4/IPv6; invalid values fall back to the direct peer address.
+  Forwarded values are ignored by default. When proxy trust is enabled, forwarded values are validated as IPv4/IPv6; invalid values fall back to the direct peer address.
 
 Mobile:
-- `EXPO_PUBLIC_BFF_BASE_URL` (required for production builds; defaults to `http://localhost:4000` in development)
+- `EXPO_PUBLIC_BFF_BASE_URL` (required in development and production; set it to the BFF URL reachable from the mobile runtime)
 
-See root and app-level `.env.example` files for a concise list of variables.
+See the root `.env.example`, `apps/bff/.env.example`, and `apps/mobile/.env.example` files for concise variable lists.
 
 ## Format and lint
 
@@ -96,11 +98,11 @@ SAST (CI-only):
 - GitHub Actions runs CodeQL in `.github/workflows/codeql.yml`.
 
 SCA / dependency review:
-- GitHub Actions runs dependency review in `.github/workflows/dependency-review.yml`.
-- Optional local audit (uses the npm registry):
+- GitHub Actions runs `pnpm audit --audit-level=moderate --prod` in `.github/workflows/dependency-review.yml`.
+- Equivalent local audit (uses the npm registry):
 
 ```bash
-pnpm audit --prod
+pnpm audit --audit-level=moderate --prod
 ```
 
 ## Quick start (one command)
@@ -115,7 +117,16 @@ This runs BFF and mobile in parallel. For BFF only: `INSTITUTION_ID=hfmt pnpm --
 
 ## Auth (optional, for private forks)
 
-The template has no route-level auth; tabs are reachable without logging in. For a private fork that requires login: add a guard in the root layout (or a wrapper) that checks for a real session and redirects to the login screen when missing. The demo session (`getDemoSession()`, `isDemo: true`) is for template use only; replace with real auth.
+The public template has no mobile login; tabs are reachable without logging in. For a private fork that requires login, add a mobile guard in the root layout (or a wrapper) that checks for a real session and redirects to the login screen when missing. The demo session (`getDemoSession()`, `isDemo: true`) is for template use only; replace it with real auth.
+
+The BFF can enforce a simple bearer-token guard for private fork smoke tests or internal deployments:
+
+```bash
+BFF_REQUIRE_AUTH=1
+BFF_AUTH_TOKEN=CHANGE_ME_LONG_RANDOM_TOKEN
+```
+
+Accepted enabled values are `1`, `true`, `yes`, and `on`. Accepted disabled values are unset, `0`, `false`, `no`, and `off`. Any other non-empty `BFF_REQUIRE_AUTH` value returns `500 auth_misconfigured` instead of serving routes unauthenticated.
 
 ## Fast loop
 

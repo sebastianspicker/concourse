@@ -15,6 +15,17 @@ function createRequest(options: {
 }
 
 describe("getClientKey", () => {
+  it("defaults to ignoring forwarded headers", () => {
+    const req = createRequest({
+      headers: { "x-forwarded-for": "203.0.113.10" },
+      remoteAddress: "127.0.0.1"
+    });
+
+    const key = getClientKey(req);
+
+    expect(key).toBe("127.0.0.1");
+  });
+
   it("ignores forwarded headers when trustProxy is never", () => {
     const req = createRequest({
       headers: { "x-forwarded-for": "203.0.113.10" },

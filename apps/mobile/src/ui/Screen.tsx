@@ -32,7 +32,6 @@ export function Screen({
     />
   ) : undefined;
 
-  // 2026: Hyper-generous negative space for breathing room
   const contentPadding = scaled(spacing.xxl, ui);
   const contentGap = scaled(spacing.xl, ui);
 
@@ -49,7 +48,7 @@ export function Screen({
         ]}
         refreshControl={refreshControl}
         scrollEnabled={scroll}
-        showsVerticalScrollIndicator={false} // Cleaner look
+        showsVerticalScrollIndicator={false}
       >
         {children}
       </ScrollView>
@@ -62,6 +61,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: spacing.xxl * 2, // Extra bottom padding for floating tab bars / modern bottom bounds
+    paddingBottom: spacing.xxl * 2,
   },
 });

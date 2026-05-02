@@ -16,12 +16,14 @@ Public backend-for-frontend for the Campus App Kit. It exposes only public data 
 INSTITUTION_ID=hfmt pnpm --filter @campus/bff dev
 ```
 
+When running from `apps/bff`, copy `.env.example` to `.env` instead of relying on the root example.
+
 Environment variables:
 
 - `INSTITUTION_ID` (required, e.g. `hfmt`)
 - `BFF_PORT` (optional, default `4000`)
 - `CORS_ORIGINS` (optional, comma-separated; use `*` for development)
-- `BFF_TRUST_PROXY` (optional, default `auto`; `auto` trusts forwarded headers only for private/loopback peers, `always` always trusts, `never` never trusts)
+- `BFF_TRUST_PROXY` (optional, default `never`; set `auto` or `always` only when the direct peer is a trusted reverse proxy)
 
 ## Connector model
 

@@ -1,3 +1,4 @@
+import type { ScheduleResponse } from "@campus/shared";
 import { ScheduleResponseSchema } from "@campus/shared";
 import { fetchPublicSchedule } from "../connectors/public/publicSchedule";
 import { parseQueryParams, parseScheduleFilter } from "../utils/queryParams";
@@ -11,7 +12,7 @@ export const handleSchedule = createJsonRoute(
       throw new Error("NO_CONFIG_SOURCES: No schedules configured");
     }
 
-    const schedule = await fetchPublicSchedule(institution);
+    const { schedule, degraded } = await fetchPublicSchedule(institution);
 
     const params = parseQueryParams(req);
     const filter = parseScheduleFilter(params);
@@ -27,9 +28,16 @@ export const handleSchedule = createJsonRoute(
     return {
       schedule: filteredSchedule,
       _total,
+      _degraded: degraded,
       _sourcesConfigured: true
     };
   },
   ScheduleResponseSchema,
-  { maxAgeSeconds: 300 }
+  {
+    maxAgeSeconds: 300,
+    getExtraHeaders: (data: ScheduleResponse) => ({
+      ...(data._degraded ? { "x-data-degraded": "true" } : {}),
+      ...(process.env.PUBLIC_EVENTS_MODE === "mock" ? { "x-data-mode": "mock" } : {})
+    })
+  }
 );

@@ -22,6 +22,8 @@ const DEFAULT_TTL_MS = 60_000;
 
 function getPublicCacheKey(suffix: string, queryParams?: Record<string, string>): string {
   try {
+    // Include the BFF base URL so preview/prod/dev endpoints do not share
+    // persisted responses when a tester switches environments.
     const base = `public:${getBffBaseUrl()}:${suffix}`;
     if (queryParams && Object.keys(queryParams).length > 0) {
       const sortedParams = Object.entries(queryParams)

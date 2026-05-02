@@ -8,15 +8,15 @@ import { spacing, typography } from "@/ui/theme";
 import { useTheme } from "@/ui/ThemeContext";
 import { formatEventDate } from "@/utils/dateFormat";
 import { parseRouteItem } from "@/utils/routeItem";
-import type { PublicEvent } from "@campus/shared";
+import { PublicEventSchema, type PublicEvent } from "@campus/shared";
 
 export default function EventDetailScreen(): JSX.Element {
   const { id, item } = useLocalSearchParams<{ id: string; item?: string }>();
-  const routedEvent = parseRouteItem<PublicEvent>(item);
-  const hasRoutedItem = routedEvent?.id === id;
+  const routedEvent = parseRouteItem<PublicEvent>(item, PublicEventSchema);
   const { data, loading, error, refreshing, refresh } = useEvents();
-  const event = hasRoutedItem ? routedEvent : (data?.events.find((entry) => entry.id === id) ?? null);
-  const effectiveLoading = hasRoutedItem ? false : loading;
+  const fetchedEvent = data?.events.find((entry) => entry.id === id) ?? null;
+  const event = fetchedEvent ?? (routedEvent?.id === id ? routedEvent : null);
+  const effectiveLoading = event ? false : loading;
   const theme = useTheme();
 
   const handleShare = useCallback(async () => {

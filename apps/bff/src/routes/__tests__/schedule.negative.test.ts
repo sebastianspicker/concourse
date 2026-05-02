@@ -72,10 +72,9 @@ describe("GET /schedule — negative paths", () => {
 
     await handleSchedule(req, response, institution);
 
-    expect(getStatus()).toBe(200);
+    expect(getStatus()).toBe(400);
     const body = JSON.parse(getBody() ?? "{}");
-    expect(body).toHaveProperty("schedule");
-    expect(Array.isArray(body.schedule)).toBe(true);
+    expect(body.error.code).toBe("bad_request");
   });
 
   it("handles negative offset query param", async () => {
@@ -95,9 +94,9 @@ describe("GET /schedule — negative paths", () => {
 
     await handleSchedule(req, response, institution);
 
-    expect(getStatus()).toBe(200);
+    expect(getStatus()).toBe(400);
     const body = JSON.parse(getBody() ?? "{}");
-    expect(body).toHaveProperty("schedule");
+    expect(body.error.code).toBe("bad_request");
   });
 
   it("returns 404 when institution has no schedule sources configured", async () => {
@@ -124,18 +123,9 @@ describe("GET /schedule — negative paths", () => {
     await handleSchedule(req, response, institution);
 
     const statusCode = getStatus();
-    expect(statusCode).toBeDefined();
-    // The connector uses Promise.allSettled so individual source failures
-    // produce an empty result rather than throwing. This gets validated by
-    // the Zod schema and returned as 200 with empty schedule.
-    // If all sources fail, we still get a valid empty response.
-    expect([200, 500]).toContain(statusCode);
+    expect(statusCode).toBe(500);
     const body = JSON.parse(getBody() ?? "{}");
-    if (statusCode === 200) {
-      expect(body).toHaveProperty("schedule");
-    } else {
-      expect(body.error.code).toBe("internal_error");
-    }
+    expect(body.error.code).toBe("internal_error");
   });
 
   it("response body contains schedule array matching schema shape", async () => {

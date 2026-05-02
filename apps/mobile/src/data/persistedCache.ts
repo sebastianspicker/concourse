@@ -17,6 +17,8 @@ export type CachedEntry<T> = {
   isOffline?: boolean;
 };
 
+// Public campus data is useful offline, but stale schedules/events can mislead
+// users. After this window, network errors should be surfaced instead.
 export const OFFLINE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 async function getStorage(): Promise<StorageLike> {
@@ -149,12 +151,10 @@ export async function fetchNetworkFirstWithFallback<T>(
   const now = Date.now();
 
   try {
-    // Try to fetch fresh data
     const freshData = await loader();
-    
-    // Cache the fresh data
+
     await setPersistedCache(key, freshData);
-    
+
     return {
       data: freshData,
       fromCache: false,
@@ -162,20 +162,22 @@ export async function fetchNetworkFirstWithFallback<T>(
       cacheAge: null
     };
   } catch (error: unknown) {
-    // Network failed - use cache if available
     if (cachedEntry) {
-      // Mark as offline data
+      const cacheAge = now - cachedEntry.timestamp;
+      if (cacheAge > OFFLINE_CACHE_MAX_AGE_MS) {
+        throw error;
+      }
+
       await markCacheAsOffline<T>(key);
-      
+
       return {
         data: cachedEntry.data,
         fromCache: true,
         isOffline: true,
-        cacheAge: now - cachedEntry.timestamp
+        cacheAge
       };
     }
-    
-    // No cache available, re-throw the error
+
     throw error;
   }
 }
@@ -185,9 +187,7 @@ export async function isOfflineData(key: string): Promise<boolean> {
   return entry?.isOffline ?? false;
 }
 
-/**
- * Get cache statistics for debugging/monitoring
- */
+/** Get cache statistics for diagnostics screens and tests. */
 export async function getCacheStats(): Promise<{
   keyCount: number;
   oldestEntry: number | null;

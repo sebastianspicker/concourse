@@ -48,10 +48,9 @@ describe("GET /rooms — negative paths", () => {
 
     await handleRooms(req, response, institution);
 
-    expect(getStatus()).toBe(200);
+    expect(getStatus()).toBe(400);
     const body = JSON.parse(getBody() ?? "{}");
-    expect(body).toHaveProperty("rooms");
-    expect(Array.isArray(body.rooms)).toBe(true);
+    expect(body.error.code).toBe("bad_request");
   });
 
   it("handles negative offset query param", async () => {
@@ -71,9 +70,9 @@ describe("GET /rooms — negative paths", () => {
 
     await handleRooms(req, response, institution);
 
-    expect(getStatus()).toBe(200);
+    expect(getStatus()).toBe(400);
     const body = JSON.parse(getBody() ?? "{}");
-    expect(body).toHaveProperty("rooms");
+    expect(body.error.code).toBe("bad_request");
   });
 
   it("returns 404 when institution has no rooms configured", async () => {
@@ -125,8 +124,8 @@ describe("GET /rooms — negative paths", () => {
 
     await handleRooms(req, response, institution);
 
-    expect(getStatus()).toBe(200);
+    expect(getStatus()).toBe(400);
     const body = JSON.parse(getBody() ?? "{}");
-    expect(body).toHaveProperty("rooms");
+    expect(body.error.code).toBe("bad_request");
   });
 });

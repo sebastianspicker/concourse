@@ -43,7 +43,7 @@ type ClientKeyOptions = {
 
 export function getClientKey(req: IncomingMessage, options?: ClientKeyOptions): string {
   const remoteAddress = normalizeIp(req.socket.remoteAddress) ?? "unknown";
-  const trustProxy = options?.trustProxy ?? "auto";
+  const trustProxy = options?.trustProxy ?? "never";
   const canTrustForwarded =
     trustProxy === "always" || (trustProxy === "auto" && isPrivateAddress(remoteAddress));
 

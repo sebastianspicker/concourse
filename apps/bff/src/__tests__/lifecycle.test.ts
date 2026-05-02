@@ -1,31 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import http from "node:http";
-
-/**
- * We avoid importing from ../server directly because that file has a
- * side-effect (`void startServer()`) that tries to bind port 4000 on import.
- * Instead, we build a minimal request listener inline for lifecycle testing.
- */
-function createMinimalListener(): (req: http.IncomingMessage, res: http.ServerResponse) => void {
-  return (req, res) => {
-    const url = req.url ?? "/";
-
-    if (url === "/health") {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ status: "ok" }));
-      return;
-    }
-
-    if (url.startsWith("/rooms") || url.startsWith("/events") || url.startsWith("/schedule") || url.startsWith("/today")) {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ data: [] }));
-      return;
-    }
-
-    res.writeHead(404, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: { code: "not_found", message: "Route not found" } }));
-  };
-}
+import { createRequestListener } from "../server";
 
 function listenOnDynamicPort(server: http.Server): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -77,7 +52,7 @@ describe("BFF server lifecycle", () => {
   });
 
   it("starts and listens on a dynamic port (port 0)", async () => {
-    server = http.createServer(createMinimalListener());
+    server = http.createServer(createRequestListener());
     const port = await listenOnDynamicPort(server);
 
     expect(port).toBeGreaterThan(0);
@@ -86,7 +61,7 @@ describe("BFF server lifecycle", () => {
   });
 
   it("health endpoint responds 200 during normal operation", async () => {
-    server = http.createServer(createMinimalListener());
+    server = http.createServer(createRequestListener());
     const port = await listenOnDynamicPort(server);
 
     const { status, body } = await httpGet(port, "/health");
@@ -97,7 +72,7 @@ describe("BFF server lifecycle", () => {
   });
 
   it("closes gracefully on server.close()", async () => {
-    server = http.createServer(createMinimalListener());
+    server = http.createServer(createRequestListener());
     await listenOnDynamicPort(server);
 
     expect(server.listening).toBe(true);
@@ -106,7 +81,7 @@ describe("BFF server lifecycle", () => {
   });
 
   it("refuses new connections after close", async () => {
-    server = http.createServer(createMinimalListener());
+    server = http.createServer(createRequestListener());
     const port = await listenOnDynamicPort(server);
 
     // Verify the server works before closing
@@ -120,7 +95,7 @@ describe("BFF server lifecycle", () => {
   });
 
   it("responds to data routes while running", async () => {
-    server = http.createServer(createMinimalListener());
+    server = http.createServer(createRequestListener());
     const port = await listenOnDynamicPort(server);
 
     const { status } = await httpGet(port, "/rooms");
@@ -129,7 +104,7 @@ describe("BFF server lifecycle", () => {
   });
 
   it("returns 404 for unknown routes while running", async () => {
-    server = http.createServer(createMinimalListener());
+    server = http.createServer(createRequestListener());
     const port = await listenOnDynamicPort(server);
 
     const { status, body } = await httpGet(port, "/nonexistent");

@@ -13,10 +13,8 @@ export type ResourceListItemProps<T> = {
   accessibilityLabel: (item: T) => string;
 };
 
-// SVG Chevron for 2026 native feel
 const ChevronRight = ({ color }: { color: string }) => (
   <View style={styles.chevronContainer}>
-    {/* Minimalistic Chevron Implementation */}
     <View style={[styles.chevronLine, styles.chevronTop, { backgroundColor: color }]} />
     <View style={[styles.chevronLine, styles.chevronBottom, { backgroundColor: color }]} />
   </View>
@@ -34,7 +32,6 @@ function ResourceListItemInner<T>({
   const theme = useTheme();
   const navigatingRef = useRef(false);
 
-  // Reanimated press scale and opacity effect for hyper-responsive tactile feedback
   const pressed = useSharedValue(0);
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 - pressed.value * 0.04 }],
@@ -42,7 +39,6 @@ function ResourceListItemInner<T>({
   }));
 
   const handlePressIn = () => {
-    // Ultra-fast engagement
     pressed.value = withSpring(1, {
       damping: 15,
       stiffness: 450,
@@ -51,7 +47,6 @@ function ResourceListItemInner<T>({
   };
 
   const handlePressOut = () => {
-    // Smooth, luxurious release
     pressed.value = withSpring(0, {
       damping: 20,
       stiffness: 300,
@@ -60,6 +55,8 @@ function ResourceListItemInner<T>({
   };
 
   const handlePress = useCallback<NonNullable<ComponentProps<typeof Link>["onPress"]>>((e) => {
+    // Expo Router can receive rapid duplicate presses before navigation settles.
+    // Drop repeats so detail screens are pushed at most once per tap burst.
     if (navigatingRef.current) {
       e.preventDefault();
       return;
@@ -79,7 +76,6 @@ function ResourceListItemInner<T>({
       >
         <Animated.View style={[animatedStyle, styles.cardWrapper]}>
           <Card title={card.title} subtitle={card.subtitle} />
-          {/* Chevron overlay to indicate it's navigatable */}
           <View style={styles.chevronOverlay}>
             <ChevronRight color={theme.colors.muted} />
           </View>
@@ -107,10 +103,10 @@ const styles = StyleSheet.create({
     width: 8,
     height: 14,
     justifyContent: "center",
-    opacity: 0.6, // 2026: Subdued iconography, letting typography shine
+    opacity: 0.6,
   },
   chevronLine: {
-    width: 1.5, // Thinner, precise
+    width: 1.5,
     height: 8.5,
     borderRadius: 1,
     position: "absolute",

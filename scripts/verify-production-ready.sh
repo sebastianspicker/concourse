@@ -11,6 +11,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:e2e
 
 if [[ "${SKIP_MARKER_CHECK:-}" != "1" ]]; then
   marker_pattern='\b(TODO|FIXME|SKELETON|PLACEHOLDER|TBD)\b'
@@ -26,12 +27,12 @@ if [[ "${SKIP_MARKER_CHECK:-}" != "1" ]]; then
       --glob '!.expo-shared/**' \
       --glob '!.pnpm-store/**' \
       --glob '!.claude/**' \
+      --glob '!AGENTS.md' \
       --glob '!docs/**' \
       --glob '!plans/**' \
       --glob '!progress.md' \
       --glob '!IMPLEMENTATION_BACKLOG.md' \
       --glob '!BUGS_AND_FIXES.md' \
-      --glob '!CLAUDE.md' \
       --glob '!verify-production-ready.sh' \
       .; then
       echo
@@ -49,12 +50,12 @@ if [[ "${SKIP_MARKER_CHECK:-}" != "1" ]]; then
     --exclude-dir .expo-shared \
     --exclude-dir .pnpm-store \
     --exclude-dir .claude \
+    --exclude AGENTS.md \
     --exclude-dir docs \
     --exclude-dir plans \
     --exclude progress.md \
     --exclude IMPLEMENTATION_BACKLOG.md \
     --exclude BUGS_AND_FIXES.md \
-    --exclude CLAUDE.md \
     --exclude verify-production-ready.sh \
     .; then
     echo

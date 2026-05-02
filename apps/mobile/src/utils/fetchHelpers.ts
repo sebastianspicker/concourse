@@ -19,7 +19,7 @@ export class HttpError extends Error {
 
 function parseRetryAfterSeconds(retryAfter: string | null): number | undefined {
   if (!retryAfter) return undefined;
-  // #62: Support both seconds and HTTP-date
+  // Retry-After can be either delay seconds or an absolute HTTP-date.
   const seconds = parseInt(retryAfter, 10);
   if (!isNaN(seconds)) return seconds;
   const date = new Date(retryAfter);
@@ -58,7 +58,8 @@ export async function fetchJsonWithTimeout<T>(
       });
     }
 
-    // #61: Handle 204 No Content or empty bodies
+    // Some BFF responses intentionally have no body; callers still expect an
+    // object-shaped value so schema parsing can decide what to do next.
     if (response.status === 204) {
       return {} as T;
     }
@@ -95,7 +96,7 @@ export async function parseBffError(response: Response): Promise<BffError> {
       return { code, message };
     }
   } catch {
-    // ignore
+    // Non-JSON error pages still map to the generic client error below.
   }
 
   return { code: "unknown_error", message: "Unknown error" };

@@ -17,6 +17,7 @@ import { sendError } from "./utils/errors";
 import { log } from "./utils/logger";
 import { getRequestId, setRequestIdHeader } from "./utils/requestId";
 import { BFF_ENV } from "./config/env";
+import { basename } from "node:path";
 
 const DATA_ROUTES: Record<string, (req: IncomingMessage, res: ServerResponse, institution: InstitutionPack) => Promise<void>> = {
   "/events": handleEvents,
@@ -136,7 +137,7 @@ export function createRequestListener(): (req: IncomingMessage, res: ServerRespo
   };
 }
 
-async function startServer(): Promise<void> {
+export async function startServer(): Promise<void> {
   log("info", "server_starting", {
     port: BFF_ENV.port,
     institutionId: BFF_ENV.institutionId
@@ -159,4 +160,11 @@ async function startServer(): Promise<void> {
   });
 }
 
-void startServer();
+function isEntrypoint(): boolean {
+  const entry = process.argv[1];
+  return entry ? ["server.ts", "server.js"].includes(basename(entry)) : false;
+}
+
+if (isEntrypoint()) {
+  void startServer();
+}

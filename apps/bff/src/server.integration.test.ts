@@ -11,6 +11,7 @@ describe("BFF server integration", () => {
   afterEach(() => {
     clearRateLimitBuckets();
     delete process.env.BFF_REQUIRE_AUTH;
+    delete process.env.BFF_AUTH_TOKEN;
     vi.unstubAllGlobals();
   });
 
@@ -66,21 +67,20 @@ describe("BFF server integration", () => {
 
     it("handles invalid limit parameter", async () => {
       const app = createRequestListener();
-      // Invalid limit should be handled gracefully
       const res = await request(app)
         .get("/events?limit=abc")
-        .expect(200);
+        .expect(400);
       
-      expect(res.body).toHaveProperty("events");
+      expect(res.body.error.code).toBe("bad_request");
     });
 
     it("handles negative limit parameter", async () => {
       const app = createRequestListener();
       const res = await request(app)
         .get("/events?limit=-1")
-        .expect(200);
+        .expect(400);
       
-      expect(res.body).toHaveProperty("events");
+      expect(res.body.error.code).toBe("bad_request");
     });
 
     it("handles invalid offset parameter", async () => {
@@ -96,9 +96,9 @@ describe("BFF server integration", () => {
       const app = createRequestListener();
       const res = await request(app)
         .get("/events?limit=999999999")
-        .expect(200);
+        .expect(400);
       
-      expect(res.body).toHaveProperty("events");
+      expect(res.body.error.code).toBe("bad_request");
     });
   });
 
@@ -170,12 +170,10 @@ describe("BFF server integration", () => {
       expect(res.body.error.code).toBe("rate_limited");
     });
 
-    it("rate limits per client key", async () => {
+    it("ignores spoofed forwarded headers in the default proxy mode", async () => {
       const app = createRequestListener();
-      // Use different IP addresses to simulate different clients
       const limit = 65;
-      
-      // First client hits rate limit
+
       for (let i = 0; i < limit; i++) {
         await request(app).get("/health").set("X-Forwarded-For", "192.168.1.1");
       }
@@ -183,15 +181,13 @@ describe("BFF server integration", () => {
         .get("/health")
         .set("X-Forwarded-For", "192.168.1.1")
         .expect(429);
-      
-      // Second client should still be allowed
       const res2 = await request(app)
         .get("/health")
         .set("X-Forwarded-For", "192.168.1.2")
-        .expect(200);
-      
+        .expect(429);
+
       expect(res1.body.error.code).toBe("rate_limited");
-      expect(res2.body.status).toBe("ok");
+      expect(res2.body.error.code).toBe("rate_limited");
     });
   });
 
@@ -313,6 +309,7 @@ describe("BFF server integration", () => {
   describe("auth guard", () => {
     it("returns 401 when auth is required and no bearer token is provided", async () => {
       process.env.BFF_REQUIRE_AUTH = "1";
+      process.env.BFF_AUTH_TOKEN = "test-token";
       const app = createRequestListener();
 
       const res = await request(app).get("/health").expect(401);
@@ -321,6 +318,7 @@ describe("BFF server integration", () => {
 
     it("allows requests when auth is required and a bearer token is present", async () => {
       process.env.BFF_REQUIRE_AUTH = "1";
+      process.env.BFF_AUTH_TOKEN = "test-token";
       const app = createRequestListener();
 
       const res = await request(app)

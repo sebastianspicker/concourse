@@ -40,7 +40,8 @@ export async function getCached<T>(
     return entry.value;
   }
 
-  // #72: Reuse in-flight promise even if forcing (to avoid parallel redundant net calls)
+  // Keep one loader per key in flight, including forced refreshes, so pull-to-
+  // refresh and initial render cannot stampede the BFF with duplicate requests.
   const existing = inFlight.get(key);
   if (existing) return existing as Promise<T>;
 
@@ -48,7 +49,7 @@ export async function getCached<T>(
   const { promise: timeout, timer } = timeoutPromise(DEFAULT_LOADER_TIMEOUT_MS);
   const promise = (async () => {
     try {
-      // #73: Add timeout to prevent infinite loading state
+      // A hung loader would otherwise leave the screen in loading state forever.
       const value = await Promise.race([
         loader(),
         timeout

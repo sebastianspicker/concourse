@@ -11,6 +11,8 @@ import { parseIcs, type ParsedIcsEvent } from "./icsParser";
 
 import { BFF_ENV } from "../../config/env";
 
+export type FetchPublicScheduleResult = { schedule: ScheduleItem[]; degraded: boolean };
+
 const scheduleBreakers = new Map<string, CircuitBreaker>();
 
 function getScheduleBreaker(sourceUrl: string): CircuitBreaker {
@@ -29,6 +31,7 @@ function getScheduleBreaker(sourceUrl: string): CircuitBreaker {
 }
 
 async function resolveFixturePath(filename: string): Promise<string> {
+  // Tests may run from apps/bff or from the monorepo root.
   const candidates = [
     resolve(process.cwd(), "src/__fixtures__", filename),
     resolve(process.cwd(), "apps/bff/src/__fixtures__", filename),
@@ -39,7 +42,7 @@ async function resolveFixturePath(filename: string): Promise<string> {
       await readFile(candidate);
       return candidate;
     } catch {
-      // try next candidate
+      // Continue with the next known test runner working directory.
     }
   }
   return candidates[0];
@@ -59,7 +62,7 @@ function toScheduleItem(p: ParsedIcsEvent): ScheduleItem {
 
 export async function fetchPublicSchedule(
   institution: InstitutionPack
-): Promise<ScheduleItem[]> {
+): Promise<FetchPublicScheduleResult> {
   const sources = institution.publicSources?.schedules ?? [];
   const cacheKey = `public-schedule:${institution.id}`;
   const ttlMs = BFF_ENV.defaultCacheTtl * 1000;
@@ -68,34 +71,37 @@ export async function fetchPublicSchedule(
   return getCached(
     cacheKey,
     async () => {
-      // Mock mode: load from fixture file for mockuni
+      // Mock mode is fixture-backed so schedule tests and demos do not depend
+      // on external ICS availability.
       if (mode === "mock" && institution.id === "mockuni") {
         try {
           const fixturePath = await resolveFixturePath("mockuni-schedule.ics");
           const icsContent = await readFile(fixturePath, "utf-8");
           const parsed = parseIcs(icsContent, { rruleHorizonDays: BFF_ENV.rruleExpansionHorizonDays });
-          return parsed.map(toScheduleItem);
+          return { schedule: parsed.map(toScheduleItem), degraded: false };
         } catch (err: unknown) {
           log("warn", "mock_schedule_load_failed", {
             reason: err instanceof Error ? err.message : String(err)
           });
-          return [];
+          return { schedule: [], degraded: true };
         }
       }
 
       const results: ScheduleItem[] = [];
+      let anyFailed = false;
 
-      const settlement = await Promise.allSettled(
+      const settledSources = await Promise.allSettled(
         sources.map(async (source: { url: string }) => {
           const text = await getScheduleBreaker(source.url).call(() => fetchTextWithTimeout(source.url));
           return parseIcs(text, { rruleHorizonDays: BFF_ENV.rruleExpansionHorizonDays });
         })
       );
 
-      settlement.forEach((result: PromiseSettledResult<ParsedIcsEvent[]>, index: number) => {
+      settledSources.forEach((result: PromiseSettledResult<ParsedIcsEvent[]>, index: number) => {
         if (result.status === "fulfilled") {
           results.push(...result.value.map(toScheduleItem));
         } else {
+          anyFailed = true;
           log("warn", "public_schedule_source_failed", {
             sourceUrl: sources[index].url,
             reason: result.reason instanceof Error ? result.reason.message : String(result.reason)
@@ -103,8 +109,15 @@ export async function fetchPublicSchedule(
         }
       });
 
-      return results;
+      // Partial source failures are represented as degraded data. Total source
+      // failure should surface as an error instead of caching an empty schedule.
+      if (settledSources.length > 0 && settledSources.every((result) => result.status === "rejected")) {
+        throw new Error("All public schedule sources failed");
+      }
+
+      return { schedule: results, degraded: anyFailed };
     },
-    ttlMs
+    ttlMs,
+    { shouldCache: (result) => !result.degraded }
   );
 }

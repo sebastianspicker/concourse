@@ -10,6 +10,9 @@ import { getRequestId } from "../utils/requestId";
 
 type JsonRouteLoader = (institution: InstitutionPack, req: IncomingMessage) => Promise<unknown>;
 
+const NO_CONFIG_SOURCES_PREFIX = "NO_CONFIG_SOURCES:";
+const INVALID_QUERY_PARAM_PREFIX = "INVALID_QUERY_PARAM:";
+
 export function createJsonRoute<T>(
   loader: JsonRouteLoader,
   schema: z.ZodType<T>,
@@ -40,9 +43,18 @@ export function createJsonRoute<T>(
       }
       const error = err instanceof Error ? err : new Error(String(err));
 
-      if (error.message.startsWith("NO_CONFIG_SOURCES:")) {
+      // Route loaders use prefix-tagged errors for expected HTTP outcomes.
+      // Everything else is treated as an internal failure so connector details
+      // do not leak to clients.
+      if (error.message.startsWith(NO_CONFIG_SOURCES_PREFIX)) {
         log("warn", "no_config_sources", { requestId, message: error.message });
-        sendTypedError(res, ErrorKind.NOT_FOUND, "not_found", error.message.replace("NO_CONFIG_SOURCES:", "").trim());
+        sendTypedError(res, ErrorKind.NOT_FOUND, "not_found", error.message.replace(NO_CONFIG_SOURCES_PREFIX, "").trim());
+        return;
+      }
+
+      if (error.message.startsWith(INVALID_QUERY_PARAM_PREFIX)) {
+        log("warn", "invalid_query_param", { requestId, message: error.message });
+        sendTypedError(res, ErrorKind.VALIDATION, "bad_request", error.message.replace(INVALID_QUERY_PARAM_PREFIX, "").trim());
         return;
       }
 

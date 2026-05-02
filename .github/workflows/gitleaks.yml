@@ -17,20 +17,20 @@ jobs:
     name: Secret Scan (gitleaks)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Run gitleaks (licensed)
-        if: ${{ env.GITLEAKS_LICENSE != '' }}
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
-        with:
-          config-path: .gitleaks.toml
-      - name: Run gitleaks (oss fallback)
-        if: ${{ env.GITLEAKS_LICENSE == '' }}
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
-        with:
-          config-path: .gitleaks.toml
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.28.0
+        run: |
+          set -euo pipefail
+          install_dir="${RUNNER_TEMP}/gitleaks"
+          mkdir -p "$install_dir"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o "${RUNNER_TEMP}/gitleaks.tar.gz"
+          tar -xzf "${RUNNER_TEMP}/gitleaks.tar.gz" -C "$install_dir" gitleaks
+          echo "$install_dir" >> "$GITHUB_PATH"
+      - name: Run gitleaks
+        run: gitleaks detect --redact --source . --verbose --config .gitleaks.toml

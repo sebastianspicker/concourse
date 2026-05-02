@@ -84,6 +84,19 @@ END:VCALENDAR`;
     expect(events[0].startsAt).toBe("2026-06-15T00:00:00.000Z");
   });
 
+  it("accepts valid epoch-zero ICS timestamps", () => {
+    const ics = `BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:epoch-zero
+SUMMARY:Unix Epoch
+DTSTART:19700101T000000Z
+END:VEVENT
+END:VCALENDAR`;
+    const events = parseIcs(ics);
+    expect(events).toHaveLength(1);
+    expect(events[0].startsAt).toBe("1970-01-01T00:00:00.000Z");
+  });
+
   it("handles values with colons (timestamps)", () => {
     const ics = `BEGIN:VCALENDAR
 BEGIN:VEVENT

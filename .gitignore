@@ -10,10 +10,14 @@ coverage/
 .nyc_output/
 *.tsbuildinfo
 *.log
+release-notes.md
 test-results/
 junit.xml
 junit-*.xml
 *.lcov
+*.xcresult
+apps/mobile/artifacts/
+apps/mobile/detox-artifacts/
 
 ### Tooling caches
 .turbo/
@@ -24,6 +28,7 @@ junit-*.xml
 .parcel-cache/
 .expo/
 .expo-shared/
+apps/mobile/.eas/
 
 ### Environment files
 .env

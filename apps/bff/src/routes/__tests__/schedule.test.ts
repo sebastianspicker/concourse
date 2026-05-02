@@ -59,7 +59,10 @@ describe("GET /schedule", () => {
     await handleSchedule({} as IncomingMessage, response, institution);
 
     expect(getStatus()).toBe(200);
-    expect(JSON.parse(getBody() ?? "{}")).toEqual(scheduleFixture);
+    expect(JSON.parse(getBody() ?? "{}")).toEqual({
+      ...scheduleFixture,
+      _degraded: false
+    });
   });
 
   it("includes _total equal to schedule array length", async () => {

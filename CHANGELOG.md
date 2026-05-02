@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `createJsonRoute` now sets `x-request-id` response header
-- Removed internal audit artifacts (`.claude/`, `plans/`, `progress.md`) from version control
+- Removed local audit/workspace artifacts from version control
 - Removed spurious `await` on sync `loadInstitutionPack` calls in BFF server startup
 - Removed unused `FilterPanel` component from mobile app
 - Removed scaffold placeholder `hello+api.ts` Expo API route
@@ -126,5 +126,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@campus/shared` - Domain types and Zod schemas
 - `@campus/institutions` - Institution configuration packs
 
-[1.0.0]: https://github.com/example/campus-app-kit/compare/v0.1.0...v1.0.0
-[0.1.0]: https://github.com/example/campus-app-kit/releases/tag/v0.1.0
+[1.1.0]: https://github.com/sebastianspicker/campus-app-kit/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/sebastianspicker/campus-app-kit/compare/v0.1.0...v1.0.0
+[0.1.0]: https://github.com/sebastianspicker/campus-app-kit/releases/tag/v0.1.0

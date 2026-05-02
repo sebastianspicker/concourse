@@ -26,8 +26,8 @@ pnpm --filter @campus/mobile dev
 
 This app expects a BFF base URL:
 
-- Local/dev builds: defaults to `http://localhost:4000`.
-- Production builds: set `EXPO_PUBLIC_BFF_BASE_URL` (for example via EAS environment variables).
+- Set `EXPO_PUBLIC_BFF_BASE_URL` in development and production.
+- For local development, use the BFF URL reachable from your simulator, emulator, or device.
 
 ## Releases (EAS)
 

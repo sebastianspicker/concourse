@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const PublicEventSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -58,6 +67,7 @@ export type ScheduleItem = z.infer<typeof ScheduleItemSchema>;
 export const ScheduleResponseSchema = z.object({
   schedule: z.array(ScheduleItemSchema),
   _total: z.number().int().optional(),
+  _degraded: z.boolean().optional(),
   _sourcesConfigured: z.boolean().optional()
 });
 
@@ -97,7 +107,7 @@ export const InstitutionPackSchema = z.object({
     })
     .optional(),
   publicRooms: z.array(RoomSchema).optional(),
-  timezone: z.string().optional()
+  timezone: z.string().refine(isValidTimeZone, "Invalid IANA timezone").optional()
 });
 
 export type InstitutionPack = z.infer<typeof InstitutionPackSchema>;

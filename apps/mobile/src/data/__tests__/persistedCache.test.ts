@@ -6,6 +6,7 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
 }));
 
 import {
+  OFFLINE_CACHE_MAX_AGE_MS,
   getPersistedCache,
   setPersistedCache,
   clearPersistedCache,
@@ -16,6 +17,7 @@ import {
 
 describe("persistedCache", () => {
   afterEach(async () => {
+    vi.useRealTimers();
     await clearPersistedCache();
   });
 
@@ -90,6 +92,22 @@ describe("fetchNetworkFirstWithFallback", () => {
     expect(result.fromCache).toBe(true);
     expect(result.isOffline).toBe(true);
     expect(result.cacheAge).toBeGreaterThanOrEqual(0);
+  });
+
+  it("rejects stale cache on network failure", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-20T00:00:00.000Z"));
+    await setPersistedCache("expired-key", { items: ["stale"] });
+
+    vi.setSystemTime(new Date("2026-04-21T00:00:00.001Z"));
+
+    await expect(
+      fetchNetworkFirstWithFallback("expired-key", async () => {
+        throw new Error("offline");
+      })
+    ).rejects.toThrow("offline");
+
+    expect(await isCacheStale("expired-key", OFFLINE_CACHE_MAX_AGE_MS)).toBe(true);
   });
 
   it("throws when no cache and network fails", async () => {

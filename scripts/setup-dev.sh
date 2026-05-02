@@ -2,7 +2,7 @@
 # Campus App Kit - Development Setup Script
 # Run this script to set up the development environment
 
-set -e
+set -euo pipefail
 
 echo "🚀 Campus App Kit - Development Setup"
 echo "======================================"
@@ -45,6 +45,13 @@ else
   echo "✅ .env already exists"
 fi
 
+if [ ! -f apps/bff/.env ]; then
+  echo "Creating apps/bff/.env from apps/bff/.env.example..."
+  cp apps/bff/.env.example apps/bff/.env
+else
+  echo "✅ apps/bff/.env already exists"
+fi
+
 if [ ! -f apps/mobile/.env ]; then
   echo "Creating apps/mobile/.env from apps/mobile/.env.example..."
   cp apps/mobile/.env.example apps/mobile/.env
@@ -66,8 +73,8 @@ echo ""
 echo "✅ Setup complete!"
 echo ""
 echo "📝 Next steps:"
-echo "   1. Edit .env and set INSTITUTION_ID (default: hfmt)"
-echo "   2. Set EXPO_PUBLIC_BFF_BASE_URL for the mobile app if you are using a physical device"
+echo "   1. Edit apps/bff/.env and set INSTITUTION_ID (default: hfmt)"
+echo "   2. Edit apps/mobile/.env and set EXPO_PUBLIC_BFF_BASE_URL"
 echo "   3. Run 'pnpm dev' to start BFF and the mobile dev-client workflow"
 echo "   4. For Expo Go, run 'pnpm --filter @campus/mobile start' instead"
 echo ""

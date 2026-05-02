@@ -15,11 +15,16 @@ A public, privacy-safe starter for building a university campus app with **React
 # Install dependencies
 pnpm install --frozen-lockfile
 
+# Configure the mobile app's BFF URL
+cp apps/mobile/.env.example apps/mobile/.env
+
 # Start BFF and mobile in parallel
 INSTITUTION_ID=hfmt pnpm dev
 ```
 
-Then open the mobile app with a dev client.
+Then open the mobile app with a dev client. For a physical device, edit
+`apps/mobile/.env` so `EXPO_PUBLIC_BFF_BASE_URL` points to the BFF URL reachable
+from that device.
 
 For Expo Go, run `pnpm --filter @campus/mobile start` instead of `pnpm dev`.
 
@@ -58,6 +63,18 @@ packages/
 docs/             Architecture, runbook, CI, deployment
 ```
 
+## How to Read This Repo
+
+Start with the runtime path, then branch out:
+
+1. Mobile screens in `apps/mobile/app/` call hooks in `apps/mobile/src/hooks/`.
+2. Hooks call `apps/mobile/src/data/publicApi.ts`, which validates BFF responses with schemas from `@campus/shared`.
+3. The BFF entry point is `apps/bff/src/server.ts`; data routes live in `apps/bff/src/routes/`.
+4. Routes call public connectors in `apps/bff/src/connectors/public/` and load public institution packs from `packages/institutions/src/packs/`.
+5. `packages/shared/src/domain/` is the contract between BFF and mobile. Update schemas there before changing response shapes.
+
+Private integrations should implement the stubs under `apps/bff/src/connectors/private-stubs/` in a private fork. This public repo should keep only public sources, public institution metadata, and mock fixtures.
+
 See [Architecture](docs/architecture.md) for data flow diagrams and design decisions.
 
 ---
@@ -67,7 +84,7 @@ See [Architecture](docs/architecture.md) for data flow diagrams and design decis
 | Context | Required Variables |
 |--------|---------------------|
 | **BFF** | `INSTITUTION_ID` (e.g., `hfmt`) |
-| **Mobile** | `EXPO_PUBLIC_BFF_BASE_URL` (production builds) |
+| **Mobile** | `EXPO_PUBLIC_BFF_BASE_URL` |
 
 Additional options: `BFF_PORT`, `CORS_ORIGINS`, `BFF_TRUST_PROXY`. See [Runbook → Configuration](docs/runbook.md#configuration) for full details.
 
@@ -78,11 +95,30 @@ Additional options: `BFF_PORT`, `CORS_ORIGINS`, `BFF_TRUST_PROXY`. See [Runbook 
 | Command | Description |
 |--------|-------------|
 | `pnpm dev` | Run BFF + mobile in parallel |
-| `pnpm verify` | Full CI check (lint, typecheck, test, build) |
+| `pnpm verify` | Full CI check (lint, typecheck, unit tests, build, E2E) |
 | `pnpm lint` | Lint all packages |
 | `pnpm typecheck` | TypeScript check |
 | `pnpm test` | Run tests |
+| `pnpm test:e2e` | Run deterministic BFF HTTP E2E tests |
 | `pnpm build` | Build all packages |
+
+---
+
+## E2E Tests
+
+The default E2E gate is process-level and starts the real compiled BFF on a
+temporary local port with `INSTITUTION_ID=mockuni` and `PUBLIC_EVENTS_MODE=mock`.
+It covers the public HTTP flows consumed by the mobile app: health, events,
+rooms, schedule, today, and invalid query handling.
+
+```bash
+pnpm install --frozen-lockfile
+pnpm test:e2e
+```
+
+Native mobile E2E tests use Detox under `apps/mobile/e2e/`. They require
+generated native iOS or Android projects and simulator/emulator tooling, so they
+are separate from the clean-checkout default gate.
 
 ---
 
@@ -101,7 +137,7 @@ Additional options: `BFF_PORT`, `CORS_ORIGINS`, `BFF_TRUST_PROXY`. See [Runbook 
 
 ## Status
 
-- **Version:** 1.0.0
+- **Version:** 1.1.0
 - **Changelog:** See [CHANGELOG.md](CHANGELOG.md)
 
 ---

@@ -112,7 +112,9 @@ describe("My Feature", () => {
 
 ## CI Integration
 
-E2E tests run in GitHub Actions. See `.github/workflows/e2e.yml` for configuration.
+The clean-checkout CI default is the root `pnpm test:e2e` BFF process test.
+These Detox tests run in GitHub Actions only when generated native iOS or Android
+projects are checked in. See `.github/workflows/e2e.yml` for configuration.
 
 ### Running in CI
 

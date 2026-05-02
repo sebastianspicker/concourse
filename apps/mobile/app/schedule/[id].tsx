@@ -5,12 +5,12 @@ import { MetaRow } from "@/ui/MetaRow";
 import { ResourceDetailScreen } from "@/ui/ResourceDetailScreen";
 import { formatEventDate, formatScheduleTime } from "@/utils/dateFormat";
 import { parseRouteItem } from "@/utils/routeItem";
-import type { ScheduleItem } from "@campus/shared";
+import { ScheduleItemSchema, type ScheduleItem } from "@campus/shared";
 
 export default function ScheduleDetailScreen(): JSX.Element {
   const { id, item } = useLocalSearchParams<{ id: string; item?: string }>();
   const { data, loading, error, refreshing, refresh } = useSchedule();
-  const routedItem = parseRouteItem<ScheduleItem>(item);
+  const routedItem = parseRouteItem<ScheduleItem>(item, ScheduleItemSchema);
   const scheduleItem = data?.schedule.find((entry) => entry.id === id) ?? (routedItem?.id === id ? routedItem : null);
 
   return (

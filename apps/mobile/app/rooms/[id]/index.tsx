@@ -4,11 +4,11 @@ import { useRooms } from "@/hooks/useRooms";
 import { MetaRow } from "@/ui/MetaRow";
 import { ResourceDetailScreen } from "@/ui/ResourceDetailScreen";
 import { parseRouteItem } from "@/utils/routeItem";
-import type { Room } from "@campus/shared";
+import { RoomSchema, type Room } from "@campus/shared";
 
 export default function RoomDetailScreen(): JSX.Element {
   const { id, item } = useLocalSearchParams<{ id: string; item?: string }>();
-  const routedRoom = parseRouteItem<Room>(item);
+  const routedRoom = parseRouteItem<Room>(item, RoomSchema);
   const hasRoutedItem = routedRoom?.id === id;
   const { data, loading, error, refreshing, refresh } = useRooms();
   const room = hasRoutedItem ? routedRoom : (data?.rooms.find((entry) => entry.id === id) ?? null);

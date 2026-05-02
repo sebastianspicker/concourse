@@ -12,8 +12,8 @@ export const BFF_ENV: BffEnv = {
   institutionId: requireNonEmpty(process.env.INSTITUTION_ID, "INSTITUTION_ID"),
   corsOrigins: parseCsv(process.env.CORS_ORIGINS),
   trustProxy: parseTrustProxy(process.env.BFF_TRUST_PROXY),
-  defaultCacheTtl: parseIntOrThrow(process.env.BFF_DEFAULT_CACHE_TTL ?? "300", "BFF_DEFAULT_CACHE_TTL"),
-  rruleExpansionHorizonDays: parseIntOrThrow(process.env.RRULE_EXPANSION_HORIZON_DAYS ?? "90", "RRULE_EXPANSION_HORIZON_DAYS")
+  defaultCacheTtl: parseIntInRange(process.env.BFF_DEFAULT_CACHE_TTL ?? "300", "BFF_DEFAULT_CACHE_TTL", 1, 86_400),
+  rruleExpansionHorizonDays: parseIntInRange(process.env.RRULE_EXPANSION_HORIZON_DAYS ?? "90", "RRULE_EXPANSION_HORIZON_DAYS", 1, 366)
 };
 
 export type TrustProxyMode = "never" | "auto" | "always";
@@ -43,14 +43,20 @@ function requireNonEmpty(value: string | undefined, name: string): string {
   return trimmed;
 }
 
-function parseIntOrThrow(raw: string, name: string): number {
-  const value = parseInt(raw, 10);
-  if (Number.isNaN(value)) throw new Error(`${name} must be a number`);
+function parseIntInRange(raw: string, name: string, min: number, max: number): number {
+  const trimmed = raw.trim();
+  if (!/^-?\d+$/.test(trimmed)) {
+    throw new Error(`${name} must be an integer`);
+  }
+  const value = Number(trimmed);
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new Error(`${name} must be between ${min} and ${max}`);
+  }
   return value;
 }
 
 function parseTrustProxy(value: string | undefined): TrustProxyMode {
-  if (!value) return "auto";
+  if (!value) return "never";
   const normalized = value.trim().toLowerCase();
   if (["1", "true", "yes", "always"].includes(normalized)) return "always";
   if (["0", "false", "no", "never"].includes(normalized)) return "never";

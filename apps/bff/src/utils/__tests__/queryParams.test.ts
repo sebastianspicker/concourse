@@ -99,14 +99,14 @@ describe("getDateParam", () => {
 });
 
 describe("parseEventsFilter", () => {
-  it("clamps limit to [0, 1000]", () => {
+  it("rejects limit above 1000", () => {
     const params = new URLSearchParams("limit=9999");
-    expect(parseEventsFilter(params).limit).toBe(1000);
+    expect(() => parseEventsFilter(params)).toThrow("limit must be an integer between 1 and 1000");
   });
 
-  it("floors negative limit to 0", () => {
+  it("rejects negative limit", () => {
     const params = new URLSearchParams("limit=-5");
-    expect(parseEventsFilter(params).limit).toBe(0);
+    expect(() => parseEventsFilter(params)).toThrow("limit must be an integer between 1 and 1000");
   });
 
   it("truncates search to 200 chars", () => {
@@ -119,9 +119,9 @@ describe("parseEventsFilter", () => {
     expect(parseEventsFilter(params).offset).toBe(0);
   });
 
-  it("floors fractional limit", () => {
+  it("rejects fractional limit", () => {
     const params = new URLSearchParams("limit=7.9");
-    expect(parseEventsFilter(params).limit).toBe(7);
+    expect(() => parseEventsFilter(params)).toThrow("limit must be an integer between 1 and 1000");
   });
 });
 

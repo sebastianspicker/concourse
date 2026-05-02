@@ -40,16 +40,16 @@ describe("fetchPublicSchedule", () => {
   });
 
   it("parses schedule and campus id", async () => {
-    const schedule = await fetchPublicSchedule(institution);
+    const result = await fetchPublicSchedule(institution);
 
-    expect(schedule.length).toBe(2);
-    expect(schedule[0].campusId).toBe("cologne");
+    expect(result.degraded).toBe(false);
+    expect(result.schedule.length).toBe(2);
+    expect(result.schedule[0].campusId).toBe("cologne");
   });
 
-  it("returns empty array on fetch failure", async () => {
+  it("throws on fetch failure so empty upstream failures are not cached as valid data", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("timeout")));
 
-    const schedule = await fetchPublicSchedule(institution);
-    expect(schedule).toEqual([]);
+    await expect(fetchPublicSchedule(institution)).rejects.toThrow("All public schedule sources failed");
   });
 });

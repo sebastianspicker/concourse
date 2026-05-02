@@ -22,6 +22,18 @@ describe("@campus/shared schemas", () => {
     ).not.toThrow();
   });
 
+  it("rejects invalid institution pack timezones", () => {
+    expect(() =>
+      InstitutionPackSchema.parse({
+        id: "hfmt",
+        name: "Example University",
+        type: "music-and-dance",
+        campuses: [],
+        timezone: "not-a-timezone"
+      })
+    ).toThrow();
+  });
+
   it("parses empty responses", () => {
     expect(() => EventsResponseSchema.parse({ events: [] })).not.toThrow();
     expect(() => ScheduleResponseSchema.parse({ schedule: [] })).not.toThrow();
@@ -30,4 +42,3 @@ describe("@campus/shared schemas", () => {
     ).not.toThrow();
   });
 });
-

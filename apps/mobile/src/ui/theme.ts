@@ -30,46 +30,41 @@ export type ThemeUi = {
   borderRadiusScale: number;
 };
 
-// ============================================
-// WCAG AA Contrast Ratio Compliance
-// ============================================
-// Text contrast ratios:
-// - Normal text (< 18pt): 4.5:1 minimum
-// - Large text (>= 18pt or 14pt bold): 3:1 minimum
-// - UI components: 3:1 minimum
+// Palette choices target WCAG AA contrast: 4.5:1 for normal text,
+// 3:1 for large text and UI component boundaries.
 
-// Light theme colors - Sophisticated, clean, airy 2026 aesthetic
+// Default light theme tokens.
 const lightColors: ThemeColors = {
-  background: "#fcfcfc",      // Crisp super-warm white
-  surface: "#ffffff",         // Pure white for elevated surfaces
-  text: "#111113",            // Deep ink black
-  muted: "#6b7280",           // Refined cool gray
-  accent: "#4f46e5",          // Deep neon indigo/violet
-  accentText: "#ffffff",      // Contrast for accent
-  border: "rgba(0, 0, 0, 0.05)", // Ultra-subtle border
+  background: "#fcfcfc",
+  surface: "#ffffff",
+  text: "#111113",
+  muted: "#6b7280",
+  accent: "#4f46e5",
+  accentText: "#ffffff",
+  border: "rgba(0, 0, 0, 0.05)",
   error: "#ef4444",
   success: "#10b981",
   warning: "#f59e0b",
   info: "#3b82f6",
-  overlay: "rgba(0, 0, 0, 0.15)", // Softer translucent overlay
+  overlay: "rgba(0, 0, 0, 0.15)",
   disabled: "#9ca3af",
   placeholder: "#9ca3af",
 };
 
-// Dark theme colors - "Deep Space Glass" 2026 premium aesthetic
+// Default dark theme tokens.
 const darkColors: ThemeColors = {
-  background: "#000000",      // Deep space OLED black
-  surface: "#111113",         // Very dark premium tint
-  text: "#f9fafb",            // Crisper off-white
-  muted: "#9ca3af",           // Visible gray
-  accent: "#818cf8",          // Neon vibrant indigo
-  accentText: "#000000",      // For buttons with bright backgrounds
-  border: "rgba(255, 255, 255, 0.08)", // Barely-there structural line
+  background: "#000000",
+  surface: "#111113",
+  text: "#f9fafb",
+  muted: "#9ca3af",
+  accent: "#818cf8",
+  accentText: "#000000",
+  border: "rgba(255, 255, 255, 0.08)",
   error: "#f87171",
   success: "#4ade80",
   warning: "#fbbf24",
   info: "#60a5fa",
-  overlay: "rgba(0, 0, 0, 0.65)", // Deeper cinematic blur backdrop
+  overlay: "rgba(0, 0, 0, 0.65)",
   disabled: "#4b5563",
   placeholder: "#4b5563",
 };
@@ -95,10 +90,11 @@ const accessibilityColors: ThemeColors = {
 const standardUi: ThemeUi = {
   fontScale: 1,
   controlScale: 1,
-  // Thinner borders for elegance (React Native supports sub-pixel values like StyleSheet.hairlineWidth, but we'll use a precise thin stroke)
+  // React Native supports sub-pixel border widths; this keeps cards separated
+  // without making every surface look boxed.
   borderWidth: 0.5,
   emphasisBorderWidth: 1.5,
-  // Larger, softer curves matching Apple/Google 2026 fluid design guidelines
+  // Keep radius changes centralized so accessibility mode can tighten shapes.
   borderRadiusScale: 1.5,
 };
 
@@ -110,7 +106,6 @@ const accessibilityUi: ThemeUi = {
   borderRadiusScale: 1.08,
 };
 
-// Export both color schemes for dynamic switching
 export const colorSchemes: Record<ColorScheme, ThemeColors> = {
   light: lightColors,
   dark: darkColors,
@@ -329,4 +324,3 @@ export function scaledRadius(value: number, ui: ThemeUi): number {
 export function scaledFont(value: number, ui: ThemeUi): number {
   return Math.round(value * ui.fontScale);
 }
-

@@ -25,7 +25,7 @@ export function Card({
 
   return (
     <Animated.View
-      entering={FadeIn.duration(500).delay(50)} // Luxurious entrance fade
+      entering={FadeIn.duration(500).delay(50)}
       style={[
         styles.card,
         isDark ? shadows.md : shadows.sm,
@@ -37,7 +37,6 @@ export function Card({
         },
       ]}
     >
-      {/* 2026 Glass Edge Overlay - Adds a subtle premium inner highlight */}
       <View
         style={[
           styles.glassEdge,
@@ -86,7 +85,7 @@ export function Card({
 const styles = StyleSheet.create({
   card: {
     borderCurve: "continuous",
-    position: "relative", // For glass edge constraint
+    position: "relative",
   },
   glassEdge: {
     position: "absolute",
@@ -98,12 +97,12 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.body,
-    fontWeight: "700", // Polished bold
-    letterSpacing: -0.3, // Modern tight tracking
+    fontWeight: "700",
+    letterSpacing: -0.3,
   },
   subtitle: {
     ...typography.caption,
-    marginTop: spacing.xs, // Tighter coupling to title for visual grouping
+    marginTop: spacing.xs,
     fontWeight: "400",
     letterSpacing: 0.1,
   }

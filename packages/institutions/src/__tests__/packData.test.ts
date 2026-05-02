@@ -77,6 +77,12 @@ describe("Institution pack data validation", () => {
     });
   });
 
+  describe("HfMT public schedule configuration", () => {
+    it("does not advertise a schedule source until a live public calendar is configured", () => {
+      expect(hfmtPublicPack.publicSources.schedules).toEqual([]);
+    });
+  });
+
   describe("load without throwing", () => {
     it.each(allPacks)("pack '$id' loads via getInstitutionPack without throwing", ({ id }) => {
       expect(() => getInstitutionPack(id)).not.toThrow();

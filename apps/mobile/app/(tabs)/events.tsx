@@ -8,7 +8,6 @@ import { Screen } from "@/ui/Screen";
 import { scaledRadius, spacing, typography } from "@/ui/theme";
 import { useTheme } from "@/ui/ThemeContext";
 import { formatEventDate } from "@/utils/dateFormat";
-import { serializeRouteItem } from "@/utils/routeItem";
 import type { PublicEvent } from "@campus/shared";
 
 type SortDirection = "asc" | "desc";
@@ -35,7 +34,7 @@ export default function EventsScreen(): JSX.Element {
 
   const keyExtractor = useCallback((e: PublicEvent) => e.id, []);
   const href = useCallback(
-    (e: PublicEvent) => ({ pathname: "/events/[id]" as const, params: { id: e.id, item: serializeRouteItem(e) } }),
+    (e: PublicEvent) => ({ pathname: "/events/[id]" as const, params: { id: e.id } }),
     []
   );
   const renderCard = useCallback(

@@ -61,10 +61,9 @@ describe("GET /events — negative paths", () => {
 
     await handleEvents(req, response, institution);
 
-    expect(getStatus()).toBe(200);
+    expect(getStatus()).toBe(400);
     const body = JSON.parse(getBody() ?? "{}");
-    expect(body).toHaveProperty("events");
-    expect(Array.isArray(body.events)).toBe(true);
+    expect(body.error.code).toBe("bad_request");
   });
 
   it("handles negative offset query param", async () => {
@@ -145,8 +144,8 @@ describe("GET /events — negative paths", () => {
 
     await handleEvents(req, response, institution);
 
-    expect(getStatus()).toBe(200);
+    expect(getStatus()).toBe(400);
     const body = JSON.parse(getBody() ?? "{}");
-    expect(body).toHaveProperty("events");
+    expect(body.error.code).toBe("bad_request");
   });
 });

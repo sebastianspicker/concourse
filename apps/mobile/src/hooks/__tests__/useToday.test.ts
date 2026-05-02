@@ -32,6 +32,7 @@ describe("useToday", () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     delete process.env.EXPO_PUBLIC_BFF_BASE_URL;
     await clearPersistedCache();
@@ -39,13 +40,20 @@ describe("useToday", () => {
 
   it("loads today", async () => {
     const { getResult, flush, unmount } = renderHook(useToday);
+    const now = new Date();
+    const expectedDate = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0")
+    ].join("-");
 
     expect(getResult().loading).toBe(true);
     await flush();
 
     expect(getResult().loading).toBe(false);
     expect(getResult().data?.events.length).toBe(1);
-    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toContain("/today?date=");
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toContain("/today");
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toContain(`date=${expectedDate}`);
     unmount();
   });
 });

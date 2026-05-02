@@ -12,7 +12,7 @@ Semantic Versioning:
 
 Before tagging a release:
 
-1. CI checks pass on the current default branch (`main`; migrate to `dev` before final release)
+1. CI checks pass on the current default branch (`main`)
 2. `CHANGELOG.md` has a section for the new version
 3. All `package.json` files have the new version
 4. Docs are up to date

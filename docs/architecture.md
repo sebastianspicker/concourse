@@ -91,6 +91,15 @@ sequenceDiagram
 3. Responses are normalized into shared domain models (Zod-validated).
 4. Mobile app renders the data and caches briefly (e.g. `getCachedJson`).
 
+## Runtime invariants
+
+- `INSTITUTION_ID` selects exactly one public institution pack at BFF startup. Unknown ids fail startup or route handling instead of silently falling back to another pack.
+- Data routes return `404 not_found` when the selected pack has no source configured for that route. That is different from an empty but valid upstream result.
+- Public event and schedule connectors may return `_degraded: true` plus `x-data-degraded: true` when at least one configured source failed but some usable data remains.
+- Degraded connector results are intentionally not cached in the BFF; the next request should be able to recover as soon as the upstream source recovers.
+- Shared Zod schemas in `packages/shared` are the cross-layer contract. The BFF validates outbound payloads against them, and the mobile client validates inbound payloads against the same schemas.
+- Dates from public sources are normalized to ISO strings with offsets. Institution packs may set `timezone`; otherwise the BFF uses `Europe/Berlin` for campus-local date handling.
+
 ## Expo API Routes
 
 The mobile app can also expose server-side API routes using Expo Router's `+api.ts` convention (files under `apps/mobile/app/` with the `+api.ts` suffix). These run on the dev server in development and on EAS Hosting in production.

@@ -7,6 +7,7 @@ import { log } from "../../utils/logger";
 import { parseDateTimeInTimeZone } from "../../utils/timeZone";
 import { buildEventId } from "./eventId";
 import { BFF_ENV } from "../../config/env";
+import mockuniEventsFixture from "../../__fixtures__/mockuni-events.json";
 
 const DEFAULT_TIME_ZONE = "Europe/Berlin";
 const MAX_EVENTS_PER_SOURCE = 8;
@@ -27,9 +28,6 @@ function getEventsBreaker(sourceUrl: string): CircuitBreaker {
   return breaker;
 }
 
-// Import mock fixtures for mock mode
-import mockuniEventsFixture from "../../__fixtures__/mockuni-events.json";
-
 export type FetchPublicEventsResult = { events: PublicEvent[]; degraded: boolean };
 
 export async function fetchPublicEvents(
@@ -47,7 +45,8 @@ export async function fetchPublicEvents(
     cacheKey,
     async (): Promise<FetchPublicEventsResult> => {
       if (mode === "mock") {
-        // Use institution-specific fixture if available
+        // Mock mode is deterministic for tests and demos; real deployments
+        // should keep PUBLIC_EVENTS_MODE unset so public sources are fetched.
         if (institution.id === "mockuni") {
           const fixtureEvents = mockuniEventsFixture.events as PublicEvent[];
           return { events: fixtureEvents, degraded: false };
@@ -67,7 +66,7 @@ export async function fetchPublicEvents(
 
       let anyFailed = false;
       const timeZone = institution.timezone ?? DEFAULT_TIME_ZONE;
-      const settlement = await Promise.allSettled(
+      const settledSources = await Promise.allSettled(
         sources.map(async (source: { url: string; label: string }) => {
           const html = await getEventsBreaker(source.url).call(() => fetchTextWithTimeout(source.url));
           return extractEventsFromHtml(html, source.url, timeZone);
@@ -75,7 +74,7 @@ export async function fetchPublicEvents(
       );
 
       const parsedEvents: PublicEvent[] = [];
-      settlement.forEach((result: PromiseSettledResult<PublicEvent[]>, index: number) => {
+      settledSources.forEach((result: PromiseSettledResult<PublicEvent[]>, index: number) => {
         if (result.status === "fulfilled") {
           parsedEvents.push(...result.value);
         } else {
@@ -102,6 +101,8 @@ export async function fetchPublicEvents(
         };
       });
 
+      // Returning source labels is a degraded fallback: it keeps the app usable
+      // during upstream HTML changes without pretending the data is fresh.
       const degradedResult: FetchPublicEventsResult = { events: fallbackEvents, degraded: true };
       return degradedResult;
     },
@@ -128,6 +129,8 @@ function extractHfmtEvents(
   timeZone: string,
 ): PublicEvent[] {
   const events: PublicEvent[] = [];
+  // The public HfMT site has used multiple event-card shapes. Prefer explicit
+  // article markup, then event tiles, then the generic link fallback.
   const blocks = html.match(/<article[\s\S]*?<\/article>/gi) ?? [];
 
   for (const block of blocks) {

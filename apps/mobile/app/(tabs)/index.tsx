@@ -93,7 +93,7 @@ export default function TodayScreen(): JSX.Element {
 
   const eventsKeyExtractor = useCallback((e: PublicEvent) => e.id, []);
   const eventsHref = useCallback(
-    (e: PublicEvent) => ({ pathname: "/events/[id]" as const, params: { id: e.id, item: serializeRouteItem(e) } }),
+    (e: PublicEvent) => ({ pathname: "/events/[id]" as const, params: { id: e.id } }),
     []
   );
   const eventsRenderCard = useCallback(

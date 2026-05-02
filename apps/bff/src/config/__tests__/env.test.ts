@@ -57,19 +57,28 @@ describe("BFF_ENV", () => {
     expect(BFF_ENV.corsOrigins).toEqual([]);
   });
 
-  it("parses BFF_TRUST_PROXY values", async () => {
+  it.each([
+    ["auto", "auto"],
+    ["always", "always"],
+    ["true", "always"],
+    ["1", "always"],
+    ["never", "never"],
+    ["false", "never"],
+    ["0", "never"]
+  ] as const)("parses BFF_TRUST_PROXY=%s as %s", async (raw, expected) => {
     process.env.INSTITUTION_ID = "test";
+    process.env.BFF_TRUST_PROXY = raw;
 
-    process.env.BFF_TRUST_PROXY = "always";
-    const mod1 = await import("../env");
-    expect(mod1.BFF_ENV.trustProxy).toBe("always");
+    const { BFF_ENV } = await import("../env");
+
+    expect(BFF_ENV.trustProxy).toBe(expected);
   });
 
-  it("defaults trustProxy to auto", async () => {
+  it("defaults trustProxy to never", async () => {
     process.env.INSTITUTION_ID = "test";
     delete process.env.BFF_TRUST_PROXY;
     const { BFF_ENV } = await import("../env");
-    expect(BFF_ENV.trustProxy).toBe("auto");
+    expect(BFF_ENV.trustProxy).toBe("never");
   });
 
   it("defaults cache TTL to 300s", async () => {
@@ -77,5 +86,23 @@ describe("BFF_ENV", () => {
     delete process.env.BFF_DEFAULT_CACHE_TTL;
     const { BFF_ENV } = await import("../env");
     expect(BFF_ENV.defaultCacheTtl).toBe(300);
+  });
+
+  it("rejects partial numeric cache TTL values", async () => {
+    process.env.INSTITUTION_ID = "test";
+    process.env.BFF_DEFAULT_CACHE_TTL = "300s";
+    await expect(import("../env")).rejects.toThrow("BFF_DEFAULT_CACHE_TTL must be an integer");
+  });
+
+  it("rejects out-of-range cache TTL values", async () => {
+    process.env.INSTITUTION_ID = "test";
+    process.env.BFF_DEFAULT_CACHE_TTL = "-1";
+    await expect(import("../env")).rejects.toThrow("BFF_DEFAULT_CACHE_TTL must be between 1 and 86400");
+  });
+
+  it("rejects zero RRULE expansion horizon", async () => {
+    process.env.INSTITUTION_ID = "test";
+    process.env.RRULE_EXPANSION_HORIZON_DAYS = "0";
+    await expect(import("../env")).rejects.toThrow("RRULE_EXPANSION_HORIZON_DAYS must be between 1 and 366");
   });
 });
