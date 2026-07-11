@@ -8,6 +8,15 @@ import {
 import { scaled, spacing } from "./theme";
 import { useTheme } from "./ThemeContext";
 
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: spacing.xxl * 2,
+  },
+});
+
 export function Screen({
   children,
   scroll = true,
@@ -55,12 +64,3 @@ export function Screen({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: spacing.xxl * 2,
-  },
-});

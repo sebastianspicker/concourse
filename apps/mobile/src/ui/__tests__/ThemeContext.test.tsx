@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { expect, it, vi, beforeEach, afterEach } from "vitest";
 import TestRenderer, { act } from "react-test-renderer";
 import React from "react";
 import {
@@ -56,17 +56,16 @@ async function flushAsync(): Promise<void> {
   });
 }
 
-describe("ThemeContext", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUseColorScheme.mockReturnValue("light");
-    mockGetItem.mockResolvedValue(null);
-    mockSetItem.mockResolvedValue(undefined);
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockUseColorScheme.mockReturnValue("light");
+  mockGetItem.mockResolvedValue(null);
+  mockSetItem.mockResolvedValue(undefined);
+});
 
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
+afterEach(() => {
+  vi.clearAllMocks();
+});
 
   it("defaults to dark preference after loading", async () => {
     const tree = TestRenderer.create(
@@ -295,4 +294,3 @@ describe("ThemeContext", () => {
       "accessibility"
     );
   });
-});

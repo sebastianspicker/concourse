@@ -3,6 +3,25 @@ import { StyleSheet, Text, View } from "react-native";
 import { scaled, scaledFont, spacing, typography, withOpacity } from "./theme";
 import { useTheme } from "./ThemeContext";
 
+const styles = StyleSheet.create({
+  section: {},
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  titleAccent: {
+    height: 14,
+  },
+  title: {
+    ...typography.small,
+  },
+  body: {
+    gap: spacing.md,
+  },
+});
+
 export function Section({
   title,
   children
@@ -46,22 +65,3 @@ export function Section({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  section: {},
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  titleAccent: {
-    height: 14,
-  },
-  title: {
-    ...typography.small,
-  },
-  body: {
-    gap: spacing.md,
-  },
-});

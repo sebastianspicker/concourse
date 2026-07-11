@@ -2,86 +2,89 @@ import type { IncomingMessage } from "node:http";
 import { isIP } from "node:net";
 import type { TrustProxyMode } from "../config/env";
 
+const IPV6_MAPPED_IPV4_PREFIX = "::ffff:";
+
 function normalizeIp(value: string | null | undefined): string | null {
   if (!value) return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
   // Strip IPv6 zone IDs (e.g., "fe80::1%eth0" -> "fe80::1") for consistent comparison
   const withoutZone = trimmed.split("%")[0];
-  const withoutMappedV6 = withoutZone.startsWith("::ffff:")
-    ? withoutZone.slice("::ffff:".length)
+  const withoutMappedV6 = withoutZone.startsWith(IPV6_MAPPED_IPV4_PREFIX)
+    ? withoutZone.slice(IPV6_MAPPED_IPV4_PREFIX.length)
     : withoutZone;
   return withoutMappedV6;
 }
 
+const FORWARDED_FOR_PATTERN = /for=([^;,\s]+)/i;
+
 function parseForwardedHeader(header: string): string | null {
   // Forwarded: for=192.0.2.60;proto=http;by=203.0.113.43
-  const match = header.match(/for=([^;,\s]+)/i);
-  if (!match) return null;
-  let value = match[1].trim();
-  if (value.startsWith("\"") && value.endsWith("\"")) {
-    value = value.slice(1, -1);
-  }
+  const match = header.match(FORWARDED_FOR_PATTERN);
+  return match ? stripPort(unquoteHeaderValue(match[1].trim())) : null;
+}
+
+const QUOTE = "\"";
+
+function unquoteHeaderValue(value: string): string {
+  return value.startsWith(QUOTE) && value.endsWith(QUOTE) ? value.slice(1, -1) : value;
+}
+
+function shouldTrustForwarded(remoteAddress: string, trustProxy: TrustProxyMode): boolean {
+  return trustProxy === "always" || (trustProxy === "auto" && isPrivateAddress(remoteAddress));
+}
+
+const FORWARDED_HEADERS = {
+  forwarded: "forwarded",
+  xForwardedFor: "x-forwarded-for"
+} as const;
+
+function getForwardedClientIp(req: IncomingMessage): string | null {
+  return parseXForwardedFor(getHeaderValue(req.headers[FORWARDED_HEADERS.xForwardedFor]))
+    ?? parseForwardedFor(getHeaderValue(req.headers[FORWARDED_HEADERS.forwarded]));
+}
+
+function getHeaderValue(value: IncomingMessage["headers"][string]): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+const X_FORWARDED_FOR_SEPARATOR = ",";
+
+function parseXForwardedFor(value: string | undefined): string | null {
+  const first = value?.split(X_FORWARDED_FOR_SEPARATOR)[0]?.trim();
+  if (!first) return null;
+  return toValidIp(stripPort(first));
+}
+
+function parseForwardedFor(value: string | undefined): string | null {
+  if (!value) return null;
+  return toValidIp(parseForwardedHeader(value));
+}
+
+const NUMERIC_PORT_PATTERN = /^\d+$/;
+
+function stripPort(value: string): string {
   if (value.startsWith("[")) {
     const end = value.indexOf("]");
-    if (end > 1) {
-      return value.slice(1, end);
-    }
+    return end === -1 ? value : value.slice(1, end);
   }
-  // host:port (IPv4 or hostname) – port is numeric suffix; do not split IPv6 on ":"
   const lastColon = value.lastIndexOf(":");
-  if (lastColon !== -1) {
-    const after = value.slice(lastColon + 1);
-    if (/^\d+$/.test(after)) return value.slice(0, lastColon);
-  }
-  return value;
+  return lastColon !== -1 && value.indexOf(":") === lastColon && NUMERIC_PORT_PATTERN.test(value.slice(lastColon + 1))
+    ? value.slice(0, lastColon)
+    : value;
 }
 
-type ClientKeyOptions = {
-  trustProxy?: TrustProxyMode;
-};
+const IPV4_OCTET_SEPARATOR = ".";
 
-export function getClientKey(req: IncomingMessage, options?: ClientKeyOptions): string {
-  const remoteAddress = normalizeIp(req.socket.remoteAddress) ?? "unknown";
-  const trustProxy = options?.trustProxy ?? "never";
-  const canTrustForwarded =
-    trustProxy === "always" || (trustProxy === "auto" && isPrivateAddress(remoteAddress));
-
-  if (canTrustForwarded) {
-    const xff = req.headers["x-forwarded-for"];
-    const xffValue = Array.isArray(xff) ? xff[0] : xff;
-    if (typeof xffValue === "string" && xffValue.trim()) {
-      const first = xffValue.split(",")[0].trim();
-      // Handle IP:port or [IPv6]:port
-      let ipPart = first;
-      if (first.startsWith("[")) {
-        const end = first.indexOf("]");
-        if (end !== -1) ipPart = first.slice(1, end);
-      } else {
-        const lastColon = first.lastIndexOf(":");
-        if (lastColon !== -1 && first.indexOf(":") === lastColon) {
-          // Likely IPv4:port
-          ipPart = first.slice(0, lastColon);
-        }
-      }
-      const candidate = normalizeIp(ipPart);
-      if (candidate && isValidIp(candidate)) return candidate;
-    }
-
-    const forwarded = req.headers["forwarded"];
-    const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-    if (typeof forwardedValue === "string") {
-      const parsed = parseForwardedHeader(forwardedValue);
-      const candidate = normalizeIp(parsed);
-      if (candidate && isValidIp(candidate)) return candidate;
-    }
-  }
-
-  return remoteAddress;
+function toValidIp(value: string | null): string | null {
+  const candidate = normalizeIp(value);
+  return candidate && isValidIp(candidate) ? candidate : null;
 }
+
+const UNKNOWN_ADDRESS = "unknown";
 
 function isPrivateAddress(value: string): boolean {
-  if (value === "unknown") return false;
+  if (value === UNKNOWN_ADDRESS) return false;
   const normalized = value.split("%")[0].toLowerCase();
 
   if (normalized.includes(".")) {
@@ -91,31 +94,74 @@ function isPrivateAddress(value: string): boolean {
   return isPrivateIpv6(normalized);
 }
 
-function isPrivateIpv4(value: string): boolean {
-  const parts = value.split(".");
-  if (parts.length !== 4) return false;
+function parseIpv4Octets(value: string): [number, number, number, number] | null {
+  const parts = value.split(IPV4_OCTET_SEPARATOR);
+  if (parts.length !== 4) return null;
   const nums = parts.map((part) => Number(part));
-  if (nums.some((num) => !Number.isInteger(num) || num < 0 || num > 255)) return false;
-
-  const [first, second] = nums;
-  if (first === 10) return true;
-  if (first === 127) return true;
-  if (first === 169 && second === 254) return true;
-  if (first === 192 && second === 168) return true;
-  if (first === 172 && second >= 16 && second <= 31) return true;
-  return false;
+  return nums.every((num) => Number.isInteger(num) && num >= 0 && num <= 255)
+    ? nums as [number, number, number, number]
+    : null;
 }
+
+const PRIVATE_IPV4_RANGES = {
+  linkLocalFirst: 169,
+  linkLocalSecond: 254,
+  localFirst: 127,
+  privateFirst: 10,
+  privateSecondFirst: 172,
+  privateSecondMax: 31,
+  privateSecondMin: 16,
+  siteLocalFirst: 192,
+  siteLocalSecond: 168
+} as const;
+
+function isPrivateIpv4(value: string): boolean {
+  const octets = parseIpv4Octets(value);
+  if (!octets) return false;
+  const [first, second] = octets;
+  return isPrivateIpv4Prefix(first) || isPrivateIpv4Pair(first, second);
+}
+
+const PRIVATE_IPV4_SINGLE_FIRST_OCTETS: ReadonlySet<number> = new Set([
+  PRIVATE_IPV4_RANGES.privateFirst,
+  PRIVATE_IPV4_RANGES.localFirst
+]);
+
+function isPrivateIpv4Prefix(first: number): boolean {
+  return PRIVATE_IPV4_SINGLE_FIRST_OCTETS.has(first);
+}
+
+const SECOND_PRIVATE_IPV4_RANGE = PRIVATE_IPV4_RANGES.privateSecondFirst;
+
+function isPrivateIpv4Pair(first: number, second: number): boolean {
+  if (first === PRIVATE_IPV4_RANGES.linkLocalFirst) return second === PRIVATE_IPV4_RANGES.linkLocalSecond;
+  if (first === PRIVATE_IPV4_RANGES.siteLocalFirst) return second === PRIVATE_IPV4_RANGES.siteLocalSecond;
+  if (first !== SECOND_PRIVATE_IPV4_RANGE) return false;
+  return second >= PRIVATE_IPV4_RANGES.privateSecondMin && second <= PRIVATE_IPV4_RANGES.privateSecondMax;
+}
+
+const PRIVATE_IPV6_PREFIXES = ["fc", "fd", "fe8", "fe9", "fea", "feb"] as const;
 
 function isPrivateIpv6(value: string): boolean {
   if (value === "::1") return true;
-  if (value.startsWith("fc") || value.startsWith("fd")) return true;
-  if (value.startsWith("fe8") || value.startsWith("fe9")) return true;
-  if (value.startsWith("fea") || value.startsWith("feb")) return true;
-  return false;
+  return PRIVATE_IPV6_PREFIXES.some((prefix) => value.startsWith(prefix));
 }
 
 function isValidIp(value: string): boolean {
-  if (!value || value === "unknown") return false;
+  if (!value || value === UNKNOWN_ADDRESS) return false;
   const trimmed = value.trim();
   return isIP(trimmed.split("%")[0]) !== 0;
+}
+
+type ClientKeyOptions = {
+  trustProxy?: TrustProxyMode;
+};
+
+export function getClientKey(req: IncomingMessage, options?: ClientKeyOptions): string {
+  const remoteAddress = normalizeIp(req.socket.remoteAddress) ?? UNKNOWN_ADDRESS;
+  if (!shouldTrustForwarded(remoteAddress, options?.trustProxy ?? "never")) {
+    return remoteAddress;
+  }
+
+  return getForwardedClientIp(req) ?? remoteAddress;
 }

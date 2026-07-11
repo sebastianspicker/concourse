@@ -14,6 +14,9 @@ export type ParsedIcsEvent = {
   recurringInstanceId?: string;
 };
 
+type IcsProperty = { value: string; params: Record<string, string> };
+type IcsPropertyMap = Record<string, IcsProperty>;
+
 // Bound open-ended RRULEs so a single public calendar entry cannot produce an
 // unbounded response or dominate request time.
 const DEFAULT_RRULE_HORIZON_DAYS = 90;
@@ -59,19 +62,33 @@ function unfoldLines(input: string): string[] {
   return unfolded;
 }
 
+function parseAllDayIcsDate(value: string): string | undefined {
+  if (!/^\d{8}$/.test(value)) {
+    return undefined;
+  }
+
+  const year = value.slice(0, 4);
+  const month = value.slice(4, 6);
+  const day = value.slice(6, 8);
+  return validIsoDate(`${year}-${month}-${day}T00:00:00.000Z`, value);
+}
+
+function validIsoDate(dateValue: string, originalValue: string): string {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid ICS date: ${originalValue}`);
+  }
+  return date.toISOString();
+}
+
+function normalizeOffset(suffix: string): string {
+  return suffix.includes(":") ? suffix : `${suffix.slice(0, 3)}:${suffix.slice(3)}`;
+}
+
 function parseIcsDate(value: string, tzid?: string): string {
-  // DATE (all-day)
-  if (/^\d{8}$/.test(value)) {
-    const year = value.slice(0, 4);
-    const month = value.slice(4, 6);
-    const day = value.slice(6, 8);
-    // All-day ICS values have no timezone or wall-clock time. Store a stable
-    // midnight UTC boundary and leave display localization to the client.
-    const date = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
-    if (Number.isNaN(date.getTime())) {
-      throw new Error(`Invalid ICS date: ${value}`);
-    }
-    return date.toISOString();
+  const allDayDate = parseAllDayIcsDate(value);
+  if (allDayDate) {
+    return allDayDate;
   }
 
   const match = value.match(
@@ -82,23 +99,14 @@ function parseIcsDate(value: string, tzid?: string): string {
   }
 
   const [, year, month, day, hour, minute, second = "00", suffix] = match;
+  const dateTime = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+
   if (suffix === "Z") {
-    const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}.000Z`);
-    if (Number.isNaN(date.getTime())) {
-      throw new Error(`Invalid ICS date: ${value}`);
-    }
-    return date.toISOString();
+    return validIsoDate(`${dateTime}.000Z`, value);
   }
 
-  if (suffix && suffix !== "Z") {
-    const normalizedOffset = suffix.includes(":")
-      ? suffix
-      : `${suffix.slice(0, 3)}:${suffix.slice(3)}`;
-    const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}${normalizedOffset}`);
-    if (Number.isNaN(date.getTime())) {
-      throw new Error(`Invalid ICS date: ${value}`);
-    }
-    return date.toISOString();
+  if (suffix) {
+    return validIsoDate(`${dateTime}${normalizeOffset(suffix)}`, value);
   }
 
   if (tzid) {
@@ -115,20 +123,10 @@ function parseIcsDate(value: string, tzid?: string): string {
     );
   }
 
-  const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}.000Z`);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid ICS date: ${value}`);
-  }
-  return date.toISOString();
+  return validIsoDate(`${dateTime}.000Z`, value);
 }
 
-function unescapeIcsValue(value: string): string {
-  return value
-    .replace(/\\n/gi, "\n")
-    .replace(/\\,/g, ",")
-    .replace(/\\;/g, ";")
-    .replace(/\\\\/g, "\\");
-}
+const RRULE_PREFIX = "RRULE:";
 
 /**
  * Expand a recurring event based on its RRULE.
@@ -148,7 +146,7 @@ function expandRecurringEvent(
 
     // rrulestr expects the rule to start with "RRULE:" even though many feeds
     // store only the property value after parsing.
-    const ruleString = rruleValue.startsWith("RRULE:") ? rruleValue : `RRULE:${rruleValue}`;
+    const ruleString = rruleValue.startsWith(RRULE_PREFIX) ? rruleValue : `${RRULE_PREFIX}${rruleValue}`;
 
     let rrule: RRule;
     try {
@@ -210,6 +208,84 @@ function expandRecurringEvent(
   }
 }
 
+function parseIcsParams(paramParts: string[]): Record<string, string> {
+  const params: Record<string, string> = {};
+  for (const part of paramParts) {
+    const [pKey, pVal] = part.split("=");
+    if (pKey && pVal) {
+      // Quoted parameter values are valid ICS syntax, e.g. TZID="Europe/Berlin".
+      params[pKey] = pVal.replace(/^"(.*)"$/, "$1");
+    }
+  }
+  return params;
+}
+
+function parsePropertyLine(line: string): { key: string; property: IcsProperty } | undefined {
+  if (!line.includes(":")) {
+    return undefined;
+  }
+
+  const [rawKey, ...rest] = line.split(":");
+  const value = rest.join(":");
+  if (!rawKey) {
+    return undefined;
+  }
+
+  const [key, ...paramParts] = rawKey.split(";");
+  return { key, property: { value: value.trim(), params: parseIcsParams(paramParts) } };
+}
+
+function parseExdatePart(datePart: string): Date | undefined {
+  const trimmed = datePart.trim();
+  if (!trimmed) return undefined;
+  try {
+    return new Date(parseIcsDate(trimmed));
+  } catch {
+    // Invalid EXDATE values should not invalidate the parent event.
+    return undefined;
+  }
+}
+
+const EXCLUDED_DATE_VALUE_SEPARATOR = ",";
+
+function parseExdates(currentExdates: string[]): Date[] {
+  const parsedExdates: Date[] = [];
+  for (const exdateStr of currentExdates) {
+    for (const datePart of exdateStr.split(EXCLUDED_DATE_VALUE_SEPARATOR)) {
+      const parsed = parseExdatePart(datePart);
+      if (parsed) parsedExdates.push(parsed);
+    }
+  }
+  return parsedExdates;
+}
+
+function appendParsedEvent(
+  events: ParsedIcsEvent[],
+  current: IcsPropertyMap,
+  currentExdates: string[],
+  horizonDays: number,
+  maxInstances: number
+): void {
+  const summary = current.SUMMARY?.value?.trim();
+  const dtStart = current.DTSTART?.value?.trim();
+  if (!summary || !dtStart) {
+    return;
+  }
+
+  try {
+    const baseEvent = buildBaseEvent(current, summary, dtStart);
+    const rrule = current.RRULE?.value?.trim();
+    if (!rrule) {
+      events.push(baseEvent);
+      return;
+    }
+
+    events.push(...expandRecurringEvent(baseEvent, rrule, horizonDays, maxInstances, parseExdates(currentExdates)));
+  } catch {
+    // Skip event with invalid date
+  }
+}
+
 export interface ParseIcsOptions {
   /** Number of days to expand recurring events into the future */
   rruleHorizonDays?: number;
@@ -217,100 +293,82 @@ export interface ParseIcsOptions {
   rruleMaxInstances?: number;
 }
 
+const BEGIN_EVENT_LINE = "BEGIN:VEVENT";
+const END_EVENT_LINE = "END:VEVENT";
+const ICS_EXCLUDED_DATE_PROPERTY = "EXDATE";
+
+function getParseIcsLimits(options?: ParseIcsOptions): { horizonDays: number; maxInstances: number } {
+  return {
+    horizonDays: options?.rruleHorizonDays ?? DEFAULT_RRULE_HORIZON_DAYS,
+    maxInstances: options?.rruleMaxInstances ?? DEFAULT_RRULE_MAX_INSTANCES
+  };
+}
+
+function collectEventProperty(line: string, current: IcsPropertyMap, currentExdates: string[]): void {
+  const parsedLine = parsePropertyLine(line);
+  if (!parsedLine) return;
+  if (parsedLine.key === ICS_EXCLUDED_DATE_PROPERTY) {
+    currentExdates.push(parsedLine.property.value);
+  }
+  current[parsedLine.key] = parsedLine.property;
+}
+
+function sortParsedEvents(events: ParsedIcsEvent[]): ParsedIcsEvent[] {
+  return events.sort((a, b) => (a.startsAt < b.startsAt ? -1 : a.startsAt > b.startsAt ? 1 : a.id.localeCompare(b.id)));
+}
+
 export function parseIcs(ics: string, options?: ParseIcsOptions): ParsedIcsEvent[] {
   const lines = unfoldLines(ics);
   const events: ParsedIcsEvent[] = [];
+  const { horizonDays, maxInstances } = getParseIcsLimits(options);
 
-  const horizonDays = options?.rruleHorizonDays ?? DEFAULT_RRULE_HORIZON_DAYS;
-  const maxInstances = options?.rruleMaxInstances ?? DEFAULT_RRULE_MAX_INSTANCES;
-
-  let current: Record<string, { value: string; params: Record<string, string> }> =
-    {};
+  let current: IcsPropertyMap = {};
   let currentExdates: string[] = [];
   let inEvent = false;
 
   for (const line of lines) {
-    if (line === "BEGIN:VEVENT") {
+    if (line === BEGIN_EVENT_LINE) {
       inEvent = true;
       current = {};
       currentExdates = [];
       continue;
     }
-    if (line === "END:VEVENT") {
+    if (line === END_EVENT_LINE) {
       inEvent = false;
-      const uid = current.UID?.value?.trim();
-      const summary = current.SUMMARY?.value?.trim();
-      const dtStart = current.DTSTART?.value?.trim();
-      const rrule = current.RRULE?.value?.trim();
-
-      if (summary && dtStart) {
-        try {
-          const startsAt = parseIcsDate(dtStart, current.DTSTART?.params?.TZID);
-          const baseEvent: ParsedIcsEvent = {
-            id: uid || generateStableId(summary, startsAt),
-            title: unescapeIcsValue(summary),
-            startsAt,
-            endsAt: current.DTEND?.value ? parseIcsDate(current.DTEND.value, current.DTEND?.params?.TZID) : undefined,
-            location: current.LOCATION?.value ? unescapeIcsValue(current.LOCATION.value.trim()) : undefined,
-            campusId:
-              current["X-CAMPUS-ID"]?.value?.trim() ||
-              current["X-CAMPUS"]?.value?.trim() ||
-              undefined,
-            description: current.DESCRIPTION?.value ? unescapeIcsValue(current.DESCRIPTION.value.trim()) : undefined
-          };
-
-          if (rrule) {
-            const parsedExdates: Date[] = [];
-            for (const exdateStr of currentExdates) {
-              for (const datePart of exdateStr.split(",")) {
-                const trimmed = datePart.trim();
-                if (trimmed) {
-                  try {
-                    parsedExdates.push(new Date(parseIcsDate(trimmed)));
-                  } catch {
-                    // Invalid EXDATE values should not invalidate the parent event.
-                  }
-                }
-              }
-            }
-            const expandedEvents = expandRecurringEvent(baseEvent, rrule, horizonDays, maxInstances, parsedExdates);
-            events.push(...expandedEvents);
-          } else {
-            events.push(baseEvent);
-          }
-        } catch {
-          // Skip event with invalid date
-        }
-      }
-
+      appendParsedEvent(events, current, currentExdates, horizonDays, maxInstances);
       current = {};
       currentExdates = [];
       continue;
     }
 
     if (!inEvent) continue;
-    if (!line.includes(":")) continue;
-
-    const [rawKey, ...rest] = line.split(":");
-    const value = rest.join(":");
-    if (!rawKey) continue;
-
-    const [key, ...paramParts] = rawKey.split(";");
-    const params: Record<string, string> = {};
-    for (const part of paramParts) {
-      const [pKey, pVal] = part.split("=");
-      if (pKey && pVal) {
-        // Quoted parameter values are valid ICS syntax, e.g. TZID="Europe/Berlin".
-        params[pKey] = pVal.replace(/^"(.*)"$/, "$1");
-      }
-    }
-
-    if (key === "EXDATE") {
-      currentExdates.push(value.trim());
-    }
-
-    current[key] = { value: value.trim(), params };
+    collectEventProperty(line, current, currentExdates);
   }
 
-  return events.sort((a, b) => (a.startsAt < b.startsAt ? -1 : a.startsAt > b.startsAt ? 1 : a.id.localeCompare(b.id)));
+  return sortParsedEvents(events);
+}
+
+function buildBaseEvent(current: IcsPropertyMap, summary: string, dtStart: string): ParsedIcsEvent {
+  const startsAt = parseIcsDate(dtStart, current.DTSTART?.params?.TZID);
+  const uid = current.UID?.value?.trim();
+  return {
+    id: uid || generateStableId(summary, startsAt),
+    title: unescapeIcsValue(summary),
+    startsAt,
+    endsAt: current.DTEND?.value ? parseIcsDate(current.DTEND.value, current.DTEND?.params?.TZID) : undefined,
+    location: current.LOCATION?.value ? unescapeIcsValue(current.LOCATION.value.trim()) : undefined,
+    campusId:
+      current["X-CAMPUS-ID"]?.value?.trim() ||
+      current["X-CAMPUS"]?.value?.trim() ||
+      undefined,
+    description: current.DESCRIPTION?.value ? unescapeIcsValue(current.DESCRIPTION.value.trim()) : undefined
+  };
+}
+
+function unescapeIcsValue(value: string): string {
+  return value
+    .replace(/\\n/gi, "\n")
+    .replace(/\\,/g, ",")
+    .replace(/\\;/g, ";")
+    .replace(/\\\\/g, "\\");
 }

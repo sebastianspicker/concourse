@@ -128,68 +128,59 @@ function extractHfmtEvents(
   sourceUrl: string,
   timeZone: string,
 ): PublicEvent[] {
-  const events: PublicEvent[] = [];
   // The public HfMT site has used multiple event-card shapes. Prefer explicit
   // article markup, then event tiles, then the generic link fallback.
-  const blocks = html.match(/<article[\s\S]*?<\/article>/gi) ?? [];
+  const articleEvents = extractEventsFromBlocks(
+    html.match(/<article[\s\S]*?<\/article>/gi) ?? [],
+    sourceUrl,
+    timeZone
+  );
+  if (articleEvents.length > 0) return articleEvents;
 
-  for (const block of blocks) {
-    const title = extractTitle(block);
-    if (!title || title.length > 200) { // Limit title length to avoid extreme cases
-      continue;
-    }
-
-    const date = extractDate(block, timeZone) ?? "1970-01-01T00:00:00.000Z";
-    const url = extractHref(block, sourceUrl);
-
-    if (!url) {
-      continue;
-    }
-
-    events.push({
-      id: buildEventId({ sourceUrl: url, title, date }),
-      title,
-      date,
-      sourceUrl: url
-    });
-
-    if (events.length >= MAX_EVENTS_PER_SOURCE) {
-      break;
-    }
-  }
-
-  if (events.length > 0) {
-    return events;
-  }
-
-  const tiles =
-    html.match(/<div[^>]*class="[^"]*event[^"]*"[\s\S]*?<\/div>/gi) ?? [];
-  for (const block of tiles) {
-    const title = extractTitle(block);
-    const date = extractDate(block, timeZone) ?? "1970-01-01T00:00:00.000Z";
-    const url = extractHref(block, sourceUrl);
-
-    if (!title || !url) {
-      continue;
-    }
-
-    events.push({
-      id: buildEventId({ sourceUrl: url, title, date }),
-      title,
-      date,
-      sourceUrl: url
-    });
-
-    if (events.length >= MAX_EVENTS_PER_SOURCE) {
-      break;
-    }
-  }
-
-  if (events.length > 0) {
-    return events;
-  }
+  const tileEvents = extractEventsFromBlocks(
+    html.match(/<div[^>]*class="[^"]*event[^"]*"[\s\S]*?<\/div>/gi) ?? [],
+    sourceUrl,
+    timeZone
+  );
+  if (tileEvents.length > 0) return tileEvents;
 
   return extractGenericEvents(html, sourceUrl);
+}
+
+function extractEventsFromBlocks(
+  blocks: string[],
+  sourceUrl: string,
+  timeZone: string
+): PublicEvent[] {
+  const events: PublicEvent[] = [];
+  for (const block of blocks) {
+    const event = extractEventFromBlock(block, sourceUrl, timeZone);
+    if (!event) continue;
+
+    events.push(event);
+    if (events.length >= MAX_EVENTS_PER_SOURCE) break;
+  }
+  return events;
+}
+
+function extractEventFromBlock(
+  block: string,
+  sourceUrl: string,
+  timeZone: string
+): PublicEvent | null {
+  const title = extractTitle(block);
+  const url = extractHref(block, sourceUrl);
+  if (!title || title.length > 200 || !url) {
+    return null;
+  }
+
+  const date = extractDate(block, timeZone) ?? "1970-01-01T00:00:00.000Z";
+  return {
+    id: buildEventId({ sourceUrl: url, title, date }),
+    title,
+    date,
+    sourceUrl: url
+  };
 }
 
 function extractGenericEvents(
@@ -274,47 +265,49 @@ function extractTitle(block: string): string | null {
   return null;
 }
 
+const HTML_DATETIME_PATTERN = /datetime="([^"]+)"/i;
+const GERMAN_DATE_TIME_PATTERN = /(\d{2})\.(\d{2})\.(\d{4})\s*(\d{2}):(\d{2})/;
+const GERMAN_DATE_PATTERN = /(\d{2})\.(\d{2})\.(\d{4})/;
+
+function parseHtmlDateTime(value: string): string | null {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.valueOf()) ? null : parsed.toISOString();
+}
+
+function parseGermanDate(block: string, timeZone: string): string | null {
+  const dateTimeMatch = block.match(GERMAN_DATE_TIME_PATTERN);
+  if (dateTimeMatch) {
+    return parseMatchedGermanDate(dateTimeMatch, timeZone);
+  }
+
+  const dateMatch = block.match(GERMAN_DATE_PATTERN);
+  return dateMatch ? parseMatchedGermanDate(dateMatch, timeZone) : null;
+}
+
+function parseMatchedGermanDate(match: RegExpMatchArray, timeZone: string): string {
+  return parseDateTimeInTimeZone(
+    {
+      year: Number(match[3]),
+      month: Number(match[2]),
+      day: Number(match[1]),
+      hour: Number(match[4] ?? 0),
+      minute: Number(match[5] ?? 0),
+      second: 0
+    },
+    timeZone
+  );
+}
+
 function extractDate(block: string, timeZone: string): string | null {
-  const datetimeMatch = block.match(/datetime="([^"]+)"/i);
+  const datetimeMatch = block.match(HTML_DATETIME_PATTERN);
   if (datetimeMatch) {
-    const parsed = new Date(datetimeMatch[1]);
-    if (!Number.isNaN(parsed.valueOf())) {
-      return parsed.toISOString();
+    const parsed = parseHtmlDateTime(datetimeMatch[1]);
+    if (parsed) {
+      return parsed;
     }
   }
 
-  const dateTimeMatch =
-    block.match(/(\d{2})\.(\d{2})\.(\d{4})\s*(\d{2}):(\d{2})/);
-  if (dateTimeMatch) {
-    return parseDateTimeInTimeZone(
-      {
-        year: Number(dateTimeMatch[3]),
-        month: Number(dateTimeMatch[2]),
-        day: Number(dateTimeMatch[1]),
-        hour: Number(dateTimeMatch[4]),
-        minute: Number(dateTimeMatch[5]),
-        second: 0
-      },
-      timeZone
-    );
-  }
-
-  const dateMatch = block.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-  if (dateMatch) {
-    return parseDateTimeInTimeZone(
-      {
-        year: Number(dateMatch[3]),
-        month: Number(dateMatch[2]),
-        day: Number(dateMatch[1]),
-        hour: 0,
-        minute: 0,
-        second: 0
-      },
-      timeZone
-    );
-  }
-
-  return null;
+  return parseGermanDate(block, timeZone);
 }
 
 function extractHref(block: string, sourceUrl: string): string | null {

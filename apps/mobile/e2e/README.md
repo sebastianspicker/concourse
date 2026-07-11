@@ -6,12 +6,12 @@ E2E tests for the Campus Mobile app using [Detox](https://wix.github.io/Detox/).
 
 Required:
 
-### iOS (macOS only)
+### iOS setup (macOS only)
 - Xcode 14+ with iOS Simulator
 - CocoaPods (`sudo gem install cocoapods`)
 - applesimutils (`brew tap wix/brew && brew install applesimutils`)
 
-### Android
+### Android setup
 - Android Studio with Android SDK
 - Android Emulator with a device running API 28+
 - Java 11+
@@ -34,7 +34,7 @@ Required:
 
 ## Running Tests
 
-### iOS
+### iOS test run
 ```bash
 # Build and run tests
 pnpm test:e2e:build:ios
@@ -44,7 +44,7 @@ pnpm test:e2e:ios
 detox test -c ios.release
 ```
 
-### Android
+### Android test run
 ```bash
 # Build and run tests
 pnpm test:e2e:build:android

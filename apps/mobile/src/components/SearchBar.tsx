@@ -3,6 +3,22 @@ import { StyleSheet, Text, TextInput, View } from "react-native";
 import { scaledRadius, spacing, typography } from "../ui/theme";
 import { useTheme } from "../ui/ThemeContext";
 
+const styles = StyleSheet.create({
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  searchIcon: {
+    fontSize: 16,
+    opacity: 0.7,
+  },
+  input: {
+    flex: 1,
+    ...typography.body,
+  },
+});
+
 export type SearchBarProps = {
   value: string;
   onChangeText: (text: string) => void;
@@ -101,19 +117,3 @@ export function SearchBar({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  searchIcon: {
-    fontSize: 16,
-    opacity: 0.7,
-  },
-  input: {
-    flex: 1,
-    ...typography.body,
-  },
-});

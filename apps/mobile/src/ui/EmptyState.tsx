@@ -3,6 +3,28 @@ import { StyleSheet, Text, View } from "react-native";
 import { scaled, scaledFont, scaledRadius, spacing, typography, withOpacity } from "./theme";
 import { useTheme } from "./ThemeContext";
 
+const styles = StyleSheet.create({
+  container: {
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  iconCircle: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.xs,
+  },
+  message: {
+    ...typography.body,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  hint: {
+    ...typography.caption,
+    textAlign: "center",
+    maxWidth: 260,
+  },
+});
+
 export type EmptyStateProps = {
   message: string;
   icon?: string;
@@ -73,25 +95,3 @@ export function EmptyState({ message, icon, hint }: EmptyStateProps): JSX.Elemen
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  iconCircle: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.xs,
-  },
-  message: {
-    ...typography.body,
-    fontWeight: "500",
-    textAlign: "center",
-  },
-  hint: {
-    ...typography.caption,
-    textAlign: "center",
-    maxWidth: 260,
-  },
-});

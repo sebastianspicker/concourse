@@ -3,6 +3,42 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import { spacing, typography } from "../ui/theme";
 import { useTheme } from "../ui/ThemeContext";
 
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.xl,
+  },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: spacing.md,
+  },
+  title: {
+    ...typography.subheading,
+    fontWeight: "bold",
+    marginBottom: spacing.sm,
+    textAlign: "center",
+  },
+  message: {
+    ...typography.body,
+    textAlign: "center",
+    marginBottom: spacing.xl,
+    maxWidth: 300,
+  },
+  button: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    ...typography.body,
+    fontWeight: "600",
+  },
+});
+
 interface Props {
   children: ReactNode;
 }
@@ -84,39 +120,3 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: spacing.xl,
-  },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: spacing.md,
-  },
-  title: {
-    ...typography.subheading,
-    fontWeight: "bold",
-    marginBottom: spacing.sm,
-    textAlign: "center",
-  },
-  message: {
-    ...typography.body,
-    textAlign: "center",
-    marginBottom: spacing.xl,
-    maxWidth: 300,
-  },
-  button: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm,
-  },
-  buttonPressed: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    ...typography.body,
-    fontWeight: "600",
-  },
-});

@@ -8,7 +8,7 @@ type StorageLike = {
   multiRemove?: (keys: readonly string[]) => Promise<void>;
 };
 
-const KEY_PREFIX = "campus-app-kit:";
+const CACHE_STORAGE_NAMESPACE = "campus-app-kit:";
 const memory = new Map<string, string>();
 
 export type CachedEntry<T> = {
@@ -44,7 +44,7 @@ async function getStorage(): Promise<StorageLike> {
     typeof AsyncStorage.getItem === "function"
   ) {
     try {
-      await AsyncStorage.getItem(`${KEY_PREFIX}__probe__`);
+      await AsyncStorage.getItem(`${CACHE_STORAGE_NAMESPACE}__probe__`);
       return AsyncStorage as StorageLike;
     } catch {
       return fallbackStorage;
@@ -61,7 +61,7 @@ export async function getPersistedCache<T>(key: string): Promise<T | null> {
 
 export async function getPersistedCacheEntry<T>(key: string): Promise<CachedEntry<T> | null> {
   const storage = await getStorage();
-  const raw = await storage.getItem(KEY_PREFIX + key);
+  const raw = await storage.getItem(CACHE_STORAGE_NAMESPACE + key);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as CachedEntry<T>;
@@ -76,7 +76,7 @@ export async function setPersistedCache<T>(key: string, value: T): Promise<void>
     timestamp: Date.now()
   };
   const storage = await getStorage();
-  await storage.setItem(KEY_PREFIX + key, JSON.stringify(entry));
+  await storage.setItem(CACHE_STORAGE_NAMESPACE + key, JSON.stringify(entry));
 }
 
 export async function markCacheAsOffline<T>(key: string): Promise<void> {
@@ -88,7 +88,7 @@ export async function markCacheAsOffline<T>(key: string): Promise<void> {
     ...entry,
     isOffline: true
   };
-  await storage.setItem(KEY_PREFIX + key, JSON.stringify(offlineEntry));
+  await storage.setItem(CACHE_STORAGE_NAMESPACE + key, JSON.stringify(offlineEntry));
 }
 
 export async function getCacheAge(key: string): Promise<number | null> {
@@ -107,14 +107,14 @@ export async function clearPersistedCache(key?: string): Promise<void> {
   const storage = await getStorage();
 
   if (key) {
-    await storage.removeItem(KEY_PREFIX + key);
+    await storage.removeItem(CACHE_STORAGE_NAMESPACE + key);
     return;
   }
 
   const allKeys = await storage.getAllKeys?.();
   if (!allKeys || allKeys.length === 0) return;
 
-  const ours = allKeys.filter((k) => k.startsWith(KEY_PREFIX));
+  const ours = allKeys.filter((k) => k.startsWith(CACHE_STORAGE_NAMESPACE));
   if (ours.length === 0) return;
 
   if (storage.multiRemove) {
@@ -196,7 +196,7 @@ export async function getCacheStats(): Promise<{
 }> {
   const storage = await getStorage();
   const allKeys = await storage.getAllKeys?.() ?? [];
-  const ourKeys = allKeys.filter(k => k.startsWith(KEY_PREFIX));
+  const ourKeys = allKeys.filter(k => k.startsWith(CACHE_STORAGE_NAMESPACE));
   
   let oldest: number | null = null;
   let newest: number | null = null;
@@ -210,7 +210,7 @@ export async function getCacheStats(): Promise<{
         if (oldest === null || entry.timestamp < oldest) oldest = entry.timestamp;
         if (newest === null || entry.timestamp > newest) newest = entry.timestamp;
         if (entry.isOffline) {
-          offlineKeys.push(key.replace(KEY_PREFIX, ""));
+          offlineKeys.push(key.replace(CACHE_STORAGE_NAMESPACE, ""));
         }
       } catch {
         // Skip invalid entries

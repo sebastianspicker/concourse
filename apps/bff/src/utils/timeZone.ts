@@ -92,8 +92,17 @@ export function parseDateTimeInTimeZone(
     0
   );
 
+  const candidateUtc = resolveCandidateUtc(targetUtc, timeZone);
+  const resolved = new Date(candidateUtc);
+  assertResolvedLocalTime(resolved, parts, timeZone);
+  return resolved.toISOString();
+}
+
+const MAX_TIME_ZONE_RESOLUTION_PASSES = 4;
+
+function resolveCandidateUtc(targetUtc: number, timeZone: string): number {
   let candidateUtc = targetUtc;
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < MAX_TIME_ZONE_RESOLUTION_PASSES; i += 1) {
     const offsetMs = getTimeZoneOffsetMs(new Date(candidateUtc), timeZone);
     const nextCandidateUtc = targetUtc - offsetMs;
     if (nextCandidateUtc === candidateUtc) {
@@ -101,19 +110,23 @@ export function parseDateTimeInTimeZone(
     }
     candidateUtc = nextCandidateUtc;
   }
+  return candidateUtc;
+}
 
-  const resolved = new Date(candidateUtc);
+function comparableParts(parts: DateTimeParts): string {
+  return [
+    parts.year,
+    parts.month,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  ].join(":");
+}
+
+function assertResolvedLocalTime(resolved: Date, parts: DateTimeParts, timeZone: string): void {
   const resolvedParts = getDateTimeParts(resolved, timeZone);
-  if (
-    resolvedParts.year !== parts.year ||
-    resolvedParts.month !== parts.month ||
-    resolvedParts.day !== parts.day ||
-    resolvedParts.hour !== parts.hour ||
-    resolvedParts.minute !== parts.minute ||
-    resolvedParts.second !== parts.second
-  ) {
+  if (comparableParts(resolvedParts) !== comparableParts(parts)) {
     throw new Error(`Invalid ${timeZone} local datetime`);
   }
-
-  return resolved.toISOString();
 }

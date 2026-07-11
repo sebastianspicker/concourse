@@ -46,14 +46,8 @@ export async function fetchTextWithTimeout(
 ): Promise<string> {
   const response = await fetchWithTimeout(url, options, timeoutMs);
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-
-  const contentLength = Number(response.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_RESPONSE_BYTES) {
-    throw new Error(`Response too large: ${contentLength} bytes`);
-  }
+  assertSuccessfulResponse(response);
+  assertContentLength(response);
 
   const reader = response.body?.getReader();
   if (!reader) {
@@ -85,4 +79,13 @@ export async function fetchTextWithTimeout(
     offset += chunk.byteLength;
   }
   return new TextDecoder().decode(combined);
+}
+
+function assertSuccessfulResponse(response: Response): void {
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+}
+
+function assertContentLength(response: Response): void {
+  const contentLength = Number(response.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_RESPONSE_BYTES) throw new Error(`Response too large: ${contentLength} bytes`);
 }

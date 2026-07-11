@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 type PublicResource<T> = {
   data: T | null;
@@ -24,19 +25,11 @@ export function usePublicResource<T>(
   loaderRef.current = loader;
 
   const runLoad = useCallback(async (force: boolean) => {
-    controllerRef.current?.abort();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-
+    const controller = replaceController(controllerRef);
     try {
-      const result = await loaderRef.current({ force, signal: controller.signal });
-      if (!mountedRef.current || controllerRef.current !== controller) return;
-      setData(result);
-      setError(null);
+      await loadPublicResource(loaderRef, controller, controllerRef, force, mountedRef, setData, setError);
     } catch (err: unknown) {
-      if (!mountedRef.current || controllerRef.current !== controller) return;
-      if (err instanceof Error && err.name === "AbortError") return;
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setLoadError(err, controller, controllerRef, mountedRef, setError);
     }
   }, []);
 
@@ -72,4 +65,39 @@ export function usePublicResource<T>(
   }, [runLoad]);
 
   return { data, error, loading, refreshing, refresh };
+}
+
+function replaceController(ref: MutableRefObject<AbortController | null>): AbortController {
+  ref.current?.abort();
+  const controller = new AbortController();
+  ref.current = controller;
+  return controller;
+}
+
+async function loadPublicResource<T>(
+  loader: MutableRefObject<(options: { force?: boolean; signal?: AbortSignal }) => Promise<T>>,
+  controller: AbortController,
+  controllerRef: MutableRefObject<AbortController | null>,
+  force: boolean,
+  mounted: MutableRefObject<boolean>,
+  setData: Dispatch<SetStateAction<T | null>>,
+  setError: Dispatch<SetStateAction<string | null>>
+): Promise<void> {
+  const result = await loader.current({ force, signal: controller.signal });
+  if (!mounted.current || controllerRef.current !== controller) return;
+  setData(result);
+  setError(null);
+}
+
+function setLoadError(
+  error: unknown,
+  controller: AbortController,
+  controllerRef: MutableRefObject<AbortController | null>,
+  mounted: MutableRefObject<boolean>,
+  setError: Dispatch<SetStateAction<string | null>>
+): void {
+  const isStale = !mounted.current || controllerRef.current !== controller;
+  const wasAborted = error instanceof Error && error.name === "AbortError";
+  if (isStale || wasAborted) return;
+  setError(error instanceof Error ? error.message : "Unknown error");
 }

@@ -4,6 +4,32 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { scaled, scaledFont, scaledRadius, shadows, spacing, typography, withOpacity } from "./theme";
 import { useTheme } from "./ThemeContext";
 
+const styles = StyleSheet.create({
+  card: {
+    borderCurve: "continuous",
+    position: "relative",
+  },
+  glassEdge: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderCurve: "continuous",
+  },
+  title: {
+    ...typography.body,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+  },
+  subtitle: {
+    ...typography.caption,
+    marginTop: spacing.xs,
+    fontWeight: "400",
+    letterSpacing: 0.1,
+  }
+});
+
 export function Card({
   title,
   subtitle
@@ -81,29 +107,3 @@ export function Card({
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    borderCurve: "continuous",
-    position: "relative",
-  },
-  glassEdge: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderCurve: "continuous",
-  },
-  title: {
-    ...typography.body,
-    fontWeight: "700",
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    ...typography.caption,
-    marginTop: spacing.xs,
-    fontWeight: "400",
-    letterSpacing: 0.1,
-  }
-});

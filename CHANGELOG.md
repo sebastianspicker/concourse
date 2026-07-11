@@ -11,11 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-04-19
 
-### Added
+### Added in 1.1.0
 
 - Unit tests for `authGuard` middleware (all auth paths: pass-through, valid Bearer, missing header, malformed scheme)
 
-### Fixed
+### Fixed in 1.1.0
 
 - Timezone handling: ICS parser and HTML event scraper now treat times as local instead of UTC when TZID is present or dates are in German format
 - `/today` endpoint accepts an optional `date` query parameter so the mobile app can send its local date instead of relying on server UTC
@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Today screen day-range filter now recomputes when calendar day changes (was stale past midnight)
 - Replace blocking `readFileSync`/`existsSync` with async `fs/promises.readFile` in schedule mock loader
 
-### Changed
+### Changed in 1.1.0
 
 - `createJsonRoute` now sets `x-request-id` response header
 - Removed local audit/workspace artifacts from version control
@@ -47,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2025-02-25
 
-### Added
+### Added in 1.0.0
 
 #### Features
 - ICS RRULE expansion for recurring events in BFF (`rrule` package integration)
@@ -67,18 +67,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded BFF integration tests (24 tests covering all endpoints)
 - Test suites for: error handling, health, events, rooms, today, rate limiting, security headers, CORS
 
-### Changed
+### Changed in 1.0.0
 
 - Improved `ResourceListSection` component with loading and error states
 - Updated ESLint configuration
 - Reorganized documentation structure
 
-### Fixed
+### Fixed in 1.0.0
 
 - Import path issues in UI components
 - Error response structure consistency across all endpoints
 
-### Removed
+### Removed in 1.0.0
 
 - Obsolete documentation files (`BUGS_AND_FIXES_ARCHIVE.md`, `OPEN_IMPROVEMENTS_AND_PLAN.md`)
 - Archived `BUGS_AND_FIXES.md`
@@ -87,7 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2024-12-01
 
-### Added
+### Added in 0.1.0
 
 - Initial release
 - Mobile app with Expo SDK 51 and Expo Router
@@ -100,7 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker configuration for BFF
 - EAS build configuration for mobile
 
-### Features
+### Features in 0.1.0
 
 #### Mobile App
 - Today screen with events and rooms

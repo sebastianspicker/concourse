@@ -1,10 +1,6 @@
-import { FlashList } from "@shopify/flash-list";
+import { FlashList, type ContentStyle, type ListRenderItem } from "@shopify/flash-list";
 import React from "react";
 import { StyleSheet, Text } from "react-native";
-
-type FlashListProps<T> = React.ComponentProps<typeof FlashList<T>>;
-type FlashListRenderItem<T> = NonNullable<FlashListProps<T>["renderItem"]>;
-type FlashListContentStyle = NonNullable<FlashListProps<unknown>["contentContainerStyle"]>;
 
 const DEFAULT_ESTIMATED_ITEM_SIZE = 72;
 
@@ -17,9 +13,9 @@ export function VirtualizedList<T>({
   estimatedItemSize = DEFAULT_ESTIMATED_ITEM_SIZE
 }: {
   data: readonly T[];
-  renderItem: FlashListRenderItem<T>;
+  renderItem: ListRenderItem<T>;
   keyExtractor: (item: T, index: number) => string;
-  contentContainerStyle?: FlashListContentStyle;
+  contentContainerStyle?: ContentStyle;
   emptyText?: string;
   estimatedItemSize?: number;
 }): JSX.Element {

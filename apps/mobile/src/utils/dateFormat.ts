@@ -1,20 +1,26 @@
-// Cache the relative time formatters for the default locale only
-let relativeTimeFormatter: Intl.RelativeTimeFormat | null = null;
-let shortRelativeTimeFormatter: Intl.RelativeTimeFormat | null = null;
+import { getRelativeTimeFormatter, getShortRelativeTimeFormatter } from "./relativeTimeFormatters";
 
-function getRelativeTimeFormatter(locale?: string): Intl.RelativeTimeFormat {
-  if (locale) {
-    return new Intl.RelativeTimeFormat(locale, { numeric: "auto", style: "long" });
-  }
-  return relativeTimeFormatter ??= new Intl.RelativeTimeFormat(undefined, { numeric: "auto", style: "long" });
-}
+const SECOND_MS = 1000;
+const MINUTE_MS = 60 * SECOND_MS;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const WEEK_MS = 7 * DAY_MS;
+const MONTH_MS = 30 * DAY_MS;
+const YEAR_MS = 365 * DAY_MS;
 
-function getShortRelativeTimeFormatter(locale?: string): Intl.RelativeTimeFormat {
-  if (locale) {
-    return new Intl.RelativeTimeFormat(locale, { numeric: "always", style: "short" });
-  }
-  return shortRelativeTimeFormatter ??= new Intl.RelativeTimeFormat(undefined, { numeric: "always", style: "short" });
-}
+const RELATIVE_TIME_THRESHOLDS: Array<{
+  thresholdMs: number;
+  unitMs: number;
+  unit: Intl.RelativeTimeFormatUnit;
+  fallbackUnit: Intl.RelativeTimeFormatUnit;
+  fallbackUnitMs: number;
+}> = [
+  { thresholdMs: HOUR_MS, unitMs: MINUTE_MS, unit: "minute", fallbackUnit: "second", fallbackUnitMs: SECOND_MS },
+  { thresholdMs: DAY_MS, unitMs: HOUR_MS, unit: "hour", fallbackUnit: "minute", fallbackUnitMs: MINUTE_MS },
+  { thresholdMs: WEEK_MS, unitMs: DAY_MS, unit: "day", fallbackUnit: "hour", fallbackUnitMs: HOUR_MS },
+  { thresholdMs: MONTH_MS, unitMs: WEEK_MS, unit: "week", fallbackUnit: "day", fallbackUnitMs: DAY_MS },
+  { thresholdMs: YEAR_MS, unitMs: MONTH_MS, unit: "month", fallbackUnit: "week", fallbackUnitMs: WEEK_MS },
+];
 
 /**
  * Determine the appropriate unit and value for relative time formatting.
@@ -24,47 +30,23 @@ function getShortRelativeTimeFormatter(locale?: string): Intl.RelativeTimeFormat
  */
 function getRelativeTimeUnit(diffMs: number): { unit: Intl.RelativeTimeFormatUnit; value: number } {
   const absMs = Math.abs(diffMs);
-  
-  // Define thresholds in milliseconds
-  const MINUTE = 60 * 1000;
-  const HOUR = 60 * MINUTE;
-  const DAY = 24 * HOUR;
-  const WEEK = 7 * DAY;
-  const MONTH = 30 * DAY;
-  const YEAR = 365 * DAY;
-  
+
   const sign = diffMs < 0 ? -1 : 1;
 
-  if (absMs < MINUTE) {
-    return { unit: "second", value: Math.round(diffMs / 1000) };
+  if (absMs < MINUTE_MS) {
+    return { unit: "second", value: Math.round(diffMs / SECOND_MS) };
   }
-  if (absMs < HOUR) {
-    const rounded = Math.round(diffMs / MINUTE);
-    // If rounding to 0, fall back to the smaller unit (seconds)
-    if (rounded === 0) return { unit: "second", value: sign * Math.max(1, Math.round(absMs / 1000)) };
-    return { unit: "minute", value: rounded };
-  }
-  if (absMs < DAY) {
-    const rounded = Math.round(diffMs / HOUR);
-    if (rounded === 0) return { unit: "minute", value: sign * Math.max(1, Math.round(absMs / MINUTE)) };
-    return { unit: "hour", value: rounded };
-  }
-  if (absMs < WEEK) {
-    const rounded = Math.round(diffMs / DAY);
-    if (rounded === 0) return { unit: "hour", value: sign * Math.max(1, Math.round(absMs / HOUR)) };
-    return { unit: "day", value: rounded };
-  }
-  if (absMs < MONTH) {
-    const rounded = Math.round(diffMs / WEEK);
-    if (rounded === 0) return { unit: "day", value: sign * Math.max(1, Math.round(absMs / DAY)) };
-    return { unit: "week", value: rounded };
-  }
-  if (absMs < YEAR) {
-    const rounded = Math.round(diffMs / MONTH);
-    if (rounded === 0) return { unit: "week", value: sign * Math.max(1, Math.round(absMs / WEEK)) };
-    return { unit: "month", value: rounded };
-  }
-  return { unit: "year", value: Math.round(diffMs / YEAR) };
+
+  const threshold = RELATIVE_TIME_THRESHOLDS.find(({ thresholdMs }) => absMs < thresholdMs);
+  if (!threshold) return { unit: "year", value: Math.round(diffMs / YEAR_MS) };
+
+  const rounded = Math.round(diffMs / threshold.unitMs);
+  if (rounded !== 0) return { unit: threshold.unit, value: rounded };
+
+  return {
+    unit: threshold.fallbackUnit,
+    value: sign * Math.max(1, Math.round(absMs / threshold.fallbackUnitMs)),
+  };
 }
 
 /**

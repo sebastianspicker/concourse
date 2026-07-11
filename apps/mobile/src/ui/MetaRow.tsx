@@ -3,6 +3,25 @@ import { StyleSheet, Text, View } from "react-native";
 import { scaled, scaledFont, spacing, typography } from "./theme";
 import { useTheme } from "./ThemeContext";
 
+const styles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  label: {
+    ...typography.caption,
+    fontWeight: "500",
+    minWidth: 80,
+  },
+  value: {
+    ...typography.body,
+    flex: 1,
+    textAlign: "right",
+  },
+});
+
 export function MetaRow({
   label,
   value
@@ -58,22 +77,3 @@ export function MetaRow({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  label: {
-    ...typography.caption,
-    fontWeight: "500",
-    minWidth: 80,
-  },
-  value: {
-    ...typography.body,
-    flex: 1,
-    textAlign: "right",
-  },
-});
