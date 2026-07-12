@@ -1,16 +1,19 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "expo-constants": new URL("./src/test/expoConstantsStub.ts", import.meta.url).pathname,
+      "@expo/vector-icons/MaterialIcons": new URL("./src/test/materialIconsStub.tsx", import.meta.url).pathname,
+    },
+  },
   test: {
     environment: "node",
     include: ["src/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", "dist", "build"],
+    setupFiles: ["./src/test/setup.ts"],
   },
   css: {
-    // Override PostCSS config to use an empty plugin list for tests.
-    // The build-time postcss.config.mjs uses the tailwindcss plugin.
-    // React Native
-    // tests don't need PostCSS transforms.
     postcss: { plugins: [] },
   },
 });

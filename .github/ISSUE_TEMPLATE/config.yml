@@ -1,2 +1,8 @@
-blank_issues_enabled: true
-
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/sebastianspicker/campus-app-kit/security/advisories/new
+    about: Report vulnerabilities privately. Do not open public security issues.
+  - name: Documentation
+    url: https://github.com/sebastianspicker/campus-app-kit/tree/main/docs
+    about: Check the public docs before opening a support-style issue.

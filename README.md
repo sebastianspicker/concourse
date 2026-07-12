@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/sebastianspicker/campus-app-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/sebastianspicker/campus-app-kit/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node 20](https://img.shields.io/badge/node-20.x-green.svg)](.nvmrc)
+[![Node 22](https://img.shields.io/badge/node-%3E%3D22.13-green.svg)](.nvmrc)
 [![pnpm 9](https://img.shields.io/badge/pnpm-9-orange.svg)](package.json)
 
 A public, privacy-safe starter for building a university campus app with **React Native + Expo** and an optional **Backend-for-Frontend (BFF)**.
@@ -28,26 +28,26 @@ from that device.
 
 For Expo Go, run `pnpm --filter @campus/mobile start` instead of `pnpm dev`.
 
-**Prerequisites:** Node.js 20, pnpm 9. See [Runbook](docs/runbook.md) for detailed setup.
+**Prerequisites:** Node.js 22.13 or newer, pnpm 9. See [Runbook](docs/runbook.md) for detailed setup.
 
 ---
 
 ## Features
 
-- **Mobile app** – Expo SDK 51 with Expo Router; Today, Events, Rooms, Schedule screens
+- **Mobile app** – Expo SDK 57 with Expo Router; responsive Today, Events, Rooms, Settings, and public detail screens
 - **BFF** – Optional Node.js API with public connectors, rate limiting, HTTP caching, CORS, circuit breaker
 - **Institution packs** – Public config per institution; easy to add more
 - **Shared types** – Zod schemas used by both BFF and mobile
 
-## Mobile App Screenshots (Mock Data)
+## Campus Desk screenshots (deterministic public data)
 
-| Today | Rooms |
+| Today on mobile | Events on desktop |
 |---|---|
-| ![Today screen with mock data in dark theme](docs/screenshots/mobile-today-dark.png) | ![Rooms screen with mock data in dark theme](docs/screenshots/mobile-rooms-dark.png) |
+| ![Today screen at 390 pixels in light theme](docs/screenshots/campus-desk-today-390-light.png) | ![Events screen at 1440 pixels in light theme](docs/screenshots/campus-desk-events-1440-light.png) |
 
-| Stage | Profile | Detail |
-|---|---|---|
-| ![Stage screen with mock events in dark theme](docs/screenshots/mobile-stage-dark.png) | ![Profile screen with theme selection in dark theme](docs/screenshots/mobile-profile-dark.png) | ![Event detail screen with mock data in dark theme](docs/screenshots/mobile-event-detail-dark.png) |
+| Rooms on small mobile | Settings in German high contrast |
+|---|---|
+| ![Rooms screen at 320 pixels in light theme](docs/screenshots/campus-desk-rooms-320-light.png) | ![Settings screen in German high-contrast mode](docs/screenshots/campus-desk-settings-768-high-contrast-de.png) |
 
 ---
 
@@ -62,6 +62,10 @@ packages/
   institutions/   Public institution packs
 docs/             Architecture, runbook, CI, deployment
 ```
+
+Internal planning, audit, ledger, status, and deprecated-doc packets are not
+part of the public docs surface. Keep them in the ignored local `archive/` lane
+or in a private fork.
 
 ## How to Read This Repo
 
@@ -84,7 +88,8 @@ See [Architecture](docs/architecture.md) for data flow diagrams and design decis
 | Context | Required Variables |
 |--------|---------------------|
 | **BFF** | `INSTITUTION_ID` (e.g., `hfmt`) |
-| **Mobile** | `EXPO_PUBLIC_BFF_BASE_URL` |
+| **Mobile runtime** | `EXPO_PUBLIC_BFF_BASE_URL` |
+| **Mobile preview/production build** | `INSTITUTION_ID`, `EXPO_PUBLIC_BFF_BASE_URL` |
 
 Additional options: `BFF_PORT`, `CORS_ORIGINS`, `BFF_TRUST_PROXY`. See [Runbook → Configuration](docs/runbook.md#configuration) for full details.
 
@@ -95,11 +100,12 @@ Additional options: `BFF_PORT`, `CORS_ORIGINS`, `BFF_TRUST_PROXY`. See [Runbook 
 | Command | Description |
 |--------|-------------|
 | `pnpm dev` | Run BFF + mobile in parallel |
-| `pnpm verify` | Full CI check (lint, typecheck, unit tests, build, E2E) |
+| `pnpm verify` | Full CI check (install, lint, typecheck, tests, build, browser/BFF E2E, marker scan) |
 | `pnpm lint` | Lint all packages |
 | `pnpm typecheck` | TypeScript check |
 | `pnpm test` | Run tests |
 | `pnpm test:e2e` | Run deterministic BFF HTTP E2E tests |
+| `pnpm test:web` | Export the Expo web app and run Playwright/axe checks |
 | `pnpm build` | Build all packages |
 
 ---
@@ -124,6 +130,10 @@ are separate from the clean-checkout default gate.
 
 ## Documentation
 
+- [Product context](PRODUCT.md)
+- [Campus Desk design system](DESIGN.md)
+- [Frontend conventions and release checks](docs/frontend.md)
+
 | Doc | Description |
 |-----|-------------|
 | [Runbook](docs/runbook.md) | Setup, config, commands, troubleshooting |
@@ -138,6 +148,10 @@ are separate from the clean-checkout default gate.
 ## Status
 
 - **Version:** 1.1.0
+- **Public scope:** Expo mobile starter, optional Node BFF, public connectors,
+  public institution packs, shared schemas, and mock fixtures
+- **Private scope:** secrets, SSO, private endpoints, private connectors,
+  internal planning/status ledgers, and deprecated audit packets
 - **Changelog:** See [CHANGELOG.md](CHANGELOG.md)
 
 ---

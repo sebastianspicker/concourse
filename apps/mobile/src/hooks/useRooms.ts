@@ -1,15 +1,9 @@
 import { useMemo } from "react";
 import type { RoomsResponse } from "../api/types";
 import { fetchRooms, type RoomsFilterOptions } from "../data/publicApi";
-import { usePublicResource } from "./usePublicResource";
+import { usePublicResource, type PublicResource } from "./usePublicResource";
 
-export function useRooms(options?: RoomsFilterOptions): {
-  data: RoomsResponse | null;
-  error: string | null;
-  loading: boolean;
-  refreshing: boolean;
-  refresh: () => Promise<void>;
-} {
+export function useRooms(options?: RoomsFilterOptions): PublicResource<RoomsResponse> {
   const filterKey = useMemo(
     () => JSON.stringify({
       campus: options?.campus, search: options?.search,

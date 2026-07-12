@@ -3,4 +3,13 @@ description = "Campus App Kit allowlist"
 paths = [
   '''pnpm-lock.yaml''',
   '''apps/bff/src/__fixtures__/''',
+  '''AGENTS\.md''',
+  '''archive/''',
+  '''docs/archive/''',
+  '''node_modules/''',
+  '''vendor/''',
+  '''third_party/''',
+  '''third-party/''',
+  '''3rdparty/''',
+  '''external/''',
 ]

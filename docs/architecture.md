@@ -106,7 +106,8 @@ The mobile app can also expose server-side API routes using Expo Router's `+api.
 
 Use Expo API routes when you need server-side secrets, third-party API proxies, webhooks, or server-side validation that belongs with the app deployment. Prefer the BFF when you need institution-specific public data, a shared backend for multiple clients, or independent deployment (Docker, Kubernetes).
 
-Provided routes: `GET /api/hello` (demo) and `GET /api/health` (health check). Requires `web.output: "server"` in `app.config.ts`.
+Provided route: `GET /api/health` (health check). Requires
+`web.output: "server"` in `app.config.ts`.
 
 ## Key files
 

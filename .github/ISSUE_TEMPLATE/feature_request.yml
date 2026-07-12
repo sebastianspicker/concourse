@@ -23,4 +23,21 @@ body:
       description: What have you tried or considered?
     validations:
       required: false
-
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: Where does this belong?
+      options:
+        - Public template
+        - Private fork only
+        - Unsure
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Public/private boundary
+      options:
+        - label: This request does not require secrets, protected institution systems, private endpoints, or real SSO in the public repo.
+          required: true

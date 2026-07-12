@@ -31,26 +31,54 @@ async function reservePort() {
   return address.port;
 }
 
-async function requestJson(baseUrl, path) {
-  const response = await fetch(new URL(path, baseUrl));
-  const text = await response.text();
+function readLoopbackResponse(port, path) {
+  return new Promise((resolve, reject) => {
+    const request = http.get({ hostname: "127.0.0.1", port, path }, (response) => {
+      let responseText = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => { responseText += chunk; });
+      response.on("end", () => resolve({ incoming: response, text: responseText }));
+    });
+    request.on("error", reject);
+  });
+}
+
+function parseJsonBody(text, path) {
   let body;
   try {
     body = text ? JSON.parse(text) : undefined;
   } catch (err) {
     throw new Error(`Expected JSON from ${path}, got: ${text.slice(0, 200)}`, { cause: err });
   }
-  return { response, body };
+  return body;
 }
 
-async function waitForHealth(baseUrl, child, logBuffer) {
+function toResponse(incoming) {
+  return {
+    status: incoming.statusCode ?? 0,
+    headers: {
+      get(name) {
+        const value = incoming.headers[name.toLowerCase()];
+        return Array.isArray(value) ? value.join(", ") : value ?? null;
+      }
+    }
+  };
+}
+
+async function requestJson(port, path) {
+  assert(path.startsWith("/") && !path.includes("://"), `Invalid E2E request path: ${path}`);
+  const { incoming, text } = await readLoopbackResponse(port, path);
+  return { response: toResponse(incoming), body: parseJsonBody(text, path) };
+}
+
+async function waitForHealth(port, child, logBuffer) {
   const deadline = Date.now() + startupTimeoutMs;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
       throw new Error(`BFF exited before health check passed:\n${logBuffer()}`);
     }
     try {
-      const { response, body } = await requestJson(baseUrl, "/health");
+      const { response, body } = await requestJson(port, "/health");
       if (response.status === 200 && body?.status === "ok") {
         return;
       }
@@ -104,37 +132,37 @@ async function run() {
   child.stderr.on("data", appendOutput);
 
   try {
-    await waitForHealth(baseUrl, child, () => childOutput);
+    await waitForHealth(port, child, () => childOutput);
 
-    const health = await requestJson(baseUrl, "/health");
+    const health = await requestJson(port, "/health");
     assert(health.response.status === 200, "health should return 200");
     assert(health.body.institution === "mockuni", "health should report the selected institution");
 
-    const events = await requestJson(baseUrl, "/events?limit=2");
+    const events = await requestJson(port, "/events?limit=2");
     assert(events.response.status === 200, "events should return 200");
     assert(events.response.headers.get("x-data-mode") === "mock", "events should advertise mock data mode");
     assert(events.body._total === 10, "events should report all fixture events before pagination");
     assert(events.body.events.length === 2, "events should apply limit pagination");
     assert(events.body.events[0].title.includes("Mathematik"), "events should serve fixture event data");
 
-    const rooms = await requestJson(baseUrl, "/rooms?campus=hauptcampus&search=H%C3%B6rsaal&limit=2");
+    const rooms = await requestJson(port, "/rooms?campus=hauptcampus&search=H%C3%B6rsaal&limit=2");
     assert(rooms.response.status === 200, "rooms should return 200");
     assert(rooms.body._total === 3, "rooms should search within the selected campus before pagination");
     assert(rooms.body.rooms.length === 2, "rooms should apply pagination");
     assert(rooms.body.rooms.every((room) => room.campusId === "hauptcampus"), "rooms should honor campus filtering");
 
-    const schedule = await requestJson(baseUrl, "/schedule?search=Mathematik&limit=1");
+    const schedule = await requestJson(port, "/schedule?search=Mathematik&limit=1");
     assert(schedule.response.status === 200, "schedule should return 200");
     assert(schedule.response.headers.get("x-data-mode") === "mock", "schedule should advertise mock data mode");
     assert(schedule.body.schedule.length === 1, "schedule should apply limit pagination");
     assert(schedule.body.schedule[0].title === "Vorlesung Mathematik I", "schedule should parse fixture ICS data");
 
-    const today = await requestJson(baseUrl, "/today?date=2026-02-25");
+    const today = await requestJson(port, "/today?date=2026-02-25");
     assert(today.response.status === 200, "today should return 200");
     assert(today.body.events.length === 2, "today should return events for the requested campus-local date");
     assert(today.body.rooms.length >= 2, "today should include public rooms");
 
-    const badQuery = await requestJson(baseUrl, "/events?limit=abc");
+    const badQuery = await requestJson(port, "/events?limit=abc");
     assert(badQuery.response.status === 400, "invalid pagination should return 400");
     assert(badQuery.body.error?.code === "bad_request", "invalid pagination should use bad_request");
 

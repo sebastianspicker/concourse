@@ -1,19 +1,17 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Card } from "./Card";
+import type { UiError } from "../api/uiError";
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
-import { detectResourceErrorType } from "./resourceErrorType";
 import { Screen } from "./Screen";
-import { Section } from "./Section";
 import { SkeletonDetail } from "./Skeleton";
-import { scaled, scaledFont, scaledRadius, spacing, typography } from "./theme";
+import { spacing, typography } from "./theme";
 import { useTheme } from "./ThemeContext";
 
 export type ResourceDetailScreenProps<T> = {
   title: string;
   loading: boolean;
-  error: string | null;
+  error: UiError | string | null;
   item: T | null;
   notFoundMessage: string;
   cardTitle: string;
@@ -25,110 +23,36 @@ export type ResourceDetailScreenProps<T> = {
 };
 
 export function ResourceDetailScreen<T>(props: ResourceDetailScreenProps<T>): JSX.Element {
-  const { title, refreshing, onRefresh } = props;
+  const { loading, error, item, notFoundMessage, cardTitle, cardSubtitle, renderMeta, footnote, refreshing, onRefresh } = props;
+  const theme = useTheme();
 
   return (
-    <Screen refreshing={refreshing} onRefresh={onRefresh}>
-      <Section title={title}>
-        <ResourceDetailContent {...props} />
-      </Section>
+    <Screen refreshing={refreshing} onRefresh={onRefresh} maxWidth={760} testID="detail-screen">
+      {loading ? <SkeletonDetail /> : error ? (
+        <ErrorState {...(typeof error === "string" ? { message: error } : { error })} onRetry={onRefresh} />
+      ) : !item ? (
+        <EmptyState message={notFoundMessage} hint="This information may have been removed or the link may be outdated." />
+      ) : (
+        <View style={styles.layout}>
+          <View style={[styles.heading, { borderBottomColor: theme.colors.border }]}>
+            <Text selectable accessibilityRole="header" style={[styles.title, { color: theme.colors.text }]}>{cardTitle}</Text>
+            {cardSubtitle ? <Text selectable style={[styles.subtitle, { color: theme.colors.muted }]}>{cardSubtitle}</Text> : null}
+          </View>
+          {renderMeta ? <View style={[styles.meta, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>{renderMeta()}</View> : null}
+          {footnote ? <Text selectable style={[styles.footnote, { color: theme.colors.muted }]}>{footnote}</Text> : null}
+        </View>
+      )}
     </Screen>
   );
 }
 
-function ResourceDetailContent<T>(props: ResourceDetailScreenProps<T>): JSX.Element {
-  const {
-    loading,
-    error,
-    item,
-    notFoundMessage,
-    cardTitle,
-    cardSubtitle,
-    renderMeta,
-    footnote,
-    onRefresh
-  } = props;
-  if (loading) {
-    return <SkeletonDetail />;
-  }
-
-  if (error) {
-    return (
-      <ErrorState
-        message={error}
-        errorType={detectResourceErrorType(error)}
-        onRetry={onRefresh}
-      />
-    );
-  }
-
-  if (!item) {
-    return (
-      <EmptyState
-        message={notFoundMessage}
-        icon="🔍"
-        hint="This item may have been removed or the link may be outdated."
-      />
-    );
-  }
-
-  return (
-    <>
-      <Card title={cardTitle} subtitle={cardSubtitle} />
-      {renderMeta ? <MetaCard>{renderMeta()}</MetaCard> : null}
-      {footnote ? <DetailFootnote>{footnote}</DetailFootnote> : null}
-    </>
-  );
-}
-
-function MetaCard({ children }: { children: React.ReactNode }): JSX.Element {
-  const theme = useTheme();
-  const ui = theme.ui;
-
-  return (
-    <View
-      style={[
-        styles.metaCard,
-        {
-          borderColor: theme.colors.border,
-          backgroundColor: theme.colors.surface,
-          borderWidth: ui.borderWidth,
-          borderRadius: scaledRadius(16, ui),
-          padding: scaled(spacing.md, ui),
-        },
-      ]}
-    >
-      {children}
-    </View>
-  );
-}
-
-function DetailFootnote({ children }: { children: string }): JSX.Element {
-  const theme = useTheme();
-  const ui = theme.ui;
-
-  return (
-    <Text
-      selectable
-      style={[
-        styles.muted,
-        {
-          color: theme.colors.muted,
-          fontSize: scaledFont(typography.caption.fontSize, ui),
-          lineHeight: scaledFont(typography.caption.lineHeight, ui),
-        },
-      ]}
-    >
-      {children}
-    </Text>
-  );
-}
+export const DetailLayout = ResourceDetailScreen;
 
 const styles = StyleSheet.create({
-  muted: {
-    ...typography.caption,
-  },
-  metaCard: {
-    borderCurve: "continuous",
-  },
+  layout: { gap: spacing.lg },
+  heading: { gap: spacing.xs, paddingBottom: spacing.lg, borderBottomWidth: 1 },
+  title: { ...typography.heading },
+  subtitle: { ...typography.body },
+  meta: { borderWidth: 1, borderRadius: 8, paddingHorizontal: spacing.md },
+  footnote: { ...typography.caption, maxWidth: 560 },
 });

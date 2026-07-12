@@ -15,6 +15,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: spacing.xxl * 2,
   },
+  content: {},
+  nonScrolling: { flex: 1 },
 });
 
 export function Screen({
@@ -22,11 +24,15 @@ export function Screen({
   scroll = true,
   refreshing = false,
   onRefresh
+  ,maxWidth = 760,
+  testID
 }: {
   children: React.ReactNode;
   scroll?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
+  maxWidth?: number;
+  testID?: string;
 }): JSX.Element {
   const theme = useTheme();
   const ui = theme.ui;
@@ -44,16 +50,25 @@ export function Screen({
   const contentPadding = scaled(spacing.xxl, ui);
   const contentGap = scaled(spacing.xl, ui);
 
+  const contentStyle = [
+    styles.content,
+    {
+      width: "100%" as const,
+      maxWidth,
+      alignSelf: "center" as const,
+      padding: contentPadding,
+      gap: contentGap,
+    },
+  ];
+
   return (
-    <View style={[styles.root, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.root, { backgroundColor: theme.colors.background }]} testID={testID}>
+      {scroll ? (
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[
           styles.scrollContent,
-          {
-            padding: contentPadding,
-            gap: contentGap,
-          },
+          contentStyle,
         ]}
         refreshControl={refreshControl}
         scrollEnabled={scroll}
@@ -61,6 +76,9 @@ export function Screen({
       >
         {children}
       </ScrollView>
+      ) : (
+        <View style={[contentStyle, styles.nonScrolling]}>{children}</View>
+      )}
     </View>
   );
 }

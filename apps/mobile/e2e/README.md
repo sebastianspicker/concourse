@@ -118,9 +118,9 @@ projects are checked in. See `.github/workflows/e2e.yml` for configuration.
 
 ### Running in CI
 
-Tests run automatically on:
-- Pull requests to `main`
-- Pushes to `main`
+The root BFF process E2E suite runs in the default CI path. Detox native E2E
+runs only when generated native iOS or Android projects are checked in and the
+workflow conditions in `.github/workflows/e2e.yml` match.
 
 ## Debugging
 

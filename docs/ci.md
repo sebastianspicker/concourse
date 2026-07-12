@@ -5,7 +5,7 @@ This repo uses GitHub Actions with a deterministic, least-privilege CI setup foc
 ## Workflows and triggers
 
 - `ci` (push to `main` or `dev`, all PRs)
-  - Runs `./scripts/verify-production-ready.sh` (lint, typecheck, tests, build, BFF E2E, marker check).
+  - Runs `./scripts/verify-production-ready.sh` (lint, typecheck, tests, build, Playwright/axe web E2E, BFF E2E, marker check).
   - Uploads test artifacts if present (e.g., `coverage/`, `test-results/`).
 - `dependency-review` (PRs only)
   - Runs `pnpm audit --audit-level=moderate --prod` against the lockfile.
@@ -29,7 +29,7 @@ Each workflow has:
 
 | Script | Purpose |
 |--------|---------|
-| `./scripts/verify-production-ready.sh` | Used by CI: lint, typecheck, tests, build, BFF E2E, marker check. |
+| `./scripts/verify-production-ready.sh` | Used by CI: lint, typecheck, tests, build, Playwright/axe web E2E, BFF E2E, marker check. |
 | `pnpm test:e2e` | Starts the compiled BFF on a temporary port and verifies critical public HTTP flows. |
 | `./scripts/ci-local.sh` | Local CI equivalent: install + verify-production-ready. |
 | `./scripts/build.sh` | Convenience: runs `pnpm build` at repo root. |
@@ -68,6 +68,17 @@ pnpm build
 
 No secrets are required for CI to pass.
 
+Repository settings to keep aligned with this public template:
+
+- Keep GitHub Advanced Security, CodeQL, secret scanning, and Dependabot alerts
+  enabled when available for the repository plan.
+- Keep branch protection focused on the public gates: `ci`, `codeql`,
+  `gitleaks`, `dependency-review`, and the default BFF `e2e` workflow.
+- Do not add CI secrets for public PR workflows. If a future private-fork job
+  needs secrets, run it only on trusted branch pushes or manual dispatch.
+- CODEOWNERS protects CI, security policy, Docker runtime, shared contracts, and
+  public institution packs.
+
 ## How to extend CI
 
 - Add new checks to `./scripts/verify-production-ready.sh` if they must run on every PR.
@@ -76,6 +87,9 @@ No secrets are required for CI to pass.
   - Pin tool versions (e.g., `corepack prepare pnpm@9.0.0 --activate`).
   - Use `--frozen-lockfile`/equivalent.
 - Prefer quick PR checks; schedule heavier checks (nightly/weekly) if needed.
+- Keep generated local artifacts out of the public docs surface. Use the ignored
+  `archive/` lane for internal audit/status packets and keep tracked docs
+  focused on current runtime behavior.
 
 ## Optional: run with act
 

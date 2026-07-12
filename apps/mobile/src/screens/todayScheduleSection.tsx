@@ -8,6 +8,8 @@ import type { SortDirection } from "@/screens/todayScreenHelpers";
 import { ScheduleSortHeader } from "@/screens/scheduleSortHeader";
 import { ResourceListSection } from "@/ui/ResourceListSection";
 import type { ScheduleItem } from "@campus/shared";
+import type { UiError } from "@/api/uiError";
+import { useLocale } from "@/i18n/LocaleContext";
 
 export function ScheduleSection({
   sortDirection,
@@ -20,10 +22,11 @@ export function ScheduleSection({
   sortDirection: SortDirection;
   onToggleSort: () => void;
   loading: boolean;
-  error: string | null;
+  error: UiError | null;
   items: ScheduleItem[];
   onRetry: () => void;
 }): JSX.Element {
+  const { t } = useLocale();
   const keyExtractor = useCallback((item: ScheduleItem) => item.id, []);
   const href = useCallback((item: ScheduleItem) => getScheduleHref(item), []);
   const renderCard = useCallback((item: ScheduleItem) => getScheduleCard(item), []);
@@ -33,13 +36,12 @@ export function ScheduleSection({
     <>
       <ScheduleSortHeader sortDirection={sortDirection} onToggleSort={onToggleSort} />
       <ResourceListSection
-        title="Schedule"
+        title={t("schedule")}
         loading={loading}
         error={error}
         items={items}
-        emptyMessage="No classes scheduled today."
+        emptyMessage={t("noSchedule")}
         emptyHint="Your schedule will appear here once a public calendar feed is configured."
-        emptyIcon={"📋"}
         keyExtractor={keyExtractor}
         href={href}
         renderCard={renderCard}

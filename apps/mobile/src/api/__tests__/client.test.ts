@@ -69,4 +69,18 @@ describe("getJson", () => {
 
     await expect(getJson("/missing")).rejects.toThrow();
   });
+
+  it("rejects a BFF configured for a different institution", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => "{}",
+      headers: { get: (name: string) => name === "x-institution-id" ? "other" : null },
+    }));
+
+    await expect(getJson("/events")).rejects.toMatchObject({
+      code: "institution_mismatch",
+      status: 409,
+    });
+  });
 });

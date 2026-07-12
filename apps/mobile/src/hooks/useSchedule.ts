@@ -1,15 +1,9 @@
 import { useMemo } from "react";
 import type { ScheduleResponse } from "../api/types";
 import { fetchSchedule, type ScheduleFilterOptions } from "../data/publicApi";
-import { usePublicResource } from "./usePublicResource";
+import { usePublicResource, type PublicResource } from "./usePublicResource";
 
-export function useSchedule(options?: ScheduleFilterOptions): {
-  data: ScheduleResponse | null;
-  error: string | null;
-  loading: boolean;
-  refreshing: boolean;
-  refresh: () => Promise<void>;
-} {
+export function useSchedule(options?: ScheduleFilterOptions): PublicResource<ScheduleResponse> {
   const filterKey = useMemo(
     () => JSON.stringify({
       search: options?.search, from: options?.from, to: options?.to,

@@ -1,5 +1,9 @@
-# Require review for CI/CD and security-sensitive files
-.github/                @campus-app-kit/maintainers
-SECURITY.md             @campus-app-kit/maintainers
-.gitleaks.toml          @campus-app-kit/maintainers
-apps/bff/Dockerfile*    @campus-app-kit/maintainers
+# Review ownership for public template safety and release-sensitive surfaces.
+*                                      @sebastianspicker
+
+.github/                               @sebastianspicker
+SECURITY.md                            @sebastianspicker
+.gitleaks.toml                         @sebastianspicker
+apps/bff/Dockerfile*                   @sebastianspicker
+packages/shared/src/domain/            @sebastianspicker
+packages/institutions/src/packs/       @sebastianspicker

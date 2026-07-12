@@ -83,6 +83,15 @@ describe("guardAuth", () => {
     expect(body.error.code).toBe("auth_misconfigured");
   });
 
+  it("sets request id on invalid auth mode responses", () => {
+    process.env.BFF_REQUIRE_AUTH = "enabled";
+    const { req, res } = createMockReqRes({});
+
+    guardAuth(req, res, "req-invalid-mode-header");
+
+    expect(res.getHeaders()["x-request-id"]).toBe("req-invalid-mode-header");
+  });
+
   describe("when BFF_REQUIRE_AUTH=1", () => {
     beforeEach(() => {
       process.env.BFF_REQUIRE_AUTH = "1";
@@ -125,6 +134,11 @@ describe("guardAuth", () => {
       const result = guardAuth(req, res, "req-3");
       expect(result).toBe(false);
       expect(res.getStatusCode()).toBe(401);
+    });
+
+    it("trims whitespace around Bearer token values", () => {
+      const { req, res } = createMockReqRes({ authorization: "Bearer  expected-token  " });
+      expect(guardAuth(req, res, "req-trimmed-token")).toBe(true);
     });
 
     it("returns false and sends 401 when Authorization header is empty string", () => {

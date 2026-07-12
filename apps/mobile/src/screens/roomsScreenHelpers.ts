@@ -1,5 +1,5 @@
-import { formatCampusId } from "../utils/dateFormat";
-import { serializeRouteItem } from "../utils/routeItem";
+import { formatCampusId } from "@/utils/dateFormat";
+import { serializeRouteItem } from "@/utils/routeItem";
 import type { Room } from "@campus/shared";
 
 export function getRoomHref(room: Room): {

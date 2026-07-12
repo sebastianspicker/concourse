@@ -1,6 +1,11 @@
 export const hfmtPublicPack = {
   id: "hfmt",
   name: "University for Music and Dance (HfMT Cologne)",
+  app: {
+    displayName: "HfMT Cologne",
+    defaultLocale: "de",
+    accent: "#176B87"
+  },
   type: "music-and-dance",
   campuses: [
     {
@@ -55,4 +60,3 @@ export const hfmtPublicPack = {
   ],
   timezone: "Europe/Berlin"
 } as const;
-

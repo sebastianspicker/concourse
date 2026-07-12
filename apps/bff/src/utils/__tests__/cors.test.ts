@@ -39,5 +39,6 @@ describe("getCorsHeaders", () => {
     ]);
     expect(headers["access-control-allow-methods"]).toBe("GET, OPTIONS");
     expect(headers["access-control-allow-headers"]).toBe("content-type, authorization");
+    expect(headers["access-control-expose-headers"]).toContain("x-institution-id");
   });
 });

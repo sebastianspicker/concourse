@@ -2,8 +2,28 @@ name: gitleaks
 
 on:
   pull_request:
+    paths-ignore:
+      - 'AGENTS.md'
+      - 'archive/**'
+      - 'docs/archive/**'
+      - 'node_modules/**'
+      - 'vendor/**'
+      - 'third_party/**'
+      - 'third-party/**'
+      - '3rdparty/**'
+      - 'external/**'
   push:
     branches: [main, dev]
+    paths-ignore:
+      - 'AGENTS.md'
+      - 'archive/**'
+      - 'docs/archive/**'
+      - 'node_modules/**'
+      - 'vendor/**'
+      - 'third_party/**'
+      - 'third-party/**'
+      - '3rdparty/**'
+      - 'external/**'
 
 permissions:
   contents: read

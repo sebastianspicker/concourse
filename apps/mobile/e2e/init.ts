@@ -230,22 +230,20 @@ export const E2E_TIMEOUT = 30000;
  */
 export const TEST_IDS = {
   // Navigation
-  TAB_BAR: "tab-bar",
-  EVENTS_TAB: "events-tab",
-  SCHEDULE_TAB: "schedule-tab",
-  ROOMS_TAB: "rooms-tab",
-  PROFILE_TAB: "profile-tab",
+  TAB_BAR: "tab-today",
+  TODAY_TAB: "tab-today",
+  EVENTS_TAB: "tab-events",
+  ROOMS_TAB: "tab-rooms",
+  SETTINGS_TAB: "tab-settings",
   
   // Screens
-  HOME_SCREEN: "home-screen",
+  HOME_SCREEN: "today-screen",
   EVENTS_SCREEN: "events-screen",
-  SCHEDULE_SCREEN: "schedule-screen",
   ROOMS_SCREEN: "rooms-screen",
-  PROFILE_SCREEN: "profile-screen",
+  SETTINGS_SCREEN: "settings-screen",
   
   // Lists
   EVENTS_LIST: "events-list",
-  SCHEDULE_LIST: "schedule-list",
   ROOMS_LIST: "rooms-list",
   
   // Items
@@ -270,9 +268,9 @@ export const TEST_IDS = {
   EMPTY_STATE: "empty-state",
   
   // Search
-  SEARCH_BAR: "search-bar",
-  SEARCH_INPUT: "search-input",
-  SEARCH_CLEAR_BUTTON: "search-clear-button",
+  SEARCH_BAR: "events-search",
+  SEARCH_INPUT: "events-search",
+  SEARCH_CLEAR_BUTTON: "events-search-clear",
   
   // Offline
   OFFLINE_INDICATOR: "offline-indicator",

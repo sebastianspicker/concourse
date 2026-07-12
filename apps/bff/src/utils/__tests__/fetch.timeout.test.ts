@@ -96,4 +96,48 @@ describe("fetchWithTimeout — timeout behavior", () => {
     );
     expect(timeoutCall).toBeDefined();
   });
+
+  it("rejects private literal hosts before fetch", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    await expect(fetchWithTimeout("http://127.0.0.1:4000")).rejects.toThrow(
+      "Fetch URL must target a public host"
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "http://localhost:4000",
+    "http://0.0.0.0:4000",
+    "http://10.0.0.1",
+    "http://172.16.0.1",
+    "http://192.168.1.1",
+    "http://169.254.1.1",
+    "http://[::1]:4000",
+    "http://[fd00::1]",
+    "http://[fe80::1]"
+  ])("rejects private host %s before fetch", async (url) => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    await expect(fetchWithTimeout(url)).rejects.toThrow("Fetch URL must target a public host");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects URLs with credentials before fetch", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    await expect(fetchWithTimeout("https://user:pass@example.com")).rejects.toThrow(
+      "Fetch URL must not include credentials"
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-http URLs before fetch", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    await expect(fetchWithTimeout("file:///etc/passwd")).rejects.toThrow(
+      "Fetch URL must use http or https"
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });

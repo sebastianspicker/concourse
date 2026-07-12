@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- “The Campus Desk” product and design contracts, English/German localization, institution-controlled app identity, and accessible light, dark, system, and high-contrast appearance choices.
+- Responsive web navigation, virtualized public resource lists, localized resource freshness and error states, and deterministic Playwright/axe coverage with current release screenshots.
+- BFF institution identity headers and client-side configuration mismatch detection.
+
+### Changed
+
+- Upgraded the mobile app to Expo SDK 57, React Native 0.86, React 19.2, and Node.js 22.13 or newer.
+- Replaced the demo Profile/authentication experience with Settings while retaining a compatibility redirect.
+- Consolidated frontend styling on typed React Native tokens and flat, compact Campus Desk components.
+- Made `pnpm verify` enforce browser accessibility/responsive checks and deterministic BFF E2E flows.
+
+### Removed
+
+- Demo authentication, unused NativeWind/Tailwind wrappers and configuration, decorative animation/image dependencies, FlashList, stale UI helpers, and superseded screenshots.
+
 ---
 
 ## [1.1.0] - 2026-04-19

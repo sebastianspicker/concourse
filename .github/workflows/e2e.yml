@@ -9,6 +9,9 @@ on:
       - 'packages/shared/**'
       - 'packages/institutions/**'
       - 'scripts/e2e-bff.mjs'
+      - 'scripts/mock-public-bff.mjs'
+      - 'scripts/serve-expo-export.mjs'
+      - 'playwright.config.ts'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/e2e.yml'
@@ -20,6 +23,9 @@ on:
       - 'packages/shared/**'
       - 'packages/institutions/**'
       - 'scripts/e2e-bff.mjs'
+      - 'scripts/mock-public-bff.mjs'
+      - 'scripts/serve-expo-export.mjs'
+      - 'playwright.config.ts'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/e2e.yml'
@@ -30,13 +36,14 @@ permissions:
 
 env:
   JAVA_VERSION: '17'
-  NODE_VERSION: '20'
+  NODE_VERSION: '22.13.0'
 
 jobs:
   service:
     name: BFF HTTP E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -235,35 +242,35 @@ jobs:
     steps:
       - name: Check test results
         env:
-          ANDROID_RESULT: ${{ needs.android.result }}
-          ANDROID_PROJECT_DETECTED: ${{ needs.native-projects.outputs.android }}
-          IOS_RESULT: ${{ needs.ios.result }}
-          IOS_PROJECT_DETECTED: ${{ needs.native-projects.outputs.ios }}
           SERVICE_RESULT: ${{ needs.service.result }}
+          NATIVE_PROJECTS_IOS: ${{ needs.native-projects.outputs.ios }}
+          NATIVE_PROJECTS_ANDROID: ${{ needs.native-projects.outputs.android }}
+          IOS_RESULT: ${{ needs.ios.result }}
+          ANDROID_RESULT: ${{ needs.android.result }}
         run: |
-          if [ "$IOS_RESULT" == "failure" ] || [ "$ANDROID_RESULT" == "failure" ]; then
+          if [ "$IOS_RESULT" = "failure" ] || [ "$ANDROID_RESULT" = "failure" ]; then
             echo "E2E tests failed"
             exit 1
           fi
-          if [ "$SERVICE_RESULT" == "failure" ]; then
+          if [ "$SERVICE_RESULT" = "failure" ]; then
             echo "BFF E2E tests failed"
             exit 1
           fi
-          if [ "$IOS_RESULT" == "cancelled" ] || [ "$ANDROID_RESULT" == "cancelled" ]; then
+          if [ "$IOS_RESULT" = "cancelled" ] || [ "$ANDROID_RESULT" = "cancelled" ]; then
             echo "E2E tests were cancelled"
             exit 1
           fi
-          if [ "$SERVICE_RESULT" == "cancelled" ]; then
+          if [ "$SERVICE_RESULT" = "cancelled" ]; then
             echo "BFF E2E tests were cancelled"
             exit 1
           fi
-          if [ "$IOS_PROJECT_DETECTED" != "true" ] && [ "$ANDROID_PROJECT_DETECTED" != "true" ]; then
+          if [ "$NATIVE_PROJECTS_IOS" != "true" ] && [ "$NATIVE_PROJECTS_ANDROID" != "true" ]; then
             echo "No native iOS or Android project is checked in; skipping Detox E2E."
           fi
-          if [ "$SERVICE_RESULT" == "success" ]; then
+          if [ "$SERVICE_RESULT" = "success" ]; then
             echo "BFF E2E tests passed"
           fi
-          if [ "$SERVICE_RESULT" == "skipped" ] && [ "$IOS_RESULT" == "skipped" ] && [ "$ANDROID_RESULT" == "skipped" ]; then
+          if [ "$SERVICE_RESULT" = "skipped" ] && [ "$IOS_RESULT" = "skipped" ] && [ "$ANDROID_RESULT" = "skipped" ]; then
             echo "No E2E target ran"
             exit 0
           fi

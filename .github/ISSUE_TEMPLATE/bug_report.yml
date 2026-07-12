@@ -36,16 +36,37 @@ body:
     id: logs
     attributes:
       label: Logs / screenshots
-      description: Paste relevant logs (redact secrets).
+      description: Paste relevant logs or screenshots. Redact secrets, tokens, private URLs, student data, and internal institution details.
       render: shell
     validations:
       required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the public template is affected?
+      options:
+        - Mobile app
+        - BFF
+        - Shared schemas
+        - Institution packs
+        - Public connectors
+        - Documentation
+        - CI / tooling
+    validations:
+      required: true
   - type: input
     id: environment
     attributes:
       label: Environment
       description: OS, Node, pnpm, Expo version (if relevant)
-      placeholder: macOS 14, Node 20.11.1, pnpm 9.x, Expo SDK …
+      placeholder: macOS 15, Node 22.13.0, pnpm 9.x, Expo SDK 57
     validations:
       required: false
-
+  - type: checkboxes
+    id: public-safety
+    attributes:
+      label: Public repo safety
+      options:
+        - label: I removed secrets, credentials, private endpoints, internal URLs, and personal data from this report.
+          required: true

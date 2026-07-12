@@ -1,10 +1,9 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Link } from "expo-router";
 import React, { type ComponentProps, useCallback, useRef } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
-import { Card } from "./Card";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { spacing, typography } from "./theme";
 import { useTheme } from "./ThemeContext";
-import { spacing } from "./theme";
 
 export type ResourceListItemProps<T> = {
   item: T;
@@ -13,114 +12,41 @@ export type ResourceListItemProps<T> = {
   accessibilityLabel: (item: T) => string;
 };
 
-const ChevronRight = ({ color }: { color: string }) => (
-  <View style={styles.chevronContainer}>
-    <View style={[styles.chevronLine, styles.chevronTop, { backgroundColor: color }]} />
-    <View style={[styles.chevronLine, styles.chevronBottom, { backgroundColor: color }]} />
-  </View>
-);
-
-function ResourceListItemInner<T>({
-  item,
-  href,
-  renderCard,
-  accessibilityLabel
-}: ResourceListItemProps<T>): JSX.Element {
-  const card = renderCard(item);
-  const linkHref = href(item);
-  const label = accessibilityLabel(item);
+function ResourceListItemInner<T>({ item, href, renderCard, accessibilityLabel }: ResourceListItemProps<T>): JSX.Element {
   const theme = useTheme();
-  const navigatingRef = useRef(false);
-
-  const pressed = useSharedValue(0);
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 - pressed.value * 0.04 }],
-    opacity: 1 - pressed.value * 0.3,
-  }));
-
-  const handlePressIn = () => {
-    pressed.value = withSpring(1, {
-      damping: 15,
-      stiffness: 450,
-      mass: 0.5
-    });
-  };
-
-  const handlePressOut = () => {
-    pressed.value = withSpring(0, {
-      damping: 20,
-      stiffness: 300,
-      mass: 0.8
-    });
-  };
-
-  const handlePress = useCallback<NonNullable<ComponentProps<typeof Link>["onPress"]>>((e) => {
-    // Expo Router can receive rapid duplicate presses before navigation settles.
-    // Drop repeats so detail screens are pushed at most once per tap burst.
-    if (navigatingRef.current) {
-      e.preventDefault();
+  const content = renderCard(item);
+  const navigating = useRef(false);
+  const handlePress = useCallback<NonNullable<ComponentProps<typeof Link>["onPress"]>>((event) => {
+    if (navigating.current) {
+      event.preventDefault();
       return;
     }
-    navigatingRef.current = true;
-    setTimeout(() => { navigatingRef.current = false; }, 500);
+    navigating.current = true;
+    setTimeout(() => { navigating.current = false; }, 500);
   }, []);
 
   return (
-    <Link href={linkHref} onPress={handlePress} asChild>
+    <Link href={href(item)} onPress={handlePress} asChild>
       <Pressable
         accessibilityRole="link"
-        accessibilityLabel={label}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={styles.pressableContainer}
+        accessibilityLabel={accessibilityLabel(item)}
+        style={({ pressed }) => [styles.row, { borderBottomColor: theme.colors.border, backgroundColor: pressed ? theme.colors.infoSurface : theme.colors.surface }]}
       >
-        <Animated.View style={[animatedStyle, styles.cardWrapper]}>
-          <Card title={card.title} subtitle={card.subtitle} />
-          <View style={styles.chevronOverlay}>
-            <ChevronRight color={theme.colors.muted} />
-          </View>
-        </Animated.View>
+        <View style={styles.copy}>
+          <Text numberOfLines={2} style={[styles.title, { color: theme.colors.text }]}>{content.title}</Text>
+          {content.subtitle ? <Text numberOfLines={2} style={[styles.subtitle, { color: theme.colors.muted }]}>{content.subtitle}</Text> : null}
+        </View>
+        <MaterialIcons name="chevron-right" size={24} color={theme.colors.muted} />
       </Pressable>
     </Link>
   );
 }
 
 const styles = StyleSheet.create({
-  pressableContainer: {
-    width: "100%",
-  },
-  cardWrapper: {
-    width: "100%",
-  },
-  chevronOverlay: {
-    position: "absolute",
-    right: spacing.md,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-  },
-  chevronContainer: {
-    width: 8,
-    height: 14,
-    justifyContent: "center",
-    opacity: 0.6,
-  },
-  chevronLine: {
-    width: 1.5,
-    height: 8.5,
-    borderRadius: 1,
-    position: "absolute",
-  },
-  chevronTop: {
-    top: 0.5,
-    transform: [{ rotate: "-45deg" }],
-  },
-  chevronBottom: {
-    bottom: 0.5,
-    transform: [{ rotate: "45deg" }],
-  },
+  row: { minHeight: 64, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  copy: { flex: 1, minWidth: 0 },
+  title: { ...typography.body, fontWeight: "600" },
+  subtitle: { ...typography.caption, marginTop: 2 },
 });
 
-export const ResourceListItem = React.memo(
-  ResourceListItemInner
-) as typeof ResourceListItemInner;
+export const ResourceListItem = React.memo(ResourceListItemInner) as typeof ResourceListItemInner;

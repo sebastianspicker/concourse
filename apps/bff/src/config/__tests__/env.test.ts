@@ -31,6 +31,13 @@ describe("BFF_ENV", () => {
     expect(BFF_ENV.port).toBe(8080);
   });
 
+  it("parses BFF_PORT with surrounding whitespace", async () => {
+    process.env.INSTITUTION_ID = "test";
+    process.env.BFF_PORT = " 8080 ";
+    const { BFF_ENV } = await import("../env");
+    expect(BFF_ENV.port).toBe(8080);
+  });
+
   it("rejects invalid BFF_PORT", async () => {
     process.env.INSTITUTION_ID = "test";
     process.env.BFF_PORT = "not-a-number";
@@ -40,6 +47,12 @@ describe("BFF_ENV", () => {
   it("rejects out-of-range BFF_PORT", async () => {
     process.env.INSTITUTION_ID = "test";
     process.env.BFF_PORT = "99999";
+    await expect(import("../env")).rejects.toThrow("Invalid BFF_PORT");
+  });
+
+  it("rejects partial numeric BFF_PORT values", async () => {
+    process.env.INSTITUTION_ID = "test";
+    process.env.BFF_PORT = "4000x";
     await expect(import("../env")).rejects.toThrow("Invalid BFF_PORT");
   });
 

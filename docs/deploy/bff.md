@@ -19,5 +19,8 @@ docker run --rm -p 4000:4000 \\
 
 ## Reverse proxies
 
-- Rate limiting derives a client key from `X-Forwarded-For`/`Forwarded` with a socket fallback.
+- `BFF_TRUST_PROXY` defaults to `never`, so rate limiting uses the direct socket
+  address and ignores `X-Forwarded-For`/`Forwarded`.
+- Set `BFF_TRUST_PROXY=auto` or `always` only when the BFF is reachable
+  exclusively through a trusted reverse proxy.
 - The server accepts `x-request-id` and always returns `x-request-id` in the response headers.

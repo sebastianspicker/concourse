@@ -1,7 +1,10 @@
 import React, { useCallback, useState } from "react";
+import { StyleSheet, View } from "react-native";
+import type { PublicEvent } from "@campus/shared";
 import { DegradedBanner } from "@/components/DegradedBanner";
-import { useEvents } from "@/hooks/useEvents";
 import { SearchBar } from "@/components/SearchBar";
+import { useEvents } from "@/hooks/useEvents";
+import { useLocale } from "@/i18n/LocaleContext";
 import { EventListControls } from "@/screens/eventsListControls";
 import {
   getEventAccessibilityLabel,
@@ -9,53 +12,53 @@ import {
   getEventHref,
   getEventsEmptyHint,
   getEventsEmptyMessage,
-  sortEventsByDate
+  sortEventsByDate,
+  type SortDirection,
 } from "@/screens/eventsScreenHelpers";
-import type { SortDirection } from "@/screens/eventsScreenHelpers";
-import { ResourceListSection } from "@/ui/ResourceListSection";
+import { ResourceList } from "@/ui/ResourceList";
 import { Screen } from "@/ui/Screen";
-import type { PublicEvent } from "@campus/shared";
+import { StatusBanner } from "@/ui/StatusBanner";
+import { spacing } from "@/ui/theme";
 
 export default function EventsScreen(): JSX.Element {
+  const { t } = useLocale();
   const [search, setSearch] = useState("");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const { data, error, loading, refreshing, refresh } = useEvents({ search: search || undefined });
-  const sortedEvents = sortEventsByDate(data?.events ?? [], sortDirection);
+  const state = useEvents({ search: search || undefined });
+  const events = sortEventsByDate(state.data?.events ?? [], sortDirection);
+  const keyExtractor = useCallback((item: PublicEvent) => item.id, []);
+  const href = useCallback((item: PublicEvent) => getEventHref(item), []);
+  const renderCard = useCallback((item: PublicEvent) => getEventCard(item), []);
+  const accessibilityLabel = useCallback((item: PublicEvent) => getEventAccessibilityLabel(item), []);
 
-  const toggleSort = useCallback(() => {
-    setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
-  }, []);
-
-  const keyExtractor = useCallback((e: PublicEvent) => e.id, []);
-  const href = useCallback((e: PublicEvent) => getEventHref(e), []);
-  const renderCard = useCallback((e: PublicEvent) => getEventCard(e), []);
-  const accessibilityLabel = useCallback((e: PublicEvent) => getEventAccessibilityLabel(e), []);
+  const header = (
+    <View style={styles.header}>
+      <SearchBar value={search} onChangeText={setSearch} label={t("searchEvents")} placeholder={t("searchEvents")} testID="events-search" />
+      <EventListControls loading={state.loading} resultCount={events.length} search={search} sortDirection={sortDirection} onToggleSort={() => setSortDirection((value) => value === "asc" ? "desc" : "asc")} />
+      {state.source === "persisted-cache" ? <StatusBanner kind="cached" cacheAge={state.cacheAge} /> : null}
+      <DegradedBanner visible={state.data?._degraded === true} />
+    </View>
+  );
 
   return (
-    <Screen refreshing={refreshing} onRefresh={refresh}>
-      <SearchBar value={search} onChangeText={setSearch} placeholder="Search events..." />
-      <EventListControls
-        loading={loading}
-        resultCount={sortedEvents.length}
-        search={search}
-        sortDirection={sortDirection}
-        onToggleSort={toggleSort}
-      />
-      <DegradedBanner visible={data?._degraded === true} />
-      <ResourceListSection
-        title="Events"
-        loading={loading}
-        error={error}
-        items={sortedEvents}
-        emptyMessage={getEventsEmptyMessage(search)}
+    <Screen scroll={false} maxWidth={760} testID="events-screen">
+      <ResourceList
+        testID="events-list"
+        header={header}
+        items={events}
+        loading={state.loading}
+        error={state.error}
+        refreshing={state.refreshing}
+        onRefresh={() => void state.refresh()}
+        emptyMessage={search ? getEventsEmptyMessage(search) : t("noEvents")}
         emptyHint={getEventsEmptyHint(search)}
-        emptyIcon={"📅"}
         keyExtractor={keyExtractor}
         href={href}
         renderCard={renderCard}
         accessibilityLabel={accessibilityLabel}
-        onRetry={refresh}
       />
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({ header: { gap: spacing.md, paddingBottom: spacing.md } });

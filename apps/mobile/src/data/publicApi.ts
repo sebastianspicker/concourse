@@ -11,6 +11,7 @@ import {
   ScheduleResponseSchema
 } from "@campus/shared";
 import { getCachedJson } from "./publicApiRequest";
+import type { ResourceLoadResult } from "./publicApiRequest";
 
 export type EventsFilterOptions = {
   force?: boolean;
@@ -23,7 +24,7 @@ export type EventsFilterOptions = {
   offlineMode?: boolean;
 };
 
-export function fetchEvents(options?: EventsFilterOptions): Promise<EventsResponse> {
+export function fetchEvents(options?: EventsFilterOptions): Promise<ResourceLoadResult<EventsResponse>> {
   const queryParams: Record<string, string> = {};
   if (options?.search) queryParams.search = options.search;
   if (options?.from) queryParams.from = options.from;
@@ -49,7 +50,7 @@ export type RoomsFilterOptions = {
   offlineMode?: boolean;
 };
 
-export function fetchRooms(options?: RoomsFilterOptions): Promise<RoomsResponse> {
+export function fetchRooms(options?: RoomsFilterOptions): Promise<ResourceLoadResult<RoomsResponse>> {
   const queryParams: Record<string, string> = {};
   if (options?.campus) queryParams.campus = options.campus;
   if (options?.search) queryParams.search = options.search;
@@ -71,7 +72,7 @@ export type TodayFetchOptions = {
   date?: string;
 };
 
-export function fetchToday(options?: TodayFetchOptions): Promise<TodayResponse> {
+export function fetchToday(options?: TodayFetchOptions): Promise<ResourceLoadResult<TodayResponse>> {
   const queryParams: Record<string, string> = {};
   if (options?.date) queryParams.date = options.date;
 
@@ -95,7 +96,7 @@ export type ScheduleFilterOptions = {
   offlineMode?: boolean;
 };
 
-export function fetchSchedule(options?: ScheduleFilterOptions): Promise<ScheduleResponse> {
+export function fetchSchedule(options?: ScheduleFilterOptions): Promise<ResourceLoadResult<ScheduleResponse>> {
   const queryParams: Record<string, string> = {};
   if (options?.search) queryParams.search = options.search;
   if (options?.from) queryParams.from = options.from;

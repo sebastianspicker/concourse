@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { spacing, typography } from "../ui/theme";
 import { useTheme } from "../ui/ThemeContext";
 import { formatCacheAge } from "./cacheAge";
+import { useLocale } from "../i18n/LocaleContext";
 
 const styles = StyleSheet.create({
   container: {
@@ -31,21 +32,20 @@ export function OfflineBanner({
   showCacheAge: boolean;
 }): JSX.Element {
   const theme = useTheme();
+  const { t } = useLocale();
 
   return (
     <View
       style={[
         styles.container,
-        { backgroundColor: theme.colors.error, paddingTop: topPadding + 8 },
+        { backgroundColor: theme.colors.errorSurface, paddingTop: topPadding + 8 },
       ]}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
     >
-      <Text style={[styles.text, { color: "#ffffff" }]}>
-        📡 You are offline
-      </Text>
+      <Text style={[styles.text, { color: theme.colors.error }]}>{t("offline")}</Text>
       {hasOfflineData && showCacheAge && (
-        <Text style={[styles.subtext, { color: "rgba(255,255,255,0.85)" }]}>
-          Showing cached data
-        </Text>
+        <Text style={[styles.subtext, { color: theme.colors.error }]}>{t("cachedData")}</Text>
       )}
     </View>
   );
@@ -65,10 +65,10 @@ export function CachedDataBanner({
     <View
       style={[
         styles.container,
-        { backgroundColor: theme.colors.warning, paddingTop: topPadding + 8 },
+        { backgroundColor: theme.colors.warningSurface, paddingTop: topPadding + 8 },
       ]}
     >
-      <Text style={[styles.text, { color: "#1b1a17" }]}>
+      <Text style={[styles.text, { color: theme.colors.warning }]}>
         Offline data{ageText ? ` (${ageText})` : ""}
       </Text>
     </View>

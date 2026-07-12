@@ -80,4 +80,40 @@ describe("getClientKey", () => {
 
     expect(key).toBe("203.0.113.60");
   });
+
+  it("parses bracketed IPv6 x-forwarded-for values with ports", () => {
+    const req = createRequest({
+      headers: { "x-forwarded-for": "[2001:db8::1]:443" },
+      remoteAddress: "127.0.0.1"
+    });
+
+    const key = getClientKey(req, { trustProxy: "auto" });
+
+    expect(key).toBe("2001:db8::1");
+  });
+
+  it("falls back to remote address for invalid forwarded values", () => {
+    const req = createRequest({
+      headers: {
+        "x-forwarded-for": "not-an-ip",
+        forwarded: "for=also-not-an-ip;proto=https"
+      },
+      remoteAddress: "127.0.0.1"
+    });
+
+    const key = getClientKey(req, { trustProxy: "auto" });
+
+    expect(key).toBe("127.0.0.1");
+  });
+
+  it("trusts forwarded headers when auto and remote address is unique-local IPv6", () => {
+    const req = createRequest({
+      headers: { "x-forwarded-for": "203.0.113.10" },
+      remoteAddress: "fd00::1"
+    });
+
+    const key = getClientKey(req, { trustProxy: "auto" });
+
+    expect(key).toBe("203.0.113.10");
+  });
 });

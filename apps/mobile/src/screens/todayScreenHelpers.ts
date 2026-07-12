@@ -1,6 +1,7 @@
-import { formatEventDate, formatRelativeTime, formatScheduleTime, formatTimeRange } from "../utils/dateFormat";
-import { serializeRouteItem } from "../utils/routeItem";
+import { formatEventDate, formatRelativeTime, formatScheduleTime, formatTimeRange } from "@/utils/dateFormat";
+import { serializeRouteItem } from "@/utils/routeItem";
 import type { PublicEvent, ScheduleItem } from "@campus/shared";
+import type { UiError } from "@/api/uiError";
 
 export type SortDirection = "asc" | "desc";
 
@@ -17,10 +18,8 @@ export function getLocalDayRange(): { from: string; to: string } {
   };
 }
 
-export function isScheduleUnavailable(error: string | null): boolean {
-  if (!error) return false;
-  const lower = error.toLowerCase();
-  return lower.includes("no schedules configured") || lower.includes("schedule not found");
+export function isScheduleUnavailable(error: UiError | null): boolean {
+  return error?.kind === "unavailableSource" || error?.kind === "notFound";
 }
 
 export function getGreeting(): string {

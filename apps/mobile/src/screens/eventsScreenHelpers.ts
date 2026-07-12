@@ -1,4 +1,4 @@
-import { formatEventDate } from "../utils/dateFormat";
+import { formatEventDate } from "@/utils/dateFormat";
 import type { PublicEvent } from "@campus/shared";
 
 export type SortDirection = "asc" | "desc";

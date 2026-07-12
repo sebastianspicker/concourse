@@ -1,11 +1,11 @@
-import { ColorScheme, colorSchemes, darkColors, uiSchemes } from "./theme";
+import { ColorScheme, colorSchemes, lightColors, uiSchemes } from "./theme";
 import type { Theme, ThemePreference } from "./themeTypes";
 
-const DEFAULT_COLOR_SCHEME: ColorScheme = "dark";
+const DEFAULT_COLOR_SCHEME: ColorScheme = "light";
 
 export function resolveColorScheme(
   preference: ThemePreference,
-  systemColorScheme: "light" | "dark" | null | undefined
+  systemColorScheme: "light" | "dark" | "unspecified" | null | undefined
 ): ColorScheme {
   if (preference !== "system") {
     return preference;
@@ -25,9 +25,9 @@ export function getThemeForScheme(colorScheme: ColorScheme): Theme {
 
 export function getInitialTheme(): Theme {
   return {
-    colors: darkColors,
+    colors: lightColors,
     ui: uiSchemes.dark,
-    isDark: true,
+    isDark: false,
     colorScheme: DEFAULT_COLOR_SCHEME,
   };
 }

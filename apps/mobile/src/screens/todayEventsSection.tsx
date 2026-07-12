@@ -6,6 +6,8 @@ import {
 } from "@/screens/todayScreenHelpers";
 import { ResourceListSection } from "@/ui/ResourceListSection";
 import type { PublicEvent } from "@campus/shared";
+import type { UiError } from "@/api/uiError";
+import { useLocale } from "@/i18n/LocaleContext";
 
 export function TodayEventsSection({
   loading,
@@ -14,10 +16,11 @@ export function TodayEventsSection({
   onRetry
 }: {
   loading: boolean;
-  error: string | null;
+  error: UiError | null;
   events: PublicEvent[];
   onRetry: () => void;
 }): JSX.Element {
+  const { t } = useLocale();
   const keyExtractor = useCallback((event: PublicEvent) => event.id, []);
   const href = useCallback((event: PublicEvent) => getEventHref(event), []);
   const renderCard = useCallback((event: PublicEvent) => getEventCard(event), []);
@@ -25,13 +28,12 @@ export function TodayEventsSection({
 
   return (
     <ResourceListSection
-      title="Events"
+      title={t("events")}
       loading={loading}
       error={error}
       items={events}
-      emptyMessage="No public events today."
+      emptyMessage={t("noEvents")}
       emptyHint="Pull down to refresh, or check the Events tab for upcoming events."
-      emptyIcon={"📅"}
       keyExtractor={keyExtractor}
       href={href}
       renderCard={renderCard}

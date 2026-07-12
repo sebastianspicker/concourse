@@ -15,7 +15,8 @@ Before tagging a release:
 1. CI checks pass on the current default branch (`main`)
 2. `CHANGELOG.md` has a section for the new version
 3. All `package.json` files have the new version
-4. Docs are up to date
+4. Public docs are up to date and the release commit does not include ignored
+   local archive, audit, plan, ledger, or status artifacts
 
 ## Release Steps
 

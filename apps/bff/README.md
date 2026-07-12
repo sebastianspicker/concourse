@@ -4,7 +4,7 @@ Public backend-for-frontend for the Campus App Kit. It exposes only public data 
 
 ## Endpoints
 
-- `GET /health` - liveness check
+- `GET /health` - process, institution-pack, and memory status
 - `GET /events` - public events from the institution pack
 - `GET /rooms` - public rooms from the institution pack
 - `GET /schedule` - public schedule (ICS) if configured
@@ -22,6 +22,8 @@ Environment variables:
 
 - `INSTITUTION_ID` (required, e.g. `hfmt`)
 - `BFF_PORT` (optional, default `4000`)
+- `BFF_REQUIRE_AUTH` (optional; unset/`0`/`false`/`no`/`off` disables bearer auth, `1`/`true`/`yes`/`on` requires it; invalid non-empty values fail closed)
+- `BFF_AUTH_TOKEN` (required when `BFF_REQUIRE_AUTH` enables bearer auth)
 - `CORS_ORIGINS` (optional, comma-separated; use `*` for development)
 - `BFF_TRUST_PROXY` (optional, default `never`; set `auto` or `always` only when the direct peer is a trusted reverse proxy)
 

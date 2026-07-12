@@ -1,0 +1,12 @@
+name: codeql-config
+
+paths-ignore:
+  - AGENTS.md
+  - archive/**
+  - docs/archive/**
+  - node_modules/**
+  - vendor/**
+  - third_party/**
+  - third-party/**
+  - 3rdparty/**
+  - external/**

@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { scaled, scaledFont, spacing, typography } from "./theme";
 import { useTheme } from "./ThemeContext";
 import type { ErrorType } from "./ErrorState";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useLocale } from "../i18n/LocaleContext";
 
 const styles = StyleSheet.create({
   iconContainer: {
@@ -11,9 +13,6 @@ const styles = StyleSheet.create({
   iconCircle: {
     alignItems: "center",
     justifyContent: "center",
-  },
-  iconText: {
-    fontSize: 36,
   },
   title: {
     ...typography.subheading,
@@ -54,10 +53,10 @@ const styles = StyleSheet.create({
   },
 });
 
-function getErrorIcon(errorType: ErrorType): string {
-  if (errorType === "network") return "📡";
-  if (errorType === "notFound") return "🔍";
-  return "⚠️";
+function getErrorIcon(errorType: ErrorType): "wifi-off" | "search-off" | "error-outline" {
+  if (errorType === "network") return "wifi-off";
+  if (errorType === "notFound") return "search-off";
+  return "error-outline";
 }
 
 export function ErrorStateIcon({ errorType }: { errorType: ErrorType }): JSX.Element {
@@ -79,7 +78,7 @@ export function ErrorStateIcon({ errorType }: { errorType: ErrorType }): JSX.Ele
           },
         ]}
       >
-        <Text style={styles.iconText}>{getErrorIcon(errorType)}</Text>
+        <MaterialIcons name={getErrorIcon(errorType)} size={36} color={theme.colors.error} />
       </View>
     </View>
   );
@@ -136,6 +135,7 @@ export function ErrorStateActions({
   onGoBack: () => void;
 }): JSX.Element {
   const theme = useTheme();
+  const { t } = useLocale();
   const ui = theme.ui;
   const bodySize = scaledFont(typography.body.fontSize, ui);
   const bodyLineHeight = scaledFont(typography.body.lineHeight, ui);
@@ -159,10 +159,10 @@ export function ErrorStateActions({
             pressed && styles.buttonPressed
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Retry"
+          accessibilityLabel={t("tryAgain")}
           accessibilityHint="Attempts to load the content again"
         >
-          <Text style={styles.retryIcon}>🔄</Text>
+          <MaterialIcons name="refresh" size={20} color={theme.colors.accentText} />
           <Text
             style={[
               styles.retryText,
@@ -173,7 +173,7 @@ export function ErrorStateActions({
               },
             ]}
           >
-            Retry
+            {t("tryAgain")}
           </Text>
         </Pressable>
       )}
@@ -192,7 +192,7 @@ export function ErrorStateActions({
             pressed && styles.buttonPressed
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t("goBack")}
           accessibilityHint="Returns to the previous screen"
         >
           <Text
@@ -205,7 +205,7 @@ export function ErrorStateActions({
               },
             ]}
           >
-            Go Back
+            {t("goBack")}
           </Text>
         </Pressable>
       )}

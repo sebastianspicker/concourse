@@ -1,23 +1,38 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import type { ResourceLoadResult } from "../data/publicApiRequest";
+import { toUiError, type UiError } from "../api/uiError";
 
-type PublicResource<T> = {
+export type PublicResource<T> = {
   data: T | null;
-  error: string | null;
+  error: UiError | null;
   loading: boolean;
   refreshing: boolean;
   refresh: () => Promise<void>;
+  source: ResourceLoadResult<T>["source"] | null;
+  updatedAt: number | null;
+  cacheAge: number | null;
 };
 
+function isCurrentRequest(
+  mountedRef: RefObject<boolean>,
+  controllerRef: RefObject<AbortController | null>,
+  controller: AbortController
+): boolean {
+  return mountedRef.current === true && controllerRef.current === controller;
+}
+
 export function usePublicResource<T>(
-  loader: (options: { force?: boolean; signal?: AbortSignal }) => Promise<T>,
+  loader: (options: { force?: boolean; signal?: AbortSignal }) => Promise<ResourceLoadResult<T>>,
   /** Serialized dependency key. When this changes, the hook re-fetches. */
   key?: string
 ): PublicResource<T> {
   const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [source, setSource] = useState<ResourceLoadResult<T>["source"] | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [cacheAge, setCacheAge] = useState<number | null>(null);
 
   const controllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef<boolean>(false);
@@ -25,11 +40,22 @@ export function usePublicResource<T>(
   loaderRef.current = loader;
 
   const runLoad = useCallback(async (force: boolean) => {
-    const controller = replaceController(controllerRef);
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
     try {
-      await loadPublicResource(loaderRef, controller, controllerRef, force, mountedRef, setData, setError);
+      const result = await loaderRef.current({ force, signal: controller.signal });
+      if (!isCurrentRequest(mountedRef, controllerRef, controller)) return;
+      setData(result.data);
+      setSource(result.source);
+      setUpdatedAt(result.updatedAt);
+      setCacheAge(result.cacheAge);
+      setError(null);
     } catch (err: unknown) {
-      setLoadError(err, controller, controllerRef, mountedRef, setError);
+      if (!isCurrentRequest(mountedRef, controllerRef, controller)) return;
+      const uiError = toUiError(err);
+      if (uiError !== null) setError(uiError);
     }
   }, []);
 
@@ -64,40 +90,5 @@ export function usePublicResource<T>(
     }
   }, [runLoad]);
 
-  return { data, error, loading, refreshing, refresh };
-}
-
-function replaceController(ref: MutableRefObject<AbortController | null>): AbortController {
-  ref.current?.abort();
-  const controller = new AbortController();
-  ref.current = controller;
-  return controller;
-}
-
-async function loadPublicResource<T>(
-  loader: MutableRefObject<(options: { force?: boolean; signal?: AbortSignal }) => Promise<T>>,
-  controller: AbortController,
-  controllerRef: MutableRefObject<AbortController | null>,
-  force: boolean,
-  mounted: MutableRefObject<boolean>,
-  setData: Dispatch<SetStateAction<T | null>>,
-  setError: Dispatch<SetStateAction<string | null>>
-): Promise<void> {
-  const result = await loader.current({ force, signal: controller.signal });
-  if (!mounted.current || controllerRef.current !== controller) return;
-  setData(result);
-  setError(null);
-}
-
-function setLoadError(
-  error: unknown,
-  controller: AbortController,
-  controllerRef: MutableRefObject<AbortController | null>,
-  mounted: MutableRefObject<boolean>,
-  setError: Dispatch<SetStateAction<string | null>>
-): void {
-  const isStale = !mounted.current || controllerRef.current !== controller;
-  const wasAborted = error instanceof Error && error.name === "AbortError";
-  if (isStale || wasAborted) return;
-  setError(error instanceof Error ? error.message : "Unknown error");
+  return { data, error, loading, refreshing, refresh, source, updatedAt, cacheAge };
 }

@@ -100,6 +100,7 @@ async function handleDataRoute(
     return;
   }
 
+  res.setHeader("x-institution-id", institution.id);
   await dataHandler(req, res, institution);
   log("info", "data_route_ok", { requestId, path, durationMs: Date.now() - startedAt });
 }

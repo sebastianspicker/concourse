@@ -1,119 +1,85 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
-import { scaledRadius, spacing, typography } from "../ui/theme";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useLocale } from "../i18n/LocaleContext";
+import { spacing, typography } from "../ui/theme";
 import { useTheme } from "../ui/ThemeContext";
-
-const styles = StyleSheet.create({
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  searchIcon: {
-    fontSize: 16,
-    opacity: 0.7,
-  },
-  input: {
-    flex: 1,
-    ...typography.body,
-  },
-});
 
 export type SearchBarProps = {
   value: string;
   onChangeText: (text: string) => void;
+  label?: string;
   placeholder?: string;
-  /** Debounce delay in milliseconds (default: 300ms) */
   debounceMs?: number;
-  /** Called immediately when user types (before debounce) */
   onImmediateChange?: (text: string) => void;
+  testID?: string;
 };
 
 export function SearchBar({
   value,
   onChangeText,
-  placeholder = "Search...",
-  debounceMs = 300,
-  onImmediateChange
+  label,
+  placeholder,
+  debounceMs = 250,
+  onImmediateChange,
+  testID,
 }: SearchBarProps): JSX.Element {
   const theme = useTheme();
-  const ui = theme.ui;
+  const { t } = useLocale();
   const [localValue, setLocalValue] = useState(value);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visibleLabel = label ?? placeholder ?? t("search");
 
-  // Sync local value when external value changes
-  useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
+  useEffect(() => setLocalValue(value), [value]);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, []);
-
-  const handleChangeText = useCallback((text: string) => {
-    setLocalValue(text);
-
-    // Call immediate change callback if provided
-    onImmediateChange?.(text);
-
-    // Clear existing timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    // Set new debounced timer
-    debounceTimerRef.current = setTimeout(() => {
-      onChangeText(text);
-    }, debounceMs);
-  }, [onChangeText, debounceMs, onImmediateChange]);
-
-  const controlPaddingX = Math.round(spacing.md * ui.controlScale);
-  const controlPaddingY = Math.round(spacing.sm * ui.controlScale);
-  const controlRadius = scaledRadius(12, ui);
-  const inputFontSize = Math.round(typography.body.fontSize * ui.fontScale);
-  const inputLineHeight = Math.round(typography.body.lineHeight * ui.fontScale);
+  const update = useCallback((next: string) => {
+    setLocalValue(next);
+    onImmediateChange?.(next);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => onChangeText(next), debounceMs);
+  }, [debounceMs, onChangeText, onImmediateChange]);
 
   return (
-    <View
-      style={[
-        styles.inputContainer,
-        {
-          backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.border,
-          borderWidth: ui.borderWidth,
-          borderRadius: controlRadius,
-          paddingHorizontal: controlPaddingX,
-          paddingVertical: controlPaddingY,
-        },
-      ]}
-      accessibilityRole="search"
-    >
-      <Text style={[styles.searchIcon, { color: theme.colors.placeholder }]}>
-        🔍
-      </Text>
-      <TextInput
-        style={[
-          styles.input,
-          {
-            color: theme.colors.text,
-            fontSize: inputFontSize,
-            lineHeight: inputLineHeight,
-          },
-        ]}
-        value={localValue}
-        onChangeText={handleChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={theme.colors.placeholder}
-        accessibilityLabel={placeholder}
-        autoCapitalize="none"
-        autoCorrect={false}
-        clearButtonMode="while-editing"
-      />
+    <View style={styles.field}>
+      <Text style={[styles.label, { color: theme.colors.text }]}>{visibleLabel}</Text>
+      <View style={[styles.control, { backgroundColor: theme.colors.surface, borderColor: theme.colors.controlBorder }]} accessibilityRole="search">
+        <MaterialIcons name="search" size={22} color={theme.colors.muted} />
+        <TextInput
+          testID={testID}
+          style={[styles.input, { color: theme.colors.text }]}
+          value={localValue}
+          onChangeText={update}
+          placeholder={placeholder}
+          placeholderTextColor={theme.colors.placeholder}
+          accessibilityLabel={visibleLabel}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        {localValue.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("clearSearch")}
+            hitSlop={8}
+            onPress={() => update("")}
+            style={styles.clear}
+            testID={testID ? `${testID}-clear` : undefined}
+          >
+            <MaterialIcons name="cancel" size={22} color={theme.colors.muted} />
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
+
+export const SearchField = SearchBar;
+
+const styles = StyleSheet.create({
+  field: { gap: spacing.xs },
+  label: { ...typography.caption, fontWeight: "600" },
+  control: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: spacing.sm, borderWidth: 1, borderRadius: 8, paddingLeft: spacing.md },
+  input: { ...typography.body, flex: 1, minWidth: 0, paddingVertical: spacing.sm },
+  clear: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+});

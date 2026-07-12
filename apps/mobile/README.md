@@ -27,7 +27,10 @@ pnpm --filter @campus/mobile dev
 This app expects a BFF base URL:
 
 - Set `EXPO_PUBLIC_BFF_BASE_URL` in development and production.
+- Set `INSTITUTION_ID` for preview and production builds; local development defaults to the example public pack.
 - For local development, use the BFF URL reachable from your simulator, emulator, or device.
+
+The UI, accessibility, localization, and responsive contracts are documented in [`../../docs/frontend.md`](../../docs/frontend.md).
 
 ## Releases (EAS)
 

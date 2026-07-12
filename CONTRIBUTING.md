@@ -4,7 +4,7 @@ This repository is kept safe to publish: no secrets, no private endpoints.
 
 ## Prerequisites
 
-- Node.js 20 (see `.nvmrc`)
+- Node.js 22.13 or newer (see `.nvmrc`)
 - pnpm 9 (see `package.json#packageManager`)
 
 Tip: enable Corepack once:
@@ -46,10 +46,12 @@ development and production — there is no automatic fallback.
 
 - Real institution credentials, tokens, or internal URLs.
 - Connectors that require access to protected systems in this public repo.
+- Internal planning, audit, ledger, status, or deprecated-doc packets.
 
 ## Pull request checklist
 
 - `pnpm verify` passes locally.
 - No placeholder markers added (unfinished task markers, stub markers, etc.).
+- No ignored local archive, audit, plan, ledger, or status artifacts included.
 - Tests are added for behavior changes (offline-capable; no real network required).
 - Docs are updated when you change workflows or env vars.

@@ -8,13 +8,26 @@ import {
 } from "./themeTypes";
 import { getInitialTheme, getThemeForScheme, resolveColorScheme } from "./themeResolve";
 import { loadThemePreference, saveThemePreference } from "./themePreferenceStorage";
+import { getConfiguredInstitution } from "../config/institution";
+import { getContrastTextColor } from "./theme";
 
 export function ThemeProvider({ children }: { children: ReactNode }): JSX.Element {
   const systemColorScheme = useColorScheme();
   const [preference, setPreferenceState] = useState<ThemePreference>(DEFAULT_THEME_PREFERENCE);
   const [isLoaded, setIsLoaded] = useState(false);
   const resolvedScheme = resolveColorScheme(preference, systemColorScheme);
-  const theme = getThemeForScheme(resolvedScheme);
+  const baseTheme = getThemeForScheme(resolvedScheme);
+  const institutionAccent = getConfiguredInstitution().app?.accent;
+  const theme = resolvedScheme !== "highContrast" && institutionAccent
+    ? {
+        ...baseTheme,
+        colors: {
+          ...baseTheme.colors,
+          accent: institutionAccent,
+          accentText: getContrastTextColor(institutionAccent),
+        },
+      }
+    : baseTheme;
 
   useEffect(() => {
     loadThemePreference()

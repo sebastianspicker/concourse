@@ -11,6 +11,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:web
 pnpm test:e2e
 
 if [[ "${SKIP_MARKER_CHECK:-}" != "1" ]]; then

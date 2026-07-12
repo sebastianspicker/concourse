@@ -1,80 +1,54 @@
 import React, { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { useRooms } from "@/hooks/useRooms";
-import { SearchBar } from "@/components/SearchBar";
-import {
-  getRoomAccessibilityLabel,
-  getRoomCard,
-  getRoomHref,
-  getRoomsEmptyHint,
-  getRoomsEmptyMessage
-} from "@/screens/roomsScreenHelpers";
-import { ResourceListSection } from "@/ui/ResourceListSection";
-import { Screen } from "@/ui/Screen";
-import { typography } from "@/ui/theme";
-import { useTheme } from "@/ui/ThemeContext";
 import type { Room } from "@campus/shared";
-
-const styles = StyleSheet.create({
-  resultRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  resultCount: {
-    ...typography.caption,
-  },
-});
-
-function RoomResultSummary({
-  loading,
-  resultCount,
-  search
-}: {
-  loading: boolean;
-  resultCount: number;
-  search: string;
-}): JSX.Element | null {
-  const theme = useTheme();
-  if (loading) return null;
-
-  return (
-    <View style={styles.resultRow}>
-      <Text style={[styles.resultCount, { color: theme.colors.muted }]}>
-        {resultCount} {resultCount === 1 ? "room" : "rooms"}
-        {search ? ` for "${search}"` : " available"}
-      </Text>
-    </View>
-  );
-}
+import { SearchBar } from "@/components/SearchBar";
+import { useRooms } from "@/hooks/useRooms";
+import { useLocale } from "@/i18n/LocaleContext";
+import { getRoomAccessibilityLabel, getRoomCard, getRoomHref, getRoomsEmptyHint, getRoomsEmptyMessage } from "@/screens/roomsScreenHelpers";
+import { ResourceList } from "@/ui/ResourceList";
+import { Screen } from "@/ui/Screen";
+import { StatusBanner } from "@/ui/StatusBanner";
+import { spacing, typography } from "@/ui/theme";
+import { useTheme } from "@/ui/ThemeContext";
 
 export default function RoomsScreen(): JSX.Element {
+  const theme = useTheme();
+  const { t } = useLocale();
   const [search, setSearch] = useState("");
-  const { data, error, loading, refreshing, refresh } = useRooms({ search: search || undefined });
-  const rooms = data?.rooms ?? [];
+  const state = useRooms({ search: search || undefined });
+  const rooms = state.data?.rooms ?? [];
+  const keyExtractor = useCallback((item: Room) => item.id, []);
+  const href = useCallback((item: Room) => getRoomHref(item), []);
+  const renderCard = useCallback((item: Room) => getRoomCard(item), []);
+  const accessibilityLabel = useCallback((item: Room) => getRoomAccessibilityLabel(item), []);
 
-  const keyExtractor = useCallback((r: Room) => r.id, []);
-  const href = useCallback((r: Room) => getRoomHref(r), []);
-  const renderCard = useCallback((r: Room) => getRoomCard(r), []);
-  const accessibilityLabel = useCallback((r: Room) => getRoomAccessibilityLabel(r), []);
+  const header = (
+    <View style={styles.header}>
+      <SearchBar value={search} onChangeText={setSearch} label={t("searchRooms")} placeholder={t("searchRooms")} testID="rooms-search" />
+      {!state.loading ? <Text style={[styles.count, { color: theme.colors.muted }]}>{rooms.length} {t("rooms").toLocaleLowerCase()}</Text> : null}
+      {state.source === "persisted-cache" ? <StatusBanner kind="cached" cacheAge={state.cacheAge} /> : null}
+    </View>
+  );
 
   return (
-    <Screen refreshing={refreshing} onRefresh={refresh}>
-      <SearchBar value={search} onChangeText={setSearch} placeholder="Search rooms..." />
-      <RoomResultSummary loading={loading} resultCount={rooms.length} search={search} />
-      <ResourceListSection
-        title="Rooms"
-        loading={loading}
-        error={error}
+    <Screen scroll={false} maxWidth={760} testID="rooms-screen">
+      <ResourceList
+        testID="rooms-list"
+        header={header}
         items={rooms}
-        emptyMessage={getRoomsEmptyMessage(search)}
+        loading={state.loading}
+        error={state.error}
+        refreshing={state.refreshing}
+        onRefresh={() => void state.refresh()}
+        emptyMessage={search ? getRoomsEmptyMessage(search) : t("noRooms")}
         emptyHint={getRoomsEmptyHint(search)}
-        emptyIcon={"🏢"}
         keyExtractor={keyExtractor}
         href={href}
         renderCard={renderCard}
         accessibilityLabel={accessibilityLabel}
-        onRetry={refresh}
       />
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({ header: { gap: spacing.md, paddingBottom: spacing.md }, count: { ...typography.caption } });

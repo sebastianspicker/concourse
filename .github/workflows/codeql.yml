@@ -3,7 +3,27 @@ name: codeql
 on:
   push:
     branches: [main, dev]
+    paths-ignore:
+      - 'AGENTS.md'
+      - 'archive/**'
+      - 'docs/archive/**'
+      - 'node_modules/**'
+      - 'vendor/**'
+      - 'third_party/**'
+      - 'third-party/**'
+      - '3rdparty/**'
+      - 'external/**'
   pull_request:
+    paths-ignore:
+      - 'AGENTS.md'
+      - 'archive/**'
+      - 'docs/archive/**'
+      - 'node_modules/**'
+      - 'vendor/**'
+      - 'third_party/**'
+      - 'third-party/**'
+      - '3rdparty/**'
+      - 'external/**'
   schedule:
     - cron: '0 2 * * 1'
 
@@ -27,4 +47,5 @@ jobs:
       - uses: github/codeql-action/init@38697555549f1db7851b81482ff19f1fa5c4fedc # v3
         with:
           languages: javascript
+          config-file: ./.github/codeql/codeql-config.yml
       - uses: github/codeql-action/analyze@38697555549f1db7851b81482ff19f1fa5c4fedc # v3

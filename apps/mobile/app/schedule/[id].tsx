@@ -6,20 +6,22 @@ import { ResourceDetailScreen } from "@/ui/ResourceDetailScreen";
 import { formatEventDate, formatScheduleTime } from "@/utils/dateFormat";
 import { parseRouteItem } from "@/utils/routeItem";
 import { ScheduleItemSchema, type ScheduleItem } from "@campus/shared";
+import { useLocale } from "@/i18n/LocaleContext";
 
 export default function ScheduleDetailScreen(): JSX.Element {
   const { id, item } = useLocalSearchParams<{ id: string; item?: string }>();
   const { data, loading, error, refreshing, refresh } = useSchedule();
   const routedItem = parseRouteItem<ScheduleItem>(item, ScheduleItemSchema);
   const scheduleItem = data?.schedule.find((entry) => entry.id === id) ?? (routedItem?.id === id ? routedItem : null);
+  const { t } = useLocale();
 
   return (
     <ResourceDetailScreen
-      title="Schedule Entry"
+      title={t("schedule")}
       loading={loading}
       error={error}
       item={scheduleItem ?? null}
-      notFoundMessage="Schedule entry not found."
+      notFoundMessage={t("errorNotFound")}
       cardTitle={scheduleItem ? scheduleItem.title : "Schedule item"}
       cardSubtitle={
         scheduleItem
@@ -31,22 +33,22 @@ export default function ScheduleDetailScreen(): JSX.Element {
           ? () => (
               <>
                 <MetaRow
-                  label="Starts"
+                  label={t("starts")}
                   value={formatEventDate(scheduleItem.startsAt)}
                 />
                 <MetaRow
-                  label="Ends"
-                  value={scheduleItem.endsAt ? formatEventDate(scheduleItem.endsAt) : "TBA"}
+                  label={t("ends")}
+                  value={scheduleItem.endsAt ? formatEventDate(scheduleItem.endsAt) : t("toBeAnnounced")}
                 />
-                <MetaRow label="Location" value={scheduleItem.location ?? "TBA"} />
+                <MetaRow label={t("location")} value={scheduleItem.location ?? t("toBeAnnounced")} />
                 {scheduleItem.campusId ? (
-                  <MetaRow label="Campus" value={scheduleItem.campusId} />
+                  <MetaRow label={t("campus")} value={scheduleItem.campusId} />
                 ) : null}
+                {scheduleItem.description ? <MetaRow label={t("description")} value={scheduleItem.description} /> : null}
               </>
             )
           : undefined
       }
-      footnote="Connect a private schedule feed to enrich this view."
       refreshing={refreshing}
       onRefresh={refresh}
     />

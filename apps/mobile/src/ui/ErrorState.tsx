@@ -8,12 +8,14 @@ import {
   ErrorStateMessage,
   ErrorStateTitle,
 } from "./ErrorStateParts";
-import { getErrorConfig } from "./errorConfig";
+import type { UiError } from "../api/uiError";
+import { useLocale } from "../i18n/LocaleContext";
 
 export type ErrorType = "network" | "notFound" | "generic";
 
 export type ErrorStateProps = {
-  message: string;
+  message?: string;
+  error?: UiError;
   errorType?: ErrorType;
   onRetry?: () => void;
   onGoBack?: () => void;
@@ -30,14 +32,16 @@ const styles = StyleSheet.create({
 });
 
 export function ErrorState({
-  message, 
+  message,
+  error,
   errorType = "generic",
   onRetry, 
   onGoBack,
   showGoBack = false 
 }: ErrorStateProps): JSX.Element {
   const navigation = useNavigation();
-  const errorConfig = getErrorConfig(errorType);
+  const { t } = useLocale();
+  const titleKey = errorType === "network" ? "errorTitleNetwork" : errorType === "notFound" ? "errorTitleNotFound" : "errorTitleGeneric";
   const showGoBackAction = showGoBack || navigation.canGoBack();
 
   const handleGoBack = () => {
@@ -51,8 +55,8 @@ export function ErrorState({
   return (
     <View style={styles.container}>
       <ErrorStateIcon errorType={errorType} />
-      <ErrorStateTitle title={errorConfig.title} />
-      <ErrorStateMessage message={message} />
+      <ErrorStateTitle title={t(titleKey)} />
+      <ErrorStateMessage message={error ? t(error.messageKey) : (message ?? t("errorUnknown"))} />
       <ErrorStateActions
         onRetry={onRetry}
         showGoBackAction={showGoBackAction}

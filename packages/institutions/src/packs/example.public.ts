@@ -1,6 +1,11 @@
 export const examplePublicPack = {
   id: "example",
   name: "Example University",
+  app: {
+    displayName: "Example University",
+    defaultLocale: "en",
+    accent: "#176B87"
+  },
   type: "music-and-dance",
   campuses: [
     {
@@ -34,4 +39,3 @@ export const examplePublicPack = {
   ],
   timezone: "America/New_York"
 } as const;
-

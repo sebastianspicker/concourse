@@ -79,16 +79,21 @@ describe("withRetry", () => {
 describe("withRetry — exponential backoff", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    // Fix Math.random for deterministic jitter: 0.5 means jitter factor = 0
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.stubGlobal("crypto", {
+      getRandomValues: (array: Uint32Array) => {
+        array[0] = 0x80000000;
+        return array;
+      }
+    });
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
-  it("exponential delay progression: baseDelay * 2^attempt (with zero jitter at random=0.5)", async () => {
+  it("exponential delay progression: baseDelay * 2^attempt with midpoint jitter", async () => {
     const delays: number[] = [];
     mockSetTimeoutImmediate(delays);
 
@@ -100,7 +105,7 @@ describe("withRetry — exponential backoff", () => {
 
     await withRetry(fn, { retries: 3, baseDelayMs: 1000 });
 
-    // With Math.random() = 0.5, jitter factor is 0, so delays are exact:
+    // With crypto midpoint randomness, jitter factor is 0, so delays are exact:
     // attempt 1: 1000 * 2^1 = 2000
     // attempt 2: 1000 * 2^2 = 4000
     // attempt 3: 1000 * 2^3 = 8000
@@ -130,6 +135,7 @@ describe("withRetry — exponential backoff", () => {
 
   it("jitter stays within +-25% of calculated delay", async () => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
     // Run many iterations to check jitter bounds
     const delays: number[] = [];

@@ -5,6 +5,7 @@ import { MetaRow } from "@/ui/MetaRow";
 import { ResourceDetailScreen } from "@/ui/ResourceDetailScreen";
 import { parseRouteItem } from "@/utils/routeItem";
 import { RoomSchema, type Room } from "@campus/shared";
+import { useLocale } from "@/i18n/LocaleContext";
 
 export default function RoomDetailScreen(): JSX.Element {
   const { id, item } = useLocalSearchParams<{ id: string; item?: string }>();
@@ -13,27 +14,26 @@ export default function RoomDetailScreen(): JSX.Element {
   const { data, loading, error, refreshing, refresh } = useRooms();
   const room = hasRoutedItem ? routedRoom : (data?.rooms.find((entry) => entry.id === id) ?? null);
   const effectiveLoading = hasRoutedItem ? false : loading;
+  const { t } = useLocale();
 
   return (
     <ResourceDetailScreen
-      title="Room Details"
+      title={t("rooms")}
       loading={effectiveLoading}
       error={error}
       item={room ?? null}
-      notFoundMessage="Room not found."
+      notFoundMessage={t("errorNotFound")}
       cardTitle={room ? room.name : `Room ID: ${id}`}
       cardSubtitle={room?.campusId}
       renderMeta={
         room
           ? () => (
               <>
-                <MetaRow label="Campus" value={room.campusId} />
-                <MetaRow label="Availability" value="Private connector required" />
+                <MetaRow label={t("campus")} value={room.campusId} />
               </>
             )
           : undefined
       }
-      footnote="Availability comes from private connectors."
       refreshing={refreshing}
       onRefresh={refresh}
     />

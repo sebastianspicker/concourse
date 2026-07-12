@@ -7,6 +7,7 @@ Profiles are defined in `apps/mobile/eas.json`.
 ## Required configuration
 
 - Set app identifiers via `MOBILE_BUNDLE_IDENTIFIER` (iOS) and `MOBILE_ANDROID_PACKAGE` (Android).
+- Set `INSTITUTION_ID` to the bundled public institution pack for preview and production builds.
 - Set `EXPO_PUBLIC_BFF_BASE_URL` for preview/production builds.
 
 ## Commands

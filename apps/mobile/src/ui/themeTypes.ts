@@ -1,8 +1,8 @@
 import type { ColorScheme, ThemeColors, ThemeUi } from "./theme";
 
-export type ThemePreference = "light" | "dark" | "accessibility" | "system";
-export const DEFAULT_THEME_PREFERENCE: ThemePreference = "dark";
-export const DEFAULT_COLOR_SCHEME: ColorScheme = "dark";
+export type ThemePreference = "light" | "dark" | "highContrast" | "system";
+export const DEFAULT_THEME_PREFERENCE: ThemePreference = "system";
+export const DEFAULT_COLOR_SCHEME: ColorScheme = "light";
 
 export type Theme = {
   colors: ThemeColors;

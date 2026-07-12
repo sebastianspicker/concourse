@@ -50,4 +50,24 @@ describe("fetchJsonWithTimeout", () => {
     await assertion;
     expect(external.signal.aborted).toBe(false);
   });
+
+  it("rejects non-http BFF URLs before fetch", async () => {
+    const fetchMock = vi.fn() as unknown as typeof fetch;
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchJsonWithTimeout("file:///tmp/data.json")).rejects.toThrow(
+      "BFF URL must use http or https"
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects BFF URLs with credentials before fetch", async () => {
+    const fetchMock = vi.fn() as unknown as typeof fetch;
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchJsonWithTimeout("https://user:pass@example.com")).rejects.toThrow(
+      "BFF URL must not include credentials"
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

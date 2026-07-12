@@ -1,5 +1,6 @@
 import { getBffBaseUrl } from "../utils/env";
-import { fetchJsonWithTimeout } from "../utils/fetchHelpers";
+import { fetchJsonResponseWithTimeout } from "../utils/fetchHelpers";
+import { getConfiguredInstitutionId } from "../config/institution";
 import { ApiErrorException } from "./errors";
 import { withRetry } from "./retry";
 
@@ -8,10 +9,24 @@ export async function getJson<T>(
   parse?: (data: unknown) => T,
   options?: { signal?: AbortSignal }
 ): Promise<T> {
+  const result = await getJsonResult(path, parse, options);
+  return result.data;
+}
+
+export type ApiJsonResult<T> = {
+  data: T;
+  institutionId: string | null;
+};
+
+export async function getJsonResult<T>(
+  path: string,
+  parse?: (data: unknown) => T,
+  options?: { signal?: AbortSignal }
+): Promise<ApiJsonResult<T>> {
   const url = `${getBffBaseUrl()}${path}`;
-  const data = await withRetry(async () => {
+  const response = await withRetry(async () => {
     try {
-      return await fetchJsonWithTimeout<unknown>(url, { signal: options?.signal });
+      return await fetchJsonResponseWithTimeout<unknown>(url, { signal: options?.signal });
     } catch (err: unknown) {
       if (
         typeof err === "object" &&
@@ -33,5 +48,18 @@ export async function getJson<T>(
     }
   }, { signal: options?.signal });
 
-  return parse ? parse(data) : (data as T);
+  const institutionId = response.headers.get("x-institution-id");
+  const expectedInstitutionId = getConfiguredInstitutionId();
+  if (institutionId !== null && institutionId !== expectedInstitutionId) {
+    throw new ApiErrorException({
+      status: 409,
+      code: "institution_mismatch",
+      message: "App and data service institution IDs do not match"
+    });
+  }
+
+  return {
+    data: parse ? parse(response.data) : (response.data as T),
+    institutionId
+  };
 }

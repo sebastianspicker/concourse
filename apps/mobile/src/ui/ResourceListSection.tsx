@@ -1,33 +1,16 @@
 import React from "react";
 import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
-import type { ErrorType } from "./ErrorState";
+import { detectResourceErrorType } from "./resourceErrorType";
 import { ResourceListItem } from "./ResourceListItem";
 import { Section } from "./Section";
 import { SkeletonList } from "./Skeleton";
-
-function detectErrorType(error: string): ErrorType {
-  const lower = error.toLowerCase();
-  if (
-    lower.includes("network") ||
-    lower.includes("connection") ||
-    lower.includes("offline") ||
-    lower.includes("timeout") ||
-    lower.includes("fetch") ||
-    lower.includes("request failed")
-  ) {
-    return "network";
-  }
-  if (lower.includes("not found") || lower.includes("404")) {
-    return "notFound";
-  }
-  return "generic";
-}
+import type { UiError } from "../api/uiError";
 
 export type ResourceListSectionProps<T> = {
   title: string;
   loading: boolean;
-  error: string | null;
+  error: UiError | string | null;
   items: T[];
   emptyMessage: string;
   keyExtractor: (item: T) => string;
@@ -39,44 +22,47 @@ export type ResourceListSectionProps<T> = {
   emptyHint?: string;
 };
 
-export function ResourceListSection<T>({
-  title,
-  loading,
-  error,
-  items,
-  emptyMessage,
-  keyExtractor,
-  href,
-  renderCard,
-  accessibilityLabel,
-  onRetry,
-  emptyIcon,
-  emptyHint
-}: ResourceListSectionProps<T>): JSX.Element {
+export function ResourceListSection<T>(props: ResourceListSectionProps<T>): JSX.Element {
+  const { title } = props;
+
   return (
     <Section title={title}>
-      {loading ? <SkeletonList count={3} /> : null}
-      {!loading && error ? (
-        <ErrorState
-          message={error}
-          errorType={detectErrorType(error)}
-          onRetry={onRetry}
-        />
-      ) : null}
-      {!loading && !error
-        ? items.map((item) => (
-            <ResourceListItem
-              key={keyExtractor(item)}
-              item={item}
-              href={href}
-              renderCard={renderCard}
-              accessibilityLabel={accessibilityLabel}
-            />
-          ))
-        : null}
-      {!loading && !error && items.length === 0 ? (
-        <EmptyState message={emptyMessage} icon={emptyIcon} hint={emptyHint} />
-      ) : null}
+      <ResourceListContent {...props} />
     </Section>
+  );
+}
+
+function ResourceListContent<T>(props: ResourceListSectionProps<T>): JSX.Element {
+  const { loading, error, items, emptyMessage, keyExtractor, href, renderCard, accessibilityLabel, onRetry, emptyIcon, emptyHint } = props;
+  if (loading) {
+    return <SkeletonList count={3} />;
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        {...(typeof error === "string" ? { message: error } : { error })}
+        errorType={detectResourceErrorType(error)}
+        onRetry={onRetry}
+      />
+    );
+  }
+
+  if (items.length === 0) {
+    return <EmptyState message={emptyMessage} icon={emptyIcon} hint={emptyHint} />;
+  }
+
+  return (
+    <>
+      {items.map((item) => (
+        <ResourceListItem
+          key={keyExtractor(item)}
+          item={item}
+          href={href}
+          renderCard={renderCard}
+          accessibilityLabel={accessibilityLabel}
+        />
+      ))}
+    </>
   );
 }

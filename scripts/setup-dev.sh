@@ -12,13 +12,13 @@ echo ""
 echo "📋 Checking prerequisites..."
 
 if ! command -v node &>/dev/null; then
-  echo "❌ Node.js is not installed. Please install Node.js 20+"
+  echo "❌ Node.js is not installed. Please install Node.js 22.13+"
   exit 1
 fi
 
-NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 20 ]; then
-  echo "❌ Node.js version 20+ is required. Current: $(node -v)"
+IFS=. read -r NODE_MAJOR NODE_MINOR _ <<< "$(node -p 'process.versions.node')"
+if [ "$NODE_MAJOR" -lt 22 ] || { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -lt 13 ]; }; then
+  echo "❌ Node.js version 22.13+ is required. Current: $(node -v)"
   exit 1
 fi
 echo "✅ Node.js $(node -v)"

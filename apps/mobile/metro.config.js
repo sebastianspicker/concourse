@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-const { getDefaultConfig } = require("expo/metro-config");
-const path = require("path");
+const { getDefaultConfig } = module.require("expo/metro-config");
+const path = module.require("path");
 
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, "../..");

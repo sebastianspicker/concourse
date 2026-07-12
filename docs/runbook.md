@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 20 (see `.nvmrc`)
+- Node.js 22.13 or newer (see `.nvmrc`)
 - pnpm 9 (see `package.json#packageManager`)
 - Expo Go or a dev client for mobile testing (optional)
 
@@ -49,6 +49,7 @@ BFF:
 
 Mobile:
 - `EXPO_PUBLIC_BFF_BASE_URL` (required in development and production; set it to the BFF URL reachable from the mobile runtime)
+- `INSTITUTION_ID` (required for preview and production builds; local development defaults to the `example` public pack)
 
 See the root `.env.example`, `apps/bff/.env.example`, and `apps/mobile/.env.example` files for concise variable lists.
 
@@ -84,7 +85,7 @@ pnpm test
 pnpm verify
 ```
 
-`pnpm verify` runs install, lint, typecheck, tests, build, and a placeholder-marker scan.
+`pnpm verify` runs a frozen dependency install, lint, typecheck, unit and integration tests, build, Playwright/axe web E2E, deterministic BFF E2E, and a placeholder-marker scan.
 
 ## Security checks (minimum baseline)
 
@@ -117,7 +118,7 @@ This runs BFF and mobile in parallel. For BFF only: `INSTITUTION_ID=hfmt pnpm --
 
 ## Auth (optional, for private forks)
 
-The public template has no mobile login; tabs are reachable without logging in. For a private fork that requires login, add a mobile guard in the root layout (or a wrapper) that checks for a real session and redirects to the login screen when missing. The demo session (`getDemoSession()`, `isDemo: true`) is for template use only; replace it with real auth.
+The public template has no mobile login; tabs are reachable without authentication. A private fork that requires login must add a reviewed session provider and route guard. No demo session or placeholder login implementation is included in the public app.
 
 The BFF can enforce a simple bearer-token guard for private fork smoke tests or internal deployments:
 
@@ -139,7 +140,12 @@ pnpm typecheck
 
 ## Health endpoint
 
-`GET /health` returns `200 { status: "ok" }` with `Cache-Control: no-store`. It is a liveness probe only; it does not check institution pack or upstream connectors. Optional: add a dependency check or response schema in a fork.
+`GET /health` returns `Cache-Control: no-store` and reports BFF process status,
+the selected institution id, uptime, institution-pack loading, and heap memory
+status. It returns HTTP 200 for `ok` and `warning`, and HTTP 503 for `error`
+when the selected institution pack cannot be loaded. It does not probe public
+upstream websites or ICS feeds; data routes surface those source failures with
+normal route errors or degraded responses.
 
 ## BFF endpoints (semantics)
 
@@ -179,13 +185,9 @@ If `/events`, `/rooms`, or `/schedule` return `404 not_found` or unexpectedly em
 - **Environment:** `INSTITUTION_ID` must match a pack that defines those sources.
 - **Upstream:** Public connectors fetch from external URLs; if those fail, the BFF may return partial or empty data. Check BFF logs for fetch/parse errors.
 
-## NativeWind / Tailwind CSS
+## Frontend styling
 
-The mobile app uses **Tailwind CSS v3** with **NativeWind v4** for optional utility-based styling alongside the existing theme and StyleSheet components.
-
-- Import CSS-wrapped components from `@/tw` (View, Text, ScrollView, Pressable, etc.) and use `className`.
-- Screens in `src/ui/` still use the theme and StyleSheet from `@/ui/theme`. You can mix both approaches.
-- Config: `metro.config.js`, `postcss.config.mjs` (`tailwindcss` plugin), `src/global.css` (Tailwind layers + platform fonts).
+The mobile app uses React Native `StyleSheet` values backed by the single token source in `apps/mobile/src/ui/theme.ts`. Tailwind and NativeWind are intentionally not part of the runtime. See [`frontend.md`](frontend.md) for the component, accessibility, and responsive conventions.
 
 ## OTA Code Signing (EAS Update)
 
@@ -199,6 +201,6 @@ If you use EAS Update, enable code signing and keep private keys out of this rep
 ## Troubleshooting
 
 - If the mobile app cannot reach the BFF, set `EXPO_PUBLIC_BFF_BASE_URL` to the BFF URL. The mobile app now requires this in both development and production.
-- If `pnpm` fails due to lockfile drift, re-run `pnpm install --frozen-lockfile` from the repo root.
+- If `pnpm` reports lockfile drift after an intentional dependency change, run `pnpm install` from the repo root and review the resulting `pnpm-lock.yaml` diff. CI and clean checkouts should continue to use `pnpm install --frozen-lockfile`.
 - If TypeScript builds fail, ensure each package is built in dependency order by running `pnpm build` from the repo root.
 - To skip install or the TODO/FIXME marker scan during verify: `SKIP_INSTALL=1 pnpm verify` or `SKIP_MARKER_CHECK=1 pnpm verify`.

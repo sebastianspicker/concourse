@@ -1,6 +1,6 @@
 import type { TodayResponse } from "../api/types";
 import { fetchToday } from "../data/publicApi";
-import { usePublicResource } from "./usePublicResource";
+import { usePublicResource, type PublicResource } from "./usePublicResource";
 
 function getLocalDateParam(date = new Date()): string {
   // `/today` is campus-day scoped. Send the device's local YYYY-MM-DD so a
@@ -11,13 +11,7 @@ function getLocalDateParam(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-export function useToday(): {
-  data: TodayResponse | null;
-  error: string | null;
-  loading: boolean;
-  refreshing: boolean;
-  refresh: () => Promise<void>;
-} {
+export function useToday(): PublicResource<TodayResponse> {
   return usePublicResource<TodayResponse>((options) =>
     fetchToday({
       force: options.force,

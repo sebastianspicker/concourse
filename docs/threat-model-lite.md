@@ -8,6 +8,7 @@ This is a lightweight checklist for what must not be committed to the public rep
 - Private endpoints, internal hostnames, admin routes.
 - Logs or fixtures with real user data.
 - Scraping logic for private portals.
+- Internal planning, audit, ledger, status, and deprecated-doc packets.
 
 ## Safe To Commit
 
@@ -18,6 +19,8 @@ This is a lightweight checklist for what must not be committed to the public rep
 ## Guardrails
 
 - Use `.env` files locally; never commit them.
+- Keep retired internal docs in a private fork or the ignored local `archive/`
+  lane.
 - Rotate secrets if anything leaks.
 - Keep the public repo a safe template.
 

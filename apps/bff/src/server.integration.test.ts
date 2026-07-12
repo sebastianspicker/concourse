@@ -336,6 +336,7 @@ describe("BFF server integration", () => {
       const res = await request(app).get("/events").expect(200);
       expect(res.body).toHaveProperty("events");
       expect(Array.isArray(res.body.events)).toBe(true);
+      expect(res.headers["x-institution-id"]).toBe(process.env.INSTITUTION_ID ?? "hfmt");
     });
 
     it("returns events with required fields", async () => {

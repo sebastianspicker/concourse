@@ -6,7 +6,7 @@ export const THEME_PREFERENCE_STORAGE_NAME = "@campus-app/theme-preference";
 const THEME_PREFERENCES: readonly ThemePreference[] = [
   "light",
   "dark",
-  "accessibility",
+  "highContrast",
   "system",
 ];
 
@@ -16,6 +16,7 @@ export function isThemePreference(value: string | null): value is ThemePreferenc
 
 export async function loadThemePreference(): Promise<ThemePreference | null> {
   const saved = await AsyncStorage.getItem(THEME_PREFERENCE_STORAGE_NAME);
+  if (saved === "accessibility") return "highContrast";
   return isThemePreference(saved) ? saved : null;
 }
 

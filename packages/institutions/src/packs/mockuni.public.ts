@@ -1,6 +1,11 @@
 export const mockuniPublicPack = {
   id: "mockuni",
   name: "Technische Universität Musterstadt",
+  app: {
+    displayName: "TU Musterstadt",
+    defaultLocale: "de",
+    accent: "#176B87"
+  },
   type: "university",
   campuses: [
     {

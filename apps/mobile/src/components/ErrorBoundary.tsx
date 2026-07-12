@@ -2,6 +2,8 @@ import React, { Component, type ReactNode } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { spacing, typography } from "../ui/theme";
 import { useTheme } from "../ui/ThemeContext";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useLocale } from "../i18n/LocaleContext";
 
 const styles = StyleSheet.create({
   container: {
@@ -10,10 +12,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: spacing.xl,
   },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: spacing.md,
-  },
+  errorIcon: { marginBottom: spacing.md },
   title: {
     ...typography.subheading,
     fontWeight: "bold",
@@ -49,22 +48,21 @@ interface State {
 }
 
 function ErrorFallback({
-  error,
   onReset,
 }: {
-  error: Error | null;
   onReset: () => void;
 }): JSX.Element {
   const theme = useTheme();
+  const { t } = useLocale();
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Text style={styles.errorIcon}>😵</Text>
+      <View style={styles.errorIcon}><MaterialIcons name="error-outline" size={48} color={theme.colors.error} /></View>
       <Text style={[styles.title, { color: theme.colors.text }]}>
-        Oops, something broke!
+        {t("errorTitleGeneric")}
       </Text>
       <Text style={[styles.message, { color: theme.colors.muted }]}>
-        {error?.message || "An unexpected error occurred. Give it another try."}
+        {t("errorUnknown")}
       </Text>
       <Pressable
         style={({ pressed }) => [
@@ -74,10 +72,10 @@ function ErrorFallback({
         ]}
         onPress={onReset}
         accessibilityRole="button"
-        accessibilityLabel="Try again"
+        accessibilityLabel={t("tryAgain")}
       >
         <Text style={[styles.buttonText, { color: theme.colors.accentText }]}>
-          Try Again
+          {t("tryAgain")}
         </Text>
       </Pressable>
     </View>
@@ -111,7 +109,6 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <ErrorFallback
-          error={this.state.error}
           onReset={this.handleReset}
         />
       );

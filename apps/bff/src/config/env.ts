@@ -1,5 +1,3 @@
-import { parsePort } from "./port";
-
 export type BffEnv = {
   port: number;
   institutionId: string;
@@ -51,6 +49,17 @@ function parseTrustProxy(value: string | undefined): TrustProxyMode {
   const parsed = TRUST_PROXY_VALUES[normalized];
   if (parsed) return parsed;
   throw new Error(`Invalid BFF_TRUST_PROXY: ${value}`);
+}
+
+const DEFAULT_PORT = 4000;
+
+function parsePort(raw: string | undefined): number {
+  if (!raw) return DEFAULT_PORT;
+  try {
+    return parseIntInRange(raw, "BFF_PORT", 1, 65_535);
+  } catch {
+    throw new Error(`Invalid BFF_PORT: ${raw}`);
+  }
 }
 
 const CSV_SEPARATOR = ",";

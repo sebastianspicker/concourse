@@ -17,11 +17,12 @@ RUN pnpm --filter @campus/shared build && \
     pnpm --filter @campus/institutions build && \
     pnpm --filter @campus/bff build
 
-USER node
 WORKDIR /repo/apps/bff
 EXPOSE 4000
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "const req=require('node:http').get({host:'127.0.0.1',port:4000,path:'/health',timeout:2000},res=>process.exit(res.statusCode===200||res.statusCode===401?0:1));req.on('timeout',()=>{req.destroy();process.exit(1)});req.on('error',()=>process.exit(1))"
+USER node
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "const http=require('node:http');const req=http.get('http://127.0.0.1:4000/health',(res)=>process.exit(res.statusCode&&res.statusCode<500?0:1));req.on('error',()=>process.exit(1));req.setTimeout(4000,()=>{req.destroy();process.exit(1);});"
 
 CMD ["node", "dist/server.js"]

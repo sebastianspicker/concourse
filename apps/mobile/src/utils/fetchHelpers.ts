@@ -1,3 +1,5 @@
+import { parseRetryAfterSeconds } from "./retryAfter";
+
 export type BffError = {
   code: string;
   message: string;
@@ -17,16 +19,26 @@ export class HttpError extends Error {
   }
 }
 
-function parseRetryAfterSeconds(retryAfter: string | null): number | undefined {
-  if (!retryAfter) return undefined;
-  // Retry-After can be either delay seconds or an absolute HTTP-date.
-  const seconds = parseInt(retryAfter, 10);
-  if (!isNaN(seconds)) return seconds;
-  const date = new Date(retryAfter);
-  if (!isNaN(date.getTime())) {
-    return Math.max(0, Math.ceil((date.getTime() - Date.now()) / 1000));
+export type JsonResponse<T> = {
+  data: T;
+  headers: Headers;
+};
+
+function assertClientHttpUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Invalid BFF URL");
   }
-  return undefined;
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error("BFF URL must use http or https");
+  }
+
+  if (parsed.username || parsed.password) {
+    throw new Error("BFF URL must not include credentials");
+  }
 }
 
 export async function fetchJsonWithTimeout<T>(
@@ -34,6 +46,17 @@ export async function fetchJsonWithTimeout<T>(
   init?: RequestInit,
   timeoutMs = 10_000
 ): Promise<T> {
+  const response = await fetchJsonResponseWithTimeout<T>(url, init, timeoutMs);
+  return response.data;
+}
+
+export async function fetchJsonResponseWithTimeout<T>(
+  url: string,
+  init?: RequestInit,
+  timeoutMs = 10_000
+): Promise<JsonResponse<T>> {
+  assertClientHttpUrl(url);
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   const cleanup = linkAbortSignals(controller, init?.signal);
@@ -61,15 +84,15 @@ export async function fetchJsonWithTimeout<T>(
     // Some BFF responses intentionally have no body; callers still expect an
     // object-shaped value so schema parsing can decide what to do next.
     if (response.status === 204) {
-      return {} as T;
+      return { data: {} as T, headers: response.headers };
     }
 
     const text = await response.text();
     if (!text) {
-      return {} as T;
+      return { data: {} as T, headers: response.headers };
     }
 
-    return JSON.parse(text) as T;
+    return { data: JSON.parse(text) as T, headers: response.headers };
   } finally {
     cleanup();
     clearTimeout(timeoutId);
