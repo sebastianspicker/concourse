@@ -1,8 +1,11 @@
+/** Builds event labels, cards, typed detail links, and localized empty states. */
 import { formatEventDate } from "@/utils/dateFormat";
-import type { PublicEvent } from "@campus/shared";
+import type { PublicEvent } from "@concourse/shared";
+import type { TranslationKey } from "@/i18n/dictionaries";
 
 export type SortDirection = "asc" | "desc";
 
+/** Sorts a copied event array by timestamp so callers never mutate cached response data. */
 export function sortEventsByDate(events: PublicEvent[], direction: SortDirection): PublicEvent[] {
   return [...events].sort((a, b) => {
     const dateA = new Date(a.date).getTime();
@@ -11,27 +14,30 @@ export function sortEventsByDate(events: PublicEvent[], direction: SortDirection
   });
 }
 
+/** Encodes a list selection as Expo Router state for the event-detail route. */
 export function getEventHref(event: PublicEvent): { pathname: "/events/[id]"; params: { id: string } } {
   return { pathname: "/events/[id]", params: { id: event.id } };
 }
 
-export function getEventCard(event: PublicEvent): { title: string; subtitle: string } {
+/** Shapes an event into localized title and date text for a resource row. */
+export function getEventCard(event: PublicEvent, locale: string, timeZone: string): { title: string; subtitle: string } {
   return {
     title: event.title,
-    subtitle: formatEventDate(event.date)
+    subtitle: formatEventDate(event.date, locale, timeZone)
   };
 }
 
-export function getEventAccessibilityLabel(event: PublicEvent): string {
-  return `${event.title}. ${formatEventDate(event.date)}.`;
+/** Produces the spoken event summary for accessible result-list navigation. */
+export function getEventAccessibilityLabel(event: PublicEvent, locale: string, timeZone: string): string {
+  return `${event.title}. ${formatEventDate(event.date, locale, timeZone)}.`;
 }
 
-export function getEventsEmptyMessage(search: string): string {
-  return search ? `No events matching "${search}"` : "No public events yet.";
+/** Selects search-specific empty copy when an active filter has no event matches. */
+export function getEventsEmptyMessage(search: string, t: (key: TranslationKey, values?: Record<string, string | number>) => string): string {
+  return search ? t("noMatchingEvents", { search }) : t("noEvents");
 }
 
-export function getEventsEmptyHint(search: string): string {
-  return search
-    ? "Try a different search term or clear your search."
-    : "Pull down to refresh -- new events appear as they are published.";
+/** Selects the matching search or unfiltered empty-state guidance key. */
+export function getEventsEmptyHint(search: string, t: (key: TranslationKey) => string): string {
+  return t(search ? "searchEmptyHint" : "eventsEmptyHint");
 }

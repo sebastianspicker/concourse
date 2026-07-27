@@ -1,21 +1,23 @@
-import type { ScheduleResponse } from "@campus/shared";
-import { ScheduleResponseSchema } from "@campus/shared";
+/** Serves filtered public schedule data from configured public sources. */
+
+import { ScheduleResponseSchema } from "@concourse/shared";
 import { fetchPublicSchedule } from "../connectors/public/publicSchedule";
 import { parseQueryParams, parseScheduleFilter } from "../utils/queryParams";
 import { applySearch, applyDateRange, applyPagination } from "../utils/filterHelpers";
 import { createJsonRoute } from "./createJsonRoute";
+import { publicDataHeaders } from "./publicDataHeaders";
 
 export const handleSchedule = createJsonRoute(
   async (institution, req) => {
+    const params = parseQueryParams(req);
+    const filter = parseScheduleFilter(params);
+
     const schedules = institution.publicSources?.schedules ?? [];
     if (schedules.length === 0) {
       throw new Error("NO_CONFIG_SOURCES: No schedules configured");
     }
 
     const { schedule, degraded } = await fetchPublicSchedule(institution);
-
-    const params = parseQueryParams(req);
-    const filter = parseScheduleFilter(params);
 
     let filteredSchedule = applyDateRange(schedule, filter.fromDate, filter.toDate, (item) => item.startsAt);
     if (filter.campusId) {
@@ -35,9 +37,6 @@ export const handleSchedule = createJsonRoute(
   ScheduleResponseSchema,
   {
     maxAgeSeconds: 300,
-    getExtraHeaders: (data: ScheduleResponse) => ({
-      ...(data._degraded ? { "x-data-degraded": "true" } : {}),
-      ...(process.env.PUBLIC_EVENTS_MODE === "mock" ? { "x-data-mode": "mock" } : {})
-    })
+    getExtraHeaders: publicDataHeaders
   }
 );

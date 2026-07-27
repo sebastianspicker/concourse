@@ -1,3 +1,4 @@
+# Validates a version tag, publishes its release notes, and pushes a verified BFF image.
 name: Release
 
 on:
@@ -11,14 +12,25 @@ jobs:
   validate:
     name: Validate Release
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      prerelease: ${{ steps.metadata.outputs.prerelease }}
+      channel: ${{ steps.metadata.outputs.channel }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify tag commit belongs to the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$GITHUB_SHA" "origin/$DEFAULT_BRANCH"
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -26,17 +38,40 @@ jobs:
 
       - name: Enable corepack (pnpm@9.0.0)
         run: |
+          set -euo pipefail
           corepack enable
           corepack prepare pnpm@9.0.0 --activate
 
+      - name: Validate tag, versions, and changelog
+        id: metadata
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG_NAME#v}"
+          pnpm release:check -- "$version"
+          if [[ "$version" == *-* ]]; then
+            prerelease=true
+            channel=prerelease
+          else
+            prerelease=false
+            channel=stable
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
       - run: pnpm install --frozen-lockfile
 
-      - name: Run CI checks
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run release checks
         run: SKIP_INSTALL=1 ./scripts/verify-production-ready.sh
 
   create-release:
     name: Create GitHub Release
-    needs: validate
+    needs: [validate, build-bff-docker]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -47,38 +82,35 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Get version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
-
       - name: Generate release notes
-        id: notes
         env:
-          VERSION: ${{ steps.version.outputs.VERSION }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | head -n -2 > release-notes.md
-          {
-            echo "RELEASE_NOTES<<EOF"
-            cat release-notes.md
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          node scripts/verify-release-metadata.mjs "$VERSION" \
+            --notes-output release-notes.md
+          test -s release-notes.md
 
       - name: Create Release
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
         with:
           body_path: release-notes.md
           draft: false
-          prerelease: false
           generate_release_notes: false
+          name: Concourse Campus Kit v${{ needs.validate.outputs.version }}
+          prerelease: ${{ needs.validate.outputs.prerelease == 'true' }}
 
   build-bff-docker:
-    name: Build BFF Docker Image
+    name: Build and Verify BFF Image
     needs: validate
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: read
       packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}/bff
+      VERSION: ${{ needs.validate.outputs.version }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -94,39 +126,104 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get version
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+      - name: Prepare image tags
+        id: image
+        env:
+          PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          tags="$IMAGE:$VERSION"
+          if [[ "$PRERELEASE" != "true" ]]; then
+            tags+=$'\n'"$IMAGE:latest"
+          fi
+          {
+            echo "tags<<EOF"
+            echo "$tags"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Build and push
+      - name: Build image for verification
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: .
           file: ./apps/bff/Dockerfile.prod
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}/bff:latest
-            ghcr.io/${{ github.repository }}/bff:${{ steps.version.outputs.VERSION }}
+          load: true
+          push: false
+          build-args: |
+            APP_VERSION=${{ needs.validate.outputs.version }}
+          tags: ${{ steps.image.outputs.tags }}
+
+      - name: Smoke image on a non-default port
+        run: |
+          set -euo pipefail
+          container_id=""
+          cleanup() {
+            if [[ -n "$container_id" ]]; then
+              docker rm --force "$container_id" >/dev/null 2>&1 || true
+            fi
+          }
+          trap cleanup EXIT
+          container_id="$(docker run --detach \
+            --env INSTITUTION_ID=example \
+            --env BFF_PORT=4100 \
+            --publish 127.0.0.1:4100:4100 \
+            "$IMAGE:$VERSION")"
+
+          body=""
+          for _ in $(seq 1 30); do
+            if body="$(curl --silent --show-error --fail http://127.0.0.1:4100/health 2>/dev/null)"; then
+              break
+            fi
+            sleep 1
+          done
+          if [[ -z "$body" ]]; then
+            docker logs "$container_id"
+            exit 1
+          fi
+          printf '%s' "$body" | VERSION="$VERSION" node -e '
+            const body = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+            if (body.status !== "ok" || body.version !== process.env.VERSION) process.exit(1);
+          '
+
+      - name: Push verified image tags
+        env:
+          TAGS: ${{ steps.image.outputs.tags }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then docker push "$tag"; fi
+          done <<< "$TAGS"
 
   notify:
-    name: Notify on Release
-    needs: [create-release, build-bff-docker]
+    name: Release Summary
+    needs: [validate, create-release, build-bff-docker]
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
     steps:
-      - name: Release Summary
+      - name: Write release summary
         env:
-          TAG_REF: ${{ github.ref }}
+          IMAGE_RESULT: ${{ needs.build-bff-docker.result }}
+          RELEASE_RESULT: ${{ needs.create-release.result }}
           REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          VALIDATE_RESULT: ${{ needs.validate.result }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          VERSION="${TAG_REF#refs/tags/v}"
           {
-            echo "## Release Created!"
+            echo "## Release workflow result"
             echo ""
-            echo "Version: ${VERSION}"
-            echo ""
-            echo "### Artifacts"
-            echo "- GitHub Release: Published"
-            echo "- Docker Image: ghcr.io/${REPO}/bff:${VERSION}"
+            echo "- Tag: $TAG"
+            echo "- Version: $VERSION"
+            echo "- Validation job: $VALIDATE_RESULT"
+            echo "- BFF image job: $IMAGE_RESULT"
+            echo "- GitHub release job: $RELEASE_RESULT"
+            if [[ "$IMAGE_RESULT" == "success" ]]; then
+              echo "- Image target: ghcr.io/$REPO/bff:$VERSION"
+            fi
+            if [[ "$VALIDATE_RESULT" != "success" || "$IMAGE_RESULT" != "success" || "$RELEASE_RESULT" != "success" ]]; then
+              echo ""
+              echo "Publication may be partial. Inspect the failed job and verify GitHub Releases and GHCR before any recovery action."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

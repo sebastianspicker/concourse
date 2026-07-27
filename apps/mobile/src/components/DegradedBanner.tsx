@@ -1,4 +1,4 @@
-import React from "react";
+/** Displays a compact warning when an upstream source returned incomplete data. */
 import { StatusBanner } from "../ui/StatusBanner";
 
 type Props = {
@@ -13,7 +13,7 @@ type Props = {
  */
 export function DegradedBanner({
   visible,
-  message = "Some data sources are temporarily unavailable. Information may be incomplete.",
+  message,
 }: Props): JSX.Element | null {
   if (!visible) return null;
   return <StatusBanner kind="degraded" message={message} />;

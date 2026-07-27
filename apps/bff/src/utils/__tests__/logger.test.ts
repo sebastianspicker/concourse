@@ -1,3 +1,5 @@
+/** Verifies structured logging behavior and redaction boundaries. */
+
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { log } from "../logger";
 

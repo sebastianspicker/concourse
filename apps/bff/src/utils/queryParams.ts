@@ -1,8 +1,11 @@
+/** Parses and validates query parameters shared by public data routes. */
+
 import type { IncomingMessage } from "node:http";
 
 /**
  * Parse query parameters from a request URL.
  */
+/** Parses the request URL or raises a route-level invalid-query error. */
 export function parseQueryParams(req: IncomingMessage): URLSearchParams {
   const url = req.url ?? "";
   try {
@@ -28,6 +31,7 @@ export function getStringParam(
  * Get a number query parameter with optional default value.
  * Returns undefined if the parameter is not present or not a valid number.
  */
+/** Reads a finite numeric query value within optional bounds. */
 export function getNumberParam(
   params: URLSearchParams,
   key: string,
@@ -42,6 +46,7 @@ export function getNumberParam(
 
 // Invalid limits are rejected instead of clamped so callers notice broken
 // pagination requests and the BFF cannot accidentally serve huge payloads.
+/** Parses a pagination limit and clamps it to the public route maximum. */
 function getBoundedLimitParam(params: URLSearchParams, key: string): number | undefined {
   const value = params.get(key);
   if (value === null) return undefined;
@@ -56,6 +61,7 @@ function getBoundedLimitParam(params: URLSearchParams, key: string): number | un
  * Get a date query parameter (ISO 8601 format).
  * Returns undefined if the parameter is not present or not a valid date.
  */
+/** Reads a strict ISO date query value rather than accepting Date parser variants. */
 export function getDateParam(
   params: URLSearchParams,
   key: string
@@ -83,10 +89,13 @@ export interface EventsFilterOptions {
   offset?: number;
 }
 
-/**
- * Parse filter options from query parameters for events endpoint.
- */
-export function parseEventsFilter(params: URLSearchParams): EventsFilterOptions {
+type DateRangePaginationFilterOptions = Pick<
+  EventsFilterOptions,
+  "search" | "fromDate" | "toDate" | "limit" | "offset"
+>;
+
+/** Parses the shared public-route date-range, search, and pagination parameters. */
+function parseDateRangePaginationFilter(params: URLSearchParams): DateRangePaginationFilterOptions {
   const limit = getBoundedLimitParam(params, "limit");
   return {
     search: getStringParam(params, "search")?.slice(0, 200),
@@ -95,6 +104,13 @@ export function parseEventsFilter(params: URLSearchParams): EventsFilterOptions 
     limit,
     offset: Math.max(0, Math.floor(getNumberParam(params, "offset") ?? 0))
   };
+}
+
+/**
+ * Parse filter options from query parameters for events endpoint.
+ */
+export function parseEventsFilter(params: URLSearchParams): EventsFilterOptions {
+  return parseDateRangePaginationFilter(params);
 }
 
 /**
@@ -119,14 +135,9 @@ export interface ScheduleFilterOptions {
  * Parse filter options from query parameters for schedule endpoint.
  */
 export function parseScheduleFilter(params: URLSearchParams): ScheduleFilterOptions {
-  const limit = getBoundedLimitParam(params, "limit");
   return {
-    search: getStringParam(params, "search")?.slice(0, 200),
-    fromDate: getDateParam(params, "from"),
-    toDate: getDateParam(params, "to"),
+    ...parseDateRangePaginationFilter(params),
     campusId: getStringParam(params, "campus")?.slice(0, 100),
-    limit,
-    offset: Math.max(0, Math.floor(getNumberParam(params, "offset") ?? 0))
   };
 }
 

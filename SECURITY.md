@@ -1,8 +1,24 @@
 # Security Policy
 
+## Supported Versions
+
+Before the first alpha tag is published, security fixes target the current
+default branch. After publication, fixes target the current default branch and
+the latest published `1.2.0-alpha.x` release. Older prereleases are not
+supported release lines.
+
 ## Reporting a Vulnerability
 
-Use GitHub's private [Security Advisories](https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/creating-a-repository-security-advisory) to report vulnerabilities privately. Do not open public issues for security reports.
+Use the repository's private
+[Security Advisory form](https://github.com/sebastianspicker/campus-app-kit/security/advisories/new).
+Do not open a public issue for a vulnerability and do not attach exploit details,
+credentials, private URLs, or personal data to a public discussion.
+
+GitHub Security Advisories is the only repository-managed private reporting
+channel for this alpha. If the form is unavailable, retain the report and retry
+later, or contact a listed maintainer through a private channel that you can
+independently verify. Do not move sensitive details to a public issue as a
+fallback.
 
 ## Scope
 
@@ -15,10 +31,6 @@ documents the integration boundary.
 
 Do not commit API keys, tokens, passwords, certificates, or private endpoints.
 Use environment variables and secret stores in private infrastructure instead.
-
-Do not commit internal planning, audit, ledger, status, or deprecated-doc
-packets. Keep those artifacts in a private fork or the ignored local `archive/`
-lane.
 
 ## BFF Auth Notes
 
@@ -35,10 +47,14 @@ Unset, `0`, `false`, `no`, and `off` disable the guard. Any other non-empty
 ## BFF Proxy Trust Notes
 
 `BFF_TRUST_PROXY` defaults to `never`, so rate limiting uses the direct peer
-address and ignores `X-Forwarded-For`/`Forwarded`. Set `auto` or `always` only
-when the BFF is reachable exclusively through a trusted reverse proxy. The `never` mode is recommended for uncertain topologies unless deployment owners have documented and reviewed a trusted proxy boundary, in which case they may select `auto` or `always`.
+address and ignores `X-Forwarded-For`/`Forwarded`. To accept forwarded client
+identities, prefer `BFF_TRUSTED_PROXIES` with exact proxy IPs or CIDR ranges.
+The BFF then walks the forwarding chain only through allowlisted hops. `auto`
+is rejected. `always` is a legacy, unsafe override and is appropriate only when
+the BFF is network-isolated behind an edge that replaces forwarded headers.
 
 ## Coordinated Disclosure
 
-If you are unsure whether something is a vulnerability, contact us privately.
-We will work with you to validate and resolve issues responsibly.
+If classification is uncertain, use the same private advisory form and label
+the report as unconfirmed. The project does not publish a response-time or fix
+deadline for alpha reports.

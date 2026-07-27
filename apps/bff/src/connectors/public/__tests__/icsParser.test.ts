@@ -1,461 +1,132 @@
+/** Verifies standard ICS event parsing and recurrence behavior. */
+
 import { describe, expect, it } from "vitest";
 import { parseIcs } from "../icsParser";
+import { icsCalendar, icsCalendarEvents } from "./icsFixtures";
+
+const recurringOptions = { rruleHorizonDays: 30 };
 
 describe("parseIcs", () => {
   describe("basic parsing", () => {
     it("parses a simple event", () => {
-      const ics = `
-BEGIN:VCALENDAR
-VERSION:2.0
-BEGIN:VEVENT
-UID:test-1
-SUMMARY:Test Event
-DTSTART:20260101T100000Z
-DTEND:20260101T110000Z
-LOCATION:Room 101
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics);
-      
-      expect(events).toHaveLength(1);
-      expect(events[0]).toEqual({
-        id: "test-1",
-        title: "Test Event",
-        startsAt: "2026-01-01T10:00:00.000Z",
-        endsAt: "2026-01-01T11:00:00.000Z",
-        location: "Room 101",
-        campusId: undefined
-      });
+      const events = parseIcs(icsCalendar("UID:test-1\nSUMMARY:Test Event\nDTSTART:20260101T100000Z\nDTEND:20260101T110000Z\nLOCATION:Room 101"));
+
+      expect(events).toEqual([{
+        id: "test-1", title: "Test Event", startsAt: "2026-01-01T10:00:00.000Z",
+        endsAt: "2026-01-01T11:00:00.000Z", location: "Room 101", campusId: undefined
+      }]);
     });
 
-    it("parses all-day event", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:test-2
-SUMMARY:All Day Event
-DTSTART:20260101
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics);
-      
-      expect(events).toHaveLength(1);
-      expect(events[0].startsAt).toBe("2026-01-01T00:00:00.000Z");
+    it.each([
+      ["all-day event", "UID:test-2\nSUMMARY:All Day Event\nDTSTART:20260101", "startsAt", "2026-01-01T00:00:00.000Z"],
+      ["unescaped summary", "UID:test-3\nSUMMARY:Event with\\, comma and\\n newline\nLOCATION:Room \\; 101\nDTSTART:20260101T100000Z", "title", "Event with, comma and\n newline"],
+      ["campus ID", "UID:campus-test-1\nSUMMARY:Event with Campus\nDTSTART:20260101T100000Z\nX-CAMPUS-ID:main-campus", "campusId", "main-campus"],
+      ["alternate campus ID", "UID:campus-test-2\nSUMMARY:Event with Campus\nDTSTART:20260101T100000Z\nX-CAMPUS:secondary-campus", "campusId", "secondary-campus"]
+    ])("parses %s", (_description, body, field, expected) => {
+      expect(parseIcs(icsCalendar(body))[0][field as "startsAt" | "title" | "campusId"]).toBe(expected);
     });
 
     it("handles missing UID by generating stable ID", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-SUMMARY:No UID Event
-DTSTART:20260101T100000Z
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics);
-      
+      const events = parseIcs(icsCalendar("SUMMARY:No UID Event\nDTSTART:20260101T100000Z"));
       expect(events).toHaveLength(1);
       expect(events[0].id).toMatch(/^[a-f0-9]{16}$/);
     });
 
-    it("unescapes special characters in summary and location", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:test-3
-SUMMARY:Event with\\, comma and\\n newline
-LOCATION:Room \\; 101
-DTSTART:20260101T100000Z
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics);
-      
-      expect(events[0].title).toBe("Event with, comma and\n newline");
-      expect(events[0].location).toBe("Room ; 101");
+    it("unescapes special characters in location", () => {
+      expect(parseIcs(icsCalendar("UID:test-3\nSUMMARY:Event\nLOCATION:Room \\; 101\nDTSTART:20260101T100000Z"))[0].location).toBe("Room ; 101");
     });
   });
 
   describe("RRULE expansion", () => {
     it("expands daily recurring event", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:daily-recurring
-SUMMARY:Daily Standup
-DTSTART:20260201T090000Z
-DTEND:20260201T093000Z
-RRULE:FREQ=DAILY;COUNT=3
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics, { rruleHorizonDays: 30 });
-      
-      expect(events).toHaveLength(3);
-      expect(events[0].startsAt).toBe("2026-02-01T09:00:00.000Z");
-      expect(events[1].startsAt).toBe("2026-02-02T09:00:00.000Z");
-      expect(events[2].startsAt).toBe("2026-02-03T09:00:00.000Z");
-      
-      // All should be marked as recurring
-      expect(events.every(e => e.isRecurring)).toBe(true);
+      const events = parseIcs(icsCalendar("UID:daily-recurring\nSUMMARY:Daily Standup\nDTSTART:20260201T090000Z\nDTEND:20260201T093000Z\nRRULE:FREQ=DAILY;COUNT=3"), recurringOptions);
+      expect(events.map((event) => event.startsAt)).toEqual(["2026-02-01T09:00:00.000Z", "2026-02-02T09:00:00.000Z", "2026-02-03T09:00:00.000Z"]);
+      expect(events.every((event) => event.isRecurring)).toBe(true);
     });
 
-    it("expands weekly recurring event with BYDAY", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:weekly-recurring
-SUMMARY:Weekly Meeting
-DTSTART:20260202T140000Z
-DTEND:20260202T150000Z
-RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;COUNT=3
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics, { rruleHorizonDays: 30 });
-      
-      expect(events).toHaveLength(3);
-      // Monday, Wednesday, Friday
-      expect(new Date(events[0].startsAt).getUTCDay()).toBe(1); // Monday
-      expect(new Date(events[1].startsAt).getUTCDay()).toBe(3); // Wednesday
-      expect(new Date(events[2].startsAt).getUTCDay()).toBe(5); // Friday
+    it.each([
+      ["weekly BYDAY", "UID:weekly-recurring\nSUMMARY:Weekly Meeting\nDTSTART:20260202T140000Z\nDTEND:20260202T150000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;COUNT=3", 30, [1, 3, 5], "day"],
+      ["monthly", "UID:monthly-recurring\nSUMMARY:Monthly Review\nDTSTART:20260115T100000Z\nDTEND:20260115T110000Z\nRRULE:FREQ=MONTHLY;COUNT=3", 90, [0, 1, 2], "month"]
+    ])("expands %s recurrence", (_description, body, horizon, expected, unit) => {
+      const events = parseIcs(icsCalendar(body), { rruleHorizonDays: horizon });
+      const values = events.map((event) => unit === "day" ? new Date(event.startsAt).getUTCDay() : new Date(event.startsAt).getUTCMonth());
+      expect(values).toEqual(expected);
     });
 
-    it("expands monthly recurring event", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:monthly-recurring
-SUMMARY:Monthly Review
-DTSTART:20260115T100000Z
-DTEND:20260115T110000Z
-RRULE:FREQ=MONTHLY;COUNT=3
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics, { rruleHorizonDays: 90 });
-      
-      expect(events).toHaveLength(3);
-      expect(new Date(events[0].startsAt).getUTCMonth()).toBe(0); // January
-      expect(new Date(events[1].startsAt).getUTCMonth()).toBe(1); // February
-      expect(new Date(events[2].startsAt).getUTCMonth()).toBe(2); // March
-    });
-
-    it("respects UNTIL constraint", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:until-recurring
-SUMMARY:Limited Series
-DTSTART:20260201T100000Z
-DTEND:20260201T110000Z
-RRULE:FREQ=DAILY;UNTIL=20260205T100000Z
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics, { rruleHorizonDays: 30 });
-      
-      // Should have events from Feb 1-5 (5 days)
-      expect(events.length).toBe(5);
+    it.each([
+      ["UNTIL", "UID:until-recurring\nSUMMARY:Limited Series\nDTSTART:20260201T100000Z\nDTEND:20260201T110000Z\nRRULE:FREQ=DAILY;UNTIL=20260205T100000Z", { rruleHorizonDays: 30 }, 5],
+      ["horizon", "UID:horizon-test\nSUMMARY:Daily Forever\nDTSTART:20260201T100000Z\nRRULE:FREQ=DAILY", { rruleHorizonDays: 7 }, 8],
+      ["instance cap", "UID:max-instances-test\nSUMMARY:Daily Forever\nDTSTART:20260201T100000Z\nRRULE:FREQ=DAILY", { rruleHorizonDays: 365, rruleMaxInstances: 5 }, 5]
+    ])("limits expansion by %s", (_description, body, options, maximum) => {
+      expect(parseIcs(icsCalendar(body), options).length).toBeLessThanOrEqual(maximum);
     });
 
     it("respects INTERVAL parameter", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:interval-recurring
-SUMMARY:Bi-weekly Meeting
-DTSTART:20260203T100000Z
-DTEND:20260203T110000Z
-RRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=3
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics, { rruleHorizonDays: 60 });
-      
-      expect(events).toHaveLength(3);
-      // Each event should be 2 weeks apart
-      const diff1 = (new Date(events[1].startsAt).getTime() - new Date(events[0].startsAt).getTime()) / (1000 * 60 * 60 * 24);
-      const diff2 = (new Date(events[2].startsAt).getTime() - new Date(events[1].startsAt).getTime()) / (1000 * 60 * 60 * 24);
-      expect(diff1).toBe(14);
-      expect(diff2).toBe(14);
-    });
-
-    it("limits expansion to horizon days", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:horizon-test
-SUMMARY:Daily Forever
-DTSTART:20260201T100000Z
-RRULE:FREQ=DAILY
-END:VEVENT
-END:VCALENDAR
-`;
-      // With a 7-day horizon
-      const events = parseIcs(ics, { rruleHorizonDays: 7 });
-      
-      // Should have events within 7 days from now
-      expect(events.length).toBeLessThanOrEqual(8); // Including today
-    });
-
-    it("limits expansion to max instances", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:max-instances-test
-SUMMARY:Daily Forever
-DTSTART:20260201T100000Z
-RRULE:FREQ=DAILY
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics, { rruleHorizonDays: 365, rruleMaxInstances: 5 });
-      
-      expect(events.length).toBeLessThanOrEqual(5);
+      const events = parseIcs(icsCalendar("UID:interval-recurring\nSUMMARY:Bi-weekly Meeting\nDTSTART:20260203T100000Z\nDTEND:20260203T110000Z\nRRULE:FREQ=WEEKLY;INTERVAL=2;COUNT=3"), { rruleHorizonDays: 60 });
+      expect(events.slice(1).map((event, index) => new Date(event.startsAt).getTime() - new Date(events[index].startsAt).getTime())).toEqual([1_209_600_000, 1_209_600_000]);
     });
 
     it("preserves duration across instances", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:duration-test
-SUMMARY:2-Hour Meeting
-DTSTART:20260201T100000Z
-DTEND:20260201T120000Z
-RRULE:FREQ=DAILY;COUNT=3
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics, { rruleHorizonDays: 30 });
-      
-      events.forEach(event => {
-        const duration = new Date(event.endsAt!).getTime() - new Date(event.startsAt).getTime();
-        expect(duration).toBe(2 * 60 * 60 * 1000); // 2 hours
-      });
+      const events = parseIcs(icsCalendar("UID:duration-test\nSUMMARY:2-Hour Meeting\nDTSTART:20260201T100000Z\nDTEND:20260201T120000Z\nRRULE:FREQ=DAILY;COUNT=3"), recurringOptions);
+      expect(events.map((event) => new Date(event.endsAt!).getTime() - new Date(event.startsAt).getTime())).toEqual([7_200_000, 7_200_000, 7_200_000]);
     });
 
     it("generates unique IDs for each instance", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:unique-id-test
-SUMMARY:Recurring Event
-DTSTART:20260201T100000Z
-RRULE:FREQ=DAILY;COUNT=3
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics, { rruleHorizonDays: 30 });
-      
-      const ids = events.map(e => e.id);
-      const uniqueIds = new Set(ids);
-      expect(uniqueIds.size).toBe(events.length);
+      const events = parseIcs(icsCalendar("UID:unique-id-test\nSUMMARY:Recurring Event\nDTSTART:20260201T100000Z\nRRULE:FREQ=DAILY;COUNT=3"), recurringOptions);
+      expect(new Set(events.map((event) => event.id)).size).toBe(events.length);
     });
 
     it("handles invalid RRULE gracefully by returning base event", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:invalid-rrule
-SUMMARY:Bad RRULE
-DTSTART:20260201T100000Z
-RRULE:INVALID_RULE
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics, { rruleHorizonDays: 30 });
-      
-      // Should return just the base event
-      expect(events).toHaveLength(1);
-      expect(events[0].title).toBe("Bad RRULE");
+      expect(parseIcs(icsCalendar("UID:invalid-rrule\nSUMMARY:Bad RRULE\nDTSTART:20260201T100000Z\nRRULE:INVALID_RULE"), recurringOptions)).toMatchObject([{ title: "Bad RRULE" }]);
+    });
+
+    it.each([
+      ["plain EXDATE", "UID:excluded-only-occurrence\nSUMMARY:Cancelled Meeting\nDTSTART:20260201T100000Z\nRRULE:FREQ=DAILY;COUNT=1\nEXDATE:20260201T100000Z"],
+      ["timezone-qualified EXDATE", "UID:excluded-timezone-occurrence\nSUMMARY:Cancelled Berlin Meeting\nDTSTART;TZID=Europe/Berlin:20260201T100000\nRRULE:FREQ=DAILY;COUNT=1\nEXDATE;TZID=Europe/Berlin:20260201T100000"]
+    ])("does not restore an occurrence removed by %s", (_description, body) => {
+      expect(parseIcs(icsCalendar(body), { referenceDate: new Date("2026-01-01T00:00:00.000Z") })).toEqual([]);
     });
 
     it("handles non-recurring event without RRULE", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:non-recurring
-SUMMARY:One-time Event
-DTSTART:20260201T100000Z
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics, { rruleHorizonDays: 30 });
-      
-      expect(events).toHaveLength(1);
-      expect(events[0].isRecurring).toBeUndefined();
+      expect(parseIcs(icsCalendar("UID:non-recurring\nSUMMARY:One-time Event\nDTSTART:20260201T100000Z"), recurringOptions)[0].isRecurring).toBeUndefined();
     });
   });
 
-  describe("campus ID extraction", () => {
-    it("extracts campus ID from X-CAMPUS-ID", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:campus-test-1
-SUMMARY:Event with Campus
-DTSTART:20260101T100000Z
-X-CAMPUS-ID:main-campus
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics);
-      
-      expect(events[0].campusId).toBe("main-campus");
-    });
-
-    it("extracts campus ID from X-CAMPUS", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:campus-test-2
-SUMMARY:Event with Campus
-DTSTART:20260101T100000Z
-X-CAMPUS:secondary-campus
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics);
-      
-      expect(events[0].campusId).toBe("secondary-campus");
-    });
-  });
-
-  describe("line unfolding", () => {
+  describe("line unfolding and sorting", () => {
     it("handles folded lines", () => {
-      const ics = `BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:folded-test
-SUMMARY:This is a very long title that
-  continues on the next line
-DTSTART:20260101T100000Z
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics);
-      
-      expect(events[0].title).toBe("This is a very long title that continues on the next line");
+      expect(parseIcs(icsCalendar("UID:folded-test\nSUMMARY:This is a very long title that\n  continues on the next line\nDTSTART:20260101T100000Z"))[0].title).toBe("This is a very long title that continues on the next line");
     });
-  });
 
-  describe("sorting", () => {
+    it("detects a recurrence rule whose property name is folded", () => {
+      expect(parseIcs(icsCalendar("UID:folded-rule\nSUMMARY:Folded recurrence\nDTSTART:20260101T100000Z\nRRU\n LE:FREQ=DAILY;COUNT=2"), { referenceDate: new Date("2025-12-31T00:00:00.000Z") })).toHaveLength(2);
+    });
+
     it("sorts events by start date", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:event-3
-SUMMARY:Event 3
-DTSTART:20260103T100000Z
-END:VEVENT
-BEGIN:VEVENT
-UID:event-1
-SUMMARY:Event 1
-DTSTART:20260101T100000Z
-END:VEVENT
-BEGIN:VEVENT
-UID:event-2
-SUMMARY:Event 2
-DTSTART:20260102T100000Z
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics);
-      
-      expect(events[0].title).toBe("Event 1");
-      expect(events[1].title).toBe("Event 2");
-      expect(events[2].title).toBe("Event 3");
+      const bodies = ["UID:event-3\nSUMMARY:Event 3\nDTSTART:20260103T100000Z", "UID:event-1\nSUMMARY:Event 1\nDTSTART:20260101T100000Z", "UID:event-2\nSUMMARY:Event 2\nDTSTART:20260102T100000Z"];
+      expect(parseIcs(icsCalendarEvents(bodies)).map((event) => event.title)).toEqual(["Event 1", "Event 2", "Event 3"]);
     });
   });
 
   describe("description field", () => {
-    it("parses DESCRIPTION property", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:desc-test-1
-SUMMARY:Event with Description
-DTSTART:20260101T100000Z
-DESCRIPTION:This is a test description with some details.
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics);
-      expect(events[0].description).toBe("This is a test description with some details.");
-    });
-
-    it("leaves description undefined when DESCRIPTION is absent", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:desc-test-2
-SUMMARY:Event without Description
-DTSTART:20260101T100000Z
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics);
-      expect(events[0].description).toBeUndefined();
-    });
-
-    it("unescapes special characters in DESCRIPTION", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:desc-test-3
-SUMMARY:Escape Test
-DTSTART:20260101T100000Z
-DESCRIPTION:Line 1\\nLine 2\\, with comma
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics);
-      expect(events[0].description).toBe("Line 1\nLine 2, with comma");
+    it.each([
+      ["parses DESCRIPTION", "UID:desc-test-1\nSUMMARY:Event with Description\nDTSTART:20260101T100000Z\nDESCRIPTION:This is a test description with some details.", "This is a test description with some details."],
+      ["leaves DESCRIPTION absent", "UID:desc-test-2\nSUMMARY:Event without Description\nDTSTART:20260101T100000Z", undefined],
+      ["unescapes DESCRIPTION", "UID:desc-test-3\nSUMMARY:Escape Test\nDTSTART:20260101T100000Z\nDESCRIPTION:Line 1\\nLine 2\\, with comma", "Line 1\nLine 2, with comma"]
+    ])("%s", (_description, body, expected) => {
+      expect(parseIcs(icsCalendar(body))[0].description).toBe(expected);
     });
   });
 
   describe("recurringInstanceId stability", () => {
+    const stableSeries = "UID:stable-id-test\nSUMMARY:Recurring Stable\nDTSTART:20260201T090000Z\nDTEND:20260201T093000Z\nRRULE:FREQ=DAILY;COUNT=3";
+
     it("produces identical recurringInstanceIds when parsed twice", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:stable-id-test
-SUMMARY:Recurring Stable
-DTSTART:20260201T090000Z
-DTEND:20260201T093000Z
-RRULE:FREQ=DAILY;COUNT=3
-END:VEVENT
-END:VCALENDAR
-`;
-      const run1 = parseIcs(ics, { rruleHorizonDays: 30 });
-      const run2 = parseIcs(ics, { rruleHorizonDays: 30 });
-
-      expect(run1).toHaveLength(3);
-      expect(run2).toHaveLength(3);
-
-      for (let i = 0; i < run1.length; i++) {
-        expect(run1[i].recurringInstanceId).toBe(run2[i].recurringInstanceId);
-      }
+      expect(parseIcs(icsCalendar(stableSeries), recurringOptions).map((event) => event.recurringInstanceId)).toEqual(parseIcs(icsCalendar(stableSeries), recurringOptions).map((event) => event.recurringInstanceId));
     });
 
     it("produces different recurringInstanceIds for different start times", () => {
-      const ics = `
-BEGIN:VCALENDAR
-BEGIN:VEVENT
-UID:distinct-id-test
-SUMMARY:Recurring Distinct
-DTSTART:20260201T090000Z
-DTEND:20260201T093000Z
-RRULE:FREQ=DAILY;COUNT=3
-END:VEVENT
-END:VCALENDAR
-`;
-      const events = parseIcs(ics, { rruleHorizonDays: 30 });
-      const ids = events.map((e) => e.recurringInstanceId);
-      const unique = new Set(ids);
-      expect(unique.size).toBe(events.length);
+      const events = parseIcs(icsCalendar(stableSeries.replace("stable-id", "distinct-id")), recurringOptions);
+      expect(new Set(events.map((event) => event.recurringInstanceId)).size).toBe(events.length);
     });
   });
 });

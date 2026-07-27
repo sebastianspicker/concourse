@@ -1,7 +1,13 @@
+/** Exercises public schedule retrieval, parsing, caching, and degradation behavior. */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fetchPublicSchedule } from "../publicSchedule";
 import { clearCache } from "../../../utils/cache";
+
+vi.mock("../../../utils/fetch", async () => ({
+  fetchTextWithTimeout: (await import("../../../__tests__/fetchTextMock")).fetchTextUsingGlobalMock
+}));
 
 const institution = {
   id: "hfmt",
@@ -18,21 +24,19 @@ const institution = {
   }
 };
 
+function stubScheduleFetch(): void {
+  const ics = readFileSync(
+    new URL("../../../__fixtures__/schedule.ics", import.meta.url),
+    "utf8"
+  );
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(ics)));
+}
+
 describe("fetchPublicSchedule", () => {
   beforeEach(() => {
     clearCache();
 
-    const ics = readFileSync(
-      new URL("../../../__fixtures__/schedule.ics", import.meta.url),
-      "utf8"
-    );
-
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: () => null },
-      body: null,
-      text: async () => ics
-    }));
+    stubScheduleFetch();
   });
 
   afterEach(() => {

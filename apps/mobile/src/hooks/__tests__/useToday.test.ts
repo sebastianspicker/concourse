@@ -1,11 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+/** Verifies Today reloads date-scoped resources and schedules campus-midnight rollover. */
+import { describe, expect, it, vi } from "vitest";
+import { act } from "react";
+import { defineResourceSuccessCase } from "./resourceTestCases";
 import { renderHook } from "./testUtils";
 import { useToday } from "../useToday";
-import { clearCache } from "../../data/cache";
-import { clearPersistedCache } from "../../data/persistedCache";
-import { _resetBffBaseUrlMemoForTests } from "../../utils/bffConfig";
+import type { TodayResponse } from "../../api/types";
+import { getCampusDate } from "../../utils/campusTime";
+import { getInstitutionTimeZone } from "../../config/institution";
 
-const mockToday = {
+const mockToday: TodayResponse = {
   events: [
     {
       id: "event-1",
@@ -18,42 +21,27 @@ const mockToday = {
 };
 
 describe("useToday", () => {
-  beforeEach(async () => {
-    process.env.EXPO_PUBLIC_BFF_BASE_URL = "http://localhost:4000";
-    _resetBffBaseUrlMemoForTests();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify(mockToday),
-      headers: { get: () => null },
-    }));
-    clearCache();
-    await clearPersistedCache();
+  defineResourceSuccessCase({
+    assertLoaded: (data) => {
+      const expectedDate = getCampusDate(new Date(), getInstitutionTimeZone());
+      expect(data?.events.length).toBe(1);
+      expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toContain("/today");
+      expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toContain(`date=${expectedDate}`);
+    },
+    body: mockToday,
+    hook: useToday,
+    testName: "loads today",
   });
 
-  afterEach(async () => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-    delete process.env.EXPO_PUBLIC_BFF_BASE_URL;
-    await clearPersistedCache();
-  });
+  it("keys the request to the configured institution day", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-31T23:30:00.000Z"));
+    const { unmount } = renderHook(useToday);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
 
-  it("loads today", async () => {
-    const { getResult, flush, unmount } = renderHook(useToday);
-    const now = new Date();
-    const expectedDate = [
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, "0"),
-      String(now.getDate()).padStart(2, "0")
-    ].join("-");
-
-    expect(getResult().loading).toBe(true);
-    await flush();
-
-    expect(getResult().loading).toBe(false);
-    expect(getResult().data?.events.length).toBe(1);
-    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toContain("/today");
-    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toContain(`date=${expectedDate}`);
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toContain("date=2026-02-01");
     unmount();
   });
 });

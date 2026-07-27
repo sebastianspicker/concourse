@@ -1,9 +1,11 @@
+/** Fetches typed BFF JSON with institution headers, timeouts, retries, and response metadata. */
 import { getBffBaseUrl } from "../utils/env";
 import { fetchJsonResponseWithTimeout } from "../utils/fetchHelpers";
 import { getConfiguredInstitutionId } from "../config/institution";
 import { ApiErrorException } from "./errors";
 import { withRetry } from "./retry";
 
+/** Delegates request, retry, validation, and institution checks, then unwraps the response payload. */
 export async function getJson<T>(
   path: string,
   parse?: (data: unknown) => T,
@@ -18,6 +20,7 @@ export type ApiJsonResult<T> = {
   institutionId: string | null;
 };
 
+/** Wraps the parsed payload with response metadata needed by callers. */
 export async function getJsonResult<T>(
   path: string,
   parse?: (data: unknown) => T,

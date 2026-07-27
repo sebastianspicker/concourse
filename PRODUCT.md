@@ -1,33 +1,41 @@
-# Campus App Kit
+# Product scope
 
-## Register
+Concourse presents public campus information to students and visitors. The
+current application covers:
 
-product
+- campus-local events
+- public room directories
+- public ICS schedule entries
+- a Today view combining same-day events and rooms
+- event, room, and schedule details
+- language and appearance preferences
+
+The application reports whether displayed data is current, cached, degraded,
+offline, empty, or unavailable. It keeps the institution identity visible and
+uses the BFF as the only campus-data API.
 
 ## Users
 
-Campus App Kit serves students and campus visitors who need current public campus information quickly, usually on a phone and often under time pressure. Institution implementers use the same starter periodically to configure public sources, identity, language, and deployment. Private integration teams may extend the documented seams in downstream forks, but private schedules and authentication are not part of the public product.
+Students and visitors use the application to check public information. An
+institution maintainer configures the institution pack, public sources, BFF,
+mobile identifiers, and deployment.
 
-## Product Purpose
+## Excluded scope
 
-Campus App Kit is a privacy-safe, white-label university information app. It helps people check today's activity, find public events and rooms, open details, and understand whether information is live, cached, degraded, or unavailable. Success means the interface is fast to scan, preserves context across navigation, explains recovery paths plainly, and never implies that demo or private data is production-ready.
+The repository does not implement protected campus access, personalized
+schedules, room occupancy, user accounts, SSO, signing, store submission, or
+hosted infrastructure. Private integrations require a separate reviewed
+implementation.
 
-## Brand Personality
+## Product rules
 
-Calm, civic, precise. “The Campus Desk” should feel dependable and familiar: the information hierarchy of a good public service and the spatial clarity of a native maps application, without institutional stiffness or decorative novelty.
+1. Show source freshness and failure state without hiding stale or partial data.
+2. Use the same public response schema in the BFF and client.
+3. Keep institution customization within the validated pack contract.
+4. Preserve normal platform navigation, focus, text scaling, and control semantics.
+5. Do not expose internal service errors or private integration details to users.
 
-## Anti-references
-
-Avoid dashboard theatre, marketing heroes, glass surfaces, large metric pills, card grids, side-stripe callouts, emoji iconography, ornamental shadows, uppercase section kickers, and decorative entrance animation. Do not expose developer terminology, fake authentication, private-connector prompts, or raw service errors to public users.
-
-## Design Principles
-
-1. Put current state before decoration.
-2. Give each surface one task and one clear title.
-3. Make public-data provenance and freshness explicit.
-4. Prefer familiar native controls and navigation over novelty.
-5. Constrain institution customization so every configured result remains accessible.
-
-## Accessibility & Inclusion
-
-Target WCAG 2.2 AA on web and native VoiceOver and TalkBack behavior. Support dynamic type, 200% text and browser zoom, keyboard navigation, visible focus, reduced motion, bold text, high contrast, large touch targets, and bilingual English/German content. Never rely on color alone, and keep every standard theme accessible rather than reserving accessibility for a special mode.
+WCAG 2.2 AA is a design target, not a conformance claim. Automated evidence
+covers Chromium keyboard navigation, 200 percent browser zoom, and serious or
+critical axe findings. Native screen readers, native text scaling, orientation,
+and signed artifacts require manual validation.

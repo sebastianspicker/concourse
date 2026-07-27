@@ -1,7 +1,10 @@
+/** Rejects HTTP methods that the read-only BFF does not support. */
+
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { sendError } from "../utils/errors";
 import { setRequestIdHeader } from "../utils/requestId";
 
+/** Allows the configured read-only methods or replies with 405 and an `Allow` header. */
 export function guardMethods(
   req: IncomingMessage,
   res: ServerResponse,

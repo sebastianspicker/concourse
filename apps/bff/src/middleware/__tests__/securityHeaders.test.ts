@@ -1,3 +1,5 @@
+/** Verifies security response headers applied by the BFF middleware. */
+
 import { describe, expect, it } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { guardSecurityHeaders } from "../securityHeaders";

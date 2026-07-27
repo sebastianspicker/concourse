@@ -1,3 +1,5 @@
+/** Tracks fixed-window request quotas by derived client key. */
+
 type Bucket = {
   count: number;
   resetAt: number;
@@ -8,6 +10,7 @@ const cleanupIntervalMs = 60_000;
 const maxBuckets = 20_000;
 let lastCleanup = 0;
 
+/** Evicts retained state before the configured memory cap can be exceeded. */
 function evictIfOverCap(): void {
   if (buckets.size < maxBuckets) return;
 
@@ -23,6 +26,7 @@ function evictIfOverCap(): void {
   }
 }
 
+/** Consumes a fixed-window quota and returns the retry delay when it is exhausted. */
 export function checkRateLimit(
   key: string,
   options?: { limit?: number; windowMs?: number }
@@ -53,15 +57,18 @@ export function checkRateLimit(
   return { allowed: true, retryAfter: 0 };
 }
 
+/** Clears rate-limit state for tests or controlled lifecycle resets. */
 export function clearRateLimitBuckets(): void {
   buckets.clear();
   lastCleanup = 0;
 }
 
+/** Reports the number of active client buckets for diagnostics and tests. */
 export function getRateLimitSize(): number {
   return buckets.size;
 }
 
+/** Periodically removes expired buckets without adding cleanup work to every request. */
 function maybeCleanup(now: number): void {
   if (now - lastCleanup < cleanupIntervalMs) {
     return;

@@ -1,29 +1,10 @@
+# Scans every pull request and public branch update for committed secret material.
 name: gitleaks
 
 on:
   pull_request:
-    paths-ignore:
-      - 'AGENTS.md'
-      - 'archive/**'
-      - 'docs/archive/**'
-      - 'node_modules/**'
-      - 'vendor/**'
-      - 'third_party/**'
-      - 'third-party/**'
-      - '3rdparty/**'
-      - 'external/**'
   push:
     branches: [main, dev]
-    paths-ignore:
-      - 'AGENTS.md'
-      - 'archive/**'
-      - 'docs/archive/**'
-      - 'node_modules/**'
-      - 'vendor/**'
-      - 'third_party/**'
-      - 'third-party/**'
-      - '3rdparty/**'
-      - 'external/**'
 
 permissions:
   contents: read
@@ -48,9 +29,23 @@ jobs:
         run: |
           set -euo pipefail
           install_dir="${RUNNER_TEMP}/gitleaks"
+          archive_name="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          checksums_name="gitleaks_${GITLEAKS_VERSION}_checksums.txt"
           mkdir -p "$install_dir"
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o "${RUNNER_TEMP}/gitleaks.tar.gz"
-          tar -xzf "${RUNNER_TEMP}/gitleaks.tar.gz" -C "$install_dir" gitleaks
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive_name}" \
+            -o "${RUNNER_TEMP}/${archive_name}"
+          curl -sSfL \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${checksums_name}" \
+            -o "${RUNNER_TEMP}/${checksums_name}"
+          checksum_line="$(grep -E "^[0-9a-f]{64}[[:space:]]+${archive_name}$" "${RUNNER_TEMP}/${checksums_name}")"
+          if [[ -z "$checksum_line" ]]; then
+            echo "Gitleaks archive checksum is missing from the release manifest."
+            exit 1
+          fi
+          printf '%s\n' "$checksum_line" > "${RUNNER_TEMP}/gitleaks.sha256"
+          (cd "$RUNNER_TEMP" && sha256sum --check gitleaks.sha256)
+          tar -xzf "${RUNNER_TEMP}/${archive_name}" -C "$install_dir" gitleaks
           echo "$install_dir" >> "$GITHUB_PATH"
       - name: Run gitleaks
         run: gitleaks detect --redact --source . --verbose --config .gitleaks.toml

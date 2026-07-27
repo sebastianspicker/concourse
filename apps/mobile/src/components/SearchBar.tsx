@@ -1,5 +1,6 @@
+/** Provides an accessible, clearable search input with keyboard-safe focus handling. */
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocale } from "../i18n/LocaleContext";
 import { spacing, typography } from "../ui/theme";
@@ -15,6 +16,7 @@ export type SearchBarProps = {
   testID?: string;
 };
 
+/** Renders the accessible query field and forwards each typed filter value. */
 export function SearchBar({
   value,
   onChangeText,
@@ -43,7 +45,17 @@ export function SearchBar({
   return (
     <View style={styles.field}>
       <Text style={[styles.label, { color: theme.colors.text }]}>{visibleLabel}</Text>
-      <View style={[styles.control, { backgroundColor: theme.colors.surface, borderColor: theme.colors.controlBorder }]} accessibilityRole="search">
+      <View
+        style={[
+          styles.control,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.controlBorder,
+            borderWidth: theme.ui.borderWidth,
+          },
+        ]}
+        accessibilityRole="search"
+      >
         <MaterialIcons name="search" size={22} color={theme.colors.muted} />
         <TextInput
           testID={testID}
@@ -77,9 +89,9 @@ export function SearchBar({
 export const SearchField = SearchBar;
 
 const styles = StyleSheet.create({
-  field: { gap: spacing.xs },
-  label: { ...typography.caption, fontWeight: "600" },
-  control: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: spacing.sm, borderWidth: 1, borderRadius: 8, paddingLeft: spacing.md },
+  field: { gap: spacing.sm },
+  label: { ...typography.caption, fontWeight: "700", letterSpacing: 0.9, textTransform: "uppercase" },
+  control: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingLeft: spacing.lg },
   input: { ...typography.body, flex: 1, minWidth: 0, paddingVertical: spacing.sm },
   clear: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
 });

@@ -1,6 +1,12 @@
+/** Serializes consistent typed error responses without exposing internals. */
+
 import type { ServerResponse } from "node:http";
-import type { AppError, ErrorKindValue } from "@campus/shared";
-import { httpStatusForKind, createAppError } from "@campus/shared";
+import {
+  httpStatusForKind,
+  createAppError,
+  type AppError,
+  type ErrorKindValue
+} from "@concourse/shared";
 import { log } from "./logger";
 
 export type ErrorBody = {
@@ -10,6 +16,7 @@ export type ErrorBody = {
   };
 };
 
+/** Sends a stable public error payload without serializing the originating exception. */
 export function sendError(
   res: ServerResponse,
   status: number,
@@ -21,7 +28,7 @@ export function sendError(
     try {
       if (!res.writableEnded) res.end();
     } catch {
-      // Ignore
+      // The socket may already be closed; the original error response remains authoritative.
     }
     return;
   }
@@ -40,6 +47,7 @@ export function sendError(
   res.end(JSON.stringify(body));
 }
 
+/** Maps a shared error kind to its public HTTP status and payload. */
 export function sendTypedError(
   res: ServerResponse,
   kind: ErrorKindValue,

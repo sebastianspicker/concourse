@@ -1,10 +1,12 @@
+/** Public HfMT Cologne pack containing only publishable identity, campus, room, and source data. */
 export const hfmtPublicPack = {
   id: "hfmt",
   name: "University for Music and Dance (HfMT Cologne)",
   app: {
     displayName: "HfMT Cologne",
     defaultLocale: "de",
-    accent: "#176B87"
+    designPreset: "atelier",
+    accent: "#4067D0"
   },
   type: "music-and-dance",
   campuses: [

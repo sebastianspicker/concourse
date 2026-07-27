@@ -1,3 +1,4 @@
+/** Verifies both locale dictionaries expose the same translation keys. */
 import { describe, expect, it } from "vitest";
 import { de, en } from "../dictionaries";
 

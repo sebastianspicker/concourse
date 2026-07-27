@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
-import type { IncomingMessage } from "node:http";
-import { getRequestId } from "../requestId";
+/** Verifies request-ID validation, fallback generation, and response propagation. */
+
+import { describe, expect, it, vi } from "vitest";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { getRequestId, setRequestIdHeader } from "../requestId";
 
 describe("getRequestId", () => {
   it("returns the x-request-id header when valid", () => {
@@ -36,5 +38,13 @@ describe("getRequestId", () => {
   it("accepts request IDs with dots, colons, and hyphens", () => {
     const req = { headers: { "x-request-id": "srv-01:req.abc-1234" } } as unknown as IncomingMessage;
     expect(getRequestId(req)).toBe("srv-01:req.abc-1234");
+  });
+});
+
+describe("setRequestIdHeader", () => {
+  it("does not mutate a response after its headers were sent", () => {
+    const setHeader = vi.fn();
+    setRequestIdHeader({ headersSent: true, setHeader } as unknown as ServerResponse, "req-12345678");
+    expect(setHeader).not.toHaveBeenCalled();
   });
 });

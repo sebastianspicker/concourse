@@ -4,22 +4,21 @@
  */
 
 module.exports = {
-  preset: "react-native",
   rootDir: "..",
-  testMatch: ["<rootDir>/e2e/**/*.test.ts"],
+  testMatch: ["<rootDir>/e2e/native/**/*.test.ts"],
   testPathIgnorePatterns: ["/node_modules/"],
   transform: {
-    "^.+\\.tsx?$": [
-      "ts-jest",
+    "^.+\\.[jt]sx?$": [
+      "babel-jest",
       {
-        tsconfig: "tsconfig.json"
+        presets: ["module:@react-native/babel-preset"]
       }
     ]
   },
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   testEnvironment: "node",
   testTimeout: 120000,
-  setupFilesAfterEnv: ["<rootDir>/e2e/init.ts"],
+  setupFilesAfterEnv: ["<rootDir>/e2e/native/init.ts"],
   reporters: ["detox/runners/jest/reporter"],
   testRunner: "jest-circus/runner",
   verbose: true

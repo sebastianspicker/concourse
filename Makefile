@@ -1,3 +1,4 @@
+# Provides memorable local aliases without hiding the underlying repository scripts.
 .PHONY: ci verify lint typecheck test build gitleaks
 
 SHELL := /bin/bash
@@ -21,4 +22,4 @@ build:
 	pnpm build
 
 gitleaks:
-	docker run --rm -v "$(PWD):/repo" zricethezav/gitleaks:latest detect --source=/repo --config=/repo/.gitleaks.toml
+	docker run --rm -v "$(PWD):/repo" ghcr.io/gitleaks/gitleaks:v8.28.0 detect --redact --source=/repo --config=/repo/.gitleaks.toml

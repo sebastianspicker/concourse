@@ -1,12 +1,14 @@
+/** Serves a lightweight health response without depending on external sources. */
+
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { BFF_ENV } from "../config/env";
 import { loadInstitutionPack } from "../config/loader";
 import { log } from "../utils/logger";
 
-// Track server start time for uptime calculation
 const serverStartTime = Date.now();
 
+/** Formats elapsed milliseconds as a compact day/hour/minute/second uptime string. */
 function formatUptime(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -19,17 +21,18 @@ function formatUptime(ms: number): string {
   return `${seconds}s`;
 }
 
+/** Reports heap usage and warns once the process exceeds ninety percent utilization. */
 function getMemoryStatus(): { status: string; usedMB: number; totalMB: number } {
   const memUsage = process.memoryUsage();
   const usedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
   const totalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
   
-  // Consider memory unhealthy if heap usage > 90%
   const status = memUsage.heapUsed / memUsage.heapTotal > 0.9 ? "warning" : "ok";
   
   return { status, usedMB, totalMB };
 }
 
+/** Checks institution configuration and memory without contacting upstream data sources. */
 export async function handleHealth(
   _req: IncomingMessage,
   res: ServerResponse
@@ -65,7 +68,7 @@ export async function handleHealth(
 
   const response = {
     status: overallStatus,
-    version: process.env.npm_package_version ?? "0.1.0",
+    version: process.env.APP_VERSION ?? process.env.npm_package_version ?? "development",
     institution: BFF_ENV.institutionId,
     uptime: formatUptime(Date.now() - serverStartTime),
     checks

@@ -1,143 +1,198 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
-import { fetchWithTimeout, TimeoutError } from "../fetch";
+/** Verifies bounded text fetching, timeout, and response-size failures. */
 
-describe("fetchWithTimeout — timeout behavior", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+import { EventEmitter } from "node:events";
+import type { ClientRequest, IncomingMessage } from "node:http";
+import type { RequestOptions } from "node:https";
+import { describe, expect, it, vi } from "vitest";
+
+import { createFetchTextWithTimeout, TimeoutError } from "../fetch";
+
+type LookupResult = { address: string; family: number };
+type RequestCall = { url: URL; options: RequestOptions };
+
+class FakeRequest extends EventEmitter {
+  end = vi.fn();
+  destroy = vi.fn();
+}
+
+type FakeResponse = IncomingMessage & { start: () => void };
+
+function response(statusCode = 200, headers: IncomingMessage["headers"] = {}, chunks: Array<string | Buffer> = ["ok"]): FakeResponse {
+  const result = new EventEmitter() as FakeResponse;
+  result.statusCode = statusCode;
+  result.headers = headers;
+  result.destroy = vi.fn();
+  // IncomingMessage buffers data until consumers attach listeners. Use the
+  // next event-loop turn so this EventEmitter fake preserves that contract
+  // across the address-selection promise boundary.
+  result.start = () => setImmediate(() => {
+    for (const chunk of chunks) result.emit("data", chunk);
+    result.emit("end");
   });
+  return result;
+}
 
-  it("completes successfully within timeout", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("ok", { status: 200 })
-    );
+function stalledResponse(): FakeResponse {
+  const result = new EventEmitter() as FakeResponse;
+  result.statusCode = 200;
+  result.headers = {};
+  result.destroy = vi.fn();
+  result.start = vi.fn();
+  return result;
+}
 
-    const response = await fetchWithTimeout("https://example.com", undefined, 10_000);
-    expect(response.status).toBe(200);
-  });
-
-  it("throws TimeoutError when fetch exceeds timeout", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(
-      (_url, init) =>
-        new Promise((_resolve, reject) => {
-          // Listen for abort on the signal passed to fetch
-          const signal = (init as RequestInit | undefined)?.signal;
-          signal?.addEventListener("abort", () => {
-            reject(new DOMException("The operation was aborted", "AbortError"));
-          });
-        })
-    );
-
-    await expect(fetchWithTimeout("https://slow.example.com", undefined, 50)).rejects.toThrow(
-      TimeoutError
-    );
-  });
-
-  it("TimeoutError has correct name property", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(
-      (_url, init) =>
-        new Promise((_resolve, reject) => {
-          const signal = (init as RequestInit | undefined)?.signal;
-          signal?.addEventListener("abort", () => {
-            reject(new DOMException("The operation was aborted", "AbortError"));
-          });
-        })
-    );
-
-    try {
-      await fetchWithTimeout("https://slow.example.com", undefined, 50);
-      expect.fail("should have thrown");
-    } catch (err) {
-      expect(err).toBeInstanceOf(TimeoutError);
-      expect((err as TimeoutError).name).toBe("TimeoutError");
+function makeFetcher({
+  lookups = [[{ address: "93.184.216.34", family: 4 }]],
+  responses = [response()],
+  requestErrors = [],
+  onRequest
+}: {
+  lookups?: LookupResult[][];
+  responses?: FakeResponse[];
+  requestErrors?: Array<Error | undefined>;
+  onRequest?: (request: FakeRequest) => void;
+} = {}) {
+  const calls: RequestCall[] = [];
+  let lookupIndex = 0;
+  let requestIndex = 0;
+  let responseIndex = 0;
+  const lookup = vi.fn(async () => lookups[Math.min(lookupIndex++, lookups.length - 1)] ?? []);
+  const request = vi.fn((url: URL, options: RequestOptions, callback: (incoming: IncomingMessage) => void) => {
+    calls.push({ url, options });
+    const fake = new FakeRequest();
+    fake.once("error", () => undefined);
+    onRequest?.(fake);
+    const requestError = requestErrors[requestIndex++];
+    if (requestError) {
+      queueMicrotask(() => fake.emit("error", requestError));
+      return fake as unknown as ClientRequest;
     }
+    const next = responses[responseIndex++];
+    if (next) queueMicrotask(() => { callback(next); next.start(); });
+    return fake as unknown as ClientRequest;
+  });
+  return { calls, fetchText: createFetchTextWithTimeout({ lookup, httpRequest: request, httpsRequest: request }), lookup, request };
+}
+
+function runPinnedLookup(lookup: NonNullable<RequestOptions["lookup"]>, hostname: string): Promise<{ address: string; family: number }> {
+  return new Promise((resolve, reject) => {
+    lookup(hostname, { family: 4 }, (error, address, family) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      if (typeof address !== "string" || family === undefined) {
+        reject(new Error("Pinned lookup returned an unexpected result shape"));
+        return;
+      }
+      resolve({ address, family });
+    });
+  });
+}
+
+describe("fetchTextWithTimeout", () => {
+  it("pins the connection lookup to validated DNS results even if resolution would later flip", async () => {
+    const { calls, fetchText } = makeFetcher();
+    await expect(fetchText("https://public.example:8443/path?q=1")).resolves.toBe("ok");
+    const callback = calls[0]?.options.lookup;
+    if (!callback) throw new Error("Expected a pinned lookup callback");
+    const pinned = await runPinnedLookup(callback, "public.example");
+    expect(pinned).toEqual({ address: "93.184.216.34", family: 4 });
+    expect(calls[0]?.options).toMatchObject({ agent: false, family: 4, method: "GET", hostname: "public.example", port: "8443", servername: "public.example" });
+    expect(calls[0]?.options.headers).toMatchObject({ Host: "public.example:8443", "Accept-Encoding": "identity" });
+    await expect(runPinnedLookup(callback, "attacker.example")).rejects.toMatchObject({ code: "ENOTFOUND" });
   });
 
-  it("caller-provided AbortSignal still works", async () => {
-    const callerController = new AbortController();
-    vi.spyOn(globalThis, "fetch").mockImplementation(
-      (_url, init) =>
-        new Promise((_resolve, reject) => {
-          const signal = (init as RequestInit | undefined)?.signal;
-          signal?.addEventListener("abort", () => {
-            reject(new DOMException("The operation was aborted", "AbortError"));
-          });
-        })
-    );
-
-    // Abort via caller signal, not timeout
-    setTimeout(() => callerController.abort(), 10);
-
-    // Use a long timeout so the caller abort fires first
-    await expect(
-      fetchWithTimeout("https://example.com", { signal: callerController.signal }, 30_000)
-    ).rejects.toThrow();
+  it("rejects mixed DNS answers before creating a request", async () => {
+    const { fetchText, request } = makeFetcher({ lookups: [[{ address: "93.184.216.34", family: 4 }, { address: "127.0.0.1", family: 4 }]] });
+    await expect(fetchText("https://public.example")).rejects.toThrow("Fetch URL must target a public host");
+    expect(request).not.toHaveBeenCalled();
   });
 
-  it("clears timeout on success (no dangling timers)", async () => {
-    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("ok", { status: 200 })
-    );
+  it("tries the next validated address when the first connection fails", async () => {
+    const firstAddress = "2606:2800:220:1:248:1893:25c8:1946";
+    const secondAddress = "93.184.216.34";
+    const fetcher = makeFetcher({
+      lookups: [[{ address: firstAddress, family: 6 }, { address: secondAddress, family: 4 }]],
+      requestErrors: [new Error("Network unreachable")],
+      responses: [response(200, {}, ["recovered"])]
+    });
 
-    await fetchWithTimeout("https://example.com", undefined, 10_000);
-    expect(clearTimeoutSpy).toHaveBeenCalled();
+    await expect(fetcher.fetchText("https://public.example")).resolves.toBe("recovered");
+    expect(fetcher.request).toHaveBeenCalledTimes(2);
+    expect(fetcher.calls.map((call) => call.options.family)).toEqual([6, 4]);
+    await expect(runPinnedLookup(fetcher.calls[1]!.options.lookup!, "public.example")).resolves.toEqual({
+      address: secondAddress,
+      family: 4
+    });
   });
 
-  it("uses 10_000ms as default timeout", async () => {
-    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response("ok", { status: 200 })
-    );
-
-    await fetchWithTimeout("https://example.com");
-    // Find the setTimeout call for the timeout (with a numeric ms arg)
-    const timeoutCall = setTimeoutSpy.mock.calls.find(
-      (call) => typeof call[1] === "number" && call[1] === 10_000
-    );
-    expect(timeoutCall).toBeDefined();
+  it("validates redirect targets, missing locations, and the three-redirect limit", async () => {
+    const privateRedirect = makeFetcher({ responses: [response(302, { location: "http://127.0.0.1" })] });
+    await expect(privateRedirect.fetchText("https://public.example")).rejects.toThrow("Fetch URL must target a public host");
+    const missingLocation = makeFetcher({ responses: [response(302)] });
+    await expect(missingLocation.fetchText("https://public.example")).rejects.toThrow("Redirect response missing Location header");
+    const redirects = makeFetcher({ responses: [response(302, { location: "/a" }), response(302, { location: "/b" }), response(302, { location: "/c" }), response(302, { location: "/d" })] });
+    await expect(redirects.fetchText("https://public.example")).rejects.toThrow("Fetch URL exceeded 3 redirects");
+    expect(redirects.request).toHaveBeenCalledTimes(4);
   });
 
-  it("rejects private literal hosts before fetch", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
+  it("resolves and pins every relative redirect hop independently", async () => {
+    const redirects = makeFetcher({
+      lookups: [[{ address: "93.184.216.34", family: 4 }], [{ address: "2606:2800:220:1:248:1893:25c8:1946", family: 6 }]],
+      responses: [response(302, { location: "/final" }), response(200, {}, ["done"])]
+    });
+    await expect(redirects.fetchText("https://public.example/start")).resolves.toBe("done");
+    expect(redirects.lookup).toHaveBeenNthCalledWith(1, "public.example", { all: true, verbatim: true });
+    expect(redirects.lookup).toHaveBeenNthCalledWith(2, "public.example", { all: true, verbatim: true });
+    expect(redirects.calls[1]?.options).toMatchObject({ family: 6, hostname: "public.example" });
+  });
 
-    await expect(fetchWithTimeout("http://127.0.0.1:4000")).rejects.toThrow(
-      "Fetch URL must target a public host"
-    );
-    expect(fetchSpy).not.toHaveBeenCalled();
+  it("distinguishes its deadline from caller aborts", async () => {
+    const stalledLookup = vi.fn(() => new Promise<LookupResult[]>(() => undefined));
+    const dnsTimeout = createFetchTextWithTimeout({ lookup: stalledLookup });
+    await expect(dnsTimeout("https://public.example", undefined, 5)).rejects.toBeInstanceOf(TimeoutError);
+
+    const waitingForHeaders = makeFetcher({ responses: [] });
+    await expect(waitingForHeaders.fetchText("https://public.example", undefined, 5)).rejects.toBeInstanceOf(TimeoutError);
+    const waitingForBody = makeFetcher({ responses: [stalledResponse()] });
+    await expect(waitingForBody.fetchText("https://public.example", undefined, 5)).rejects.toBeInstanceOf(TimeoutError);
+    const controller = new AbortController();
+    const aborted = makeFetcher({ responses: [], onRequest: () => queueMicrotask(() => controller.abort()) });
+    await expect(aborted.fetchText("https://public.example", { signal: controller.signal }, 10_000)).rejects.not.toBeInstanceOf(TimeoutError);
+    expect(aborted.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects compressed, declared-too-large, and oversized chunked responses", async () => {
+    const compressedResponse = response(200, { "content-encoding": "gzip" });
+    const compressed = makeFetcher({ responses: [compressedResponse] });
+    await expect(compressed.fetchText("https://public.example")).rejects.toThrow("Unexpected response Content-Encoding");
+    const declaredResponse = response(200, { "content-length": String(10 * 1024 * 1024 + 1) });
+    const declared = makeFetcher({ responses: [declaredResponse] });
+    await expect(declared.fetchText("https://public.example")).rejects.toThrow("Response too large");
+    const chunkedResponse = response(200, {}, [Buffer.alloc(10 * 1024 * 1024 + 1)]);
+    const chunked = makeFetcher({ responses: [chunkedResponse] });
+    await expect(chunked.fetchText("https://public.example")).rejects.toThrow("Response body exceeds");
+    expect(compressedResponse.destroy).toHaveBeenCalled();
+    expect(declaredResponse.destroy).toHaveBeenCalled();
+    expect(chunkedResponse.destroy).toHaveBeenCalled();
+  });
+
+  it("destroys rejected responses without buffering their bodies", async () => {
+    const httpError = response(503, {}, ["ignored"]);
+    const invalidLength = response(200, { "content-length": "not-a-number" });
+    const fetcher = makeFetcher({ responses: [httpError, invalidLength] });
+    await expect(fetcher.fetchText("https://public.example/error")).rejects.toThrow("HTTP 503");
+    await expect(fetcher.fetchText("https://public.example/length")).rejects.toThrow("Invalid response Content-Length");
+    expect(httpError.destroy).toHaveBeenCalled();
+    expect(invalidLength.destroy).toHaveBeenCalled();
   });
 
   it.each([
-    "http://localhost:4000",
-    "http://0.0.0.0:4000",
-    "http://10.0.0.1",
-    "http://172.16.0.1",
-    "http://192.168.1.1",
-    "http://169.254.1.1",
-    "http://[::1]:4000",
-    "http://[fd00::1]",
-    "http://[fe80::1]"
-  ])("rejects private host %s before fetch", async (url) => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-
-    await expect(fetchWithTimeout(url)).rejects.toThrow("Fetch URL must target a public host");
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("rejects URLs with credentials before fetch", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-
-    await expect(fetchWithTimeout("https://user:pass@example.com")).rejects.toThrow(
-      "Fetch URL must not include credentials"
-    );
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("rejects non-http URLs before fetch", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-
-    await expect(fetchWithTimeout("file:///etc/passwd")).rejects.toThrow(
-      "Fetch URL must use http or https"
-    );
-    expect(fetchSpy).not.toHaveBeenCalled();
+    "file:///tmp/x", "ftp://public.example", "https://user:pass@public.example", "http://127.0.0.1", "http://192.0.2.1", "http://224.0.0.1", "http://[::1]", "http://[::ffff:127.0.0.1]", "http://[2001:db8::1]", "http://[fd00::1]", "http://[fe80::1]"
+  ])("rejects disallowed URL %s", async (url) => {
+    const { fetchText, request } = makeFetcher();
+    await expect(fetchText(url)).rejects.toThrow();
+    expect(request).not.toHaveBeenCalled();
   });
 });

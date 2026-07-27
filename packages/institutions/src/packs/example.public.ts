@@ -1,10 +1,12 @@
+/** Safe generic pack used for documentation, previews, and downstream customization. */
 export const examplePublicPack = {
   id: "example",
   name: "Example University",
   app: {
     displayName: "Example University",
     defaultLocale: "en",
-    accent: "#176B87"
+    designPreset: "wayfinding",
+    accent: "#4067D0"
   },
   type: "music-and-dance",
   campuses: [
@@ -37,5 +39,5 @@ export const examplePublicPack = {
       campusId: "main"
     }
   ],
-  timezone: "America/New_York"
+  timezone: "Europe/Berlin"
 } as const;

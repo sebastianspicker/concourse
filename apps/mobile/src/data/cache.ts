@@ -1,3 +1,4 @@
+/** Deduplicates bounded in-memory resource requests and expires stale values. */
 type CacheEntry<T> = {
   value: T;
   expiresAt: number;
@@ -8,6 +9,7 @@ const inFlight = new Map<string, Promise<unknown>>();
 const MAX_CACHE_ENTRIES = 50;
 const DEFAULT_LOADER_TIMEOUT_MS = 15_000;
 
+/** Races an operation against a timeout that is cleared once either outcome settles. */
 function timeoutPromise(ms: number): { promise: Promise<never>; timer: ReturnType<typeof setTimeout> } {
   let timer: ReturnType<typeof setTimeout>;
   const promise = new Promise<never>((_, reject) => {
@@ -16,6 +18,7 @@ function timeoutPromise(ms: number): { promise: Promise<never>; timer: ReturnTyp
   return { promise, timer: timer! };
 }
 
+/** Removes oldest memory entries until the cache is within its configured capacity. */
 function evictIfNeeded(): void {
   if (cache.size <= MAX_CACHE_ENTRIES) return;
   // Map preserves insertion order. Remove oldest-inserted (FIFO) entries.
@@ -27,6 +30,10 @@ function evictIfNeeded(): void {
   }
 }
 
+/**
+ * Shares one bounded network load per key and serves only unexpired in-memory values.
+ * A loader timeout prevents a stalled transport from pinning callers indefinitely.
+ */
 export async function getCached<T>(
   key: string,
   loader: () => Promise<T>,
@@ -47,6 +54,7 @@ export async function getCached<T>(
 
   const promiseRef: { current: Promise<unknown> | null } = { current: null };
   const { promise: timeout, timer } = timeoutPromise(DEFAULT_LOADER_TIMEOUT_MS);
+/** Records the in-flight loader immediately so concurrent callers share the same request. */
   const promise = (async () => {
     try {
       // A hung loader would otherwise leave the screen in loading state forever.
@@ -66,6 +74,7 @@ export async function getCached<T>(
   return promise as Promise<T>;
 }
 
+/** Clears cache without disturbing unrelated stored state. */
 export function clearCache(key?: string): void {
   if (key) {
     cache.delete(key);

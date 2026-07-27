@@ -1,3 +1,4 @@
+/** Configures React test-renderer behavior and React Native test-environment shims. */
 import ReactTestRenderer, { act, type TestRendererOptions } from "react-test-renderer";
 import type React from "react";
 

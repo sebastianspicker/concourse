@@ -1,49 +1,46 @@
 # Connectors
 
-Connectors provide data to the BFF. The BFF loads an institution pack, then calls the appropriate connector(s) per route.
+The BFF loads one institution pack and uses its public source configuration for
+each data route.
 
-```mermaid
-flowchart LR
-  subgraph Routes["BFF routes"]
-    E[/events]
-    T[/today]
-    S[/schedule]
-    R[/rooms]
-  end
-  subgraph Public["Public connectors"]
-    Events[fetchPublicEvents]
-    Schedule[fetchPublicSchedule]
-  end
-  subgraph Stubs["Private stubs"]
-    Bookings[fetchBookings]
-  end
-  subgraph Pack["Institution pack"]
-    Rooms[publicRooms config]
-  end
-  E --> Events
-  T --> Events
-  S --> Schedule
-  R --> Rooms
-  Events --> Web[Websites / HTML]
-  Schedule --> ICS[ICS feeds]
-  Bookings -.->|empty []| -
-```
+| Route | Source |
+|---|---|
+| `/events` | Public HTML URLs in `publicSources.events` |
+| `/schedule` | Public ICS URLs in `publicSources.schedules` |
+| `/rooms` | `publicRooms` from the pack |
+| `/today` | Same-day public events plus `publicRooms` |
 
-## Public connectors
+Public connector code lives in `apps/bff/src/connectors/public/`. HTML and ICS
+responses are normalized into the schemas in
+`packages/shared/src/domain/public.ts`.
 
-- Use only public sources (websites, RSS, open APIs).
-- Safe to publish and run locally.
+## Failure behavior
 
-## Private stubs
+- Fetches use bounded timeouts.
+- Source failures are logged with request context.
+- When at least one source succeeds, events and schedules can return partial
+  data with `_degraded: true`.
+- Degraded results are not cached.
+- When no configured source can return usable data, the route returns a
+  sanitized error.
+- ICS recurrence expansion is limited by `RRULE_EXPANSION_HORIZON_DAYS`.
 
-The public repo ships interfaces and stubs only. Stubs return empty arrays (e.g. `fetchBookings()` → `[]`) with no signal that the connector is unimplemented; for private forks, consider tagged responses (e.g. `{ stub: true, data: [] }`) or clear documentation. Private repos implement the real connectors and wire them in.
+## Adding a public source
 
-## Pattern
+1. Add the public URL to an institution pack.
+2. Extend the connector only if the existing HTML or ICS parser cannot
+   normalize the source.
+3. Add synthetic fixtures and deterministic tests.
+4. Test upstream failure, partial success, malformed data, cancellation, and
+   cache behavior.
+5. Run `pnpm verify`.
 
-- `apps/bff/src/connectors/public/` for public sources.
-- `apps/bff/src/connectors/private-stubs/` for interfaces and mock outputs.
+Do not commit authenticated URLs, private hostnames, access tokens, captured
+user data, or fixtures copied from protected systems.
 
-## Testing
+## Private extension stubs
 
-Public connectors should be tested with fixtures and deterministic dates.
-Private connectors should be tested in the private repo.
+`apps/bff/src/connectors/private-stubs/` contains interfaces and inactive stub
+implementations. The public server does not import them. A private implementation
+must define authentication, error, empty-state, logging, and data-retention
+behavior before wiring those interfaces into a runtime.

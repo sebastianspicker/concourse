@@ -1,3 +1,4 @@
+# Runs the development BFF with the public HfMT pack on the standard local port.
 services:
   bff:
     build:

@@ -1,119 +1,89 @@
+/** Verifies client-key selection across direct and proxied requests. */
+
 import type { IncomingMessage } from "node:http";
 import { describe, expect, it } from "vitest";
 import { getClientKey } from "../clientKey";
 
-function createRequest(options: {
-  headers?: IncomingMessage["headers"];
-  remoteAddress?: string;
-}): IncomingMessage {
+function createRequest(options: { headers?: IncomingMessage["headers"]; remoteAddress?: string }): IncomingMessage {
   return {
     headers: options.headers ?? {},
-    socket: {
-      remoteAddress: options.remoteAddress
-    }
+    socket: { remoteAddress: options.remoteAddress }
   } as IncomingMessage;
 }
 
+const TRUSTED_EDGE = ["127.0.0.1", "10.24.0.0/16", "2001:db8:feed::/48"];
+
 describe("getClientKey", () => {
-  it("defaults to ignoring forwarded headers", () => {
-    const req = createRequest({
-      headers: { "x-forwarded-for": "203.0.113.10" },
-      remoteAddress: "127.0.0.1"
-    });
-
-    const key = getClientKey(req);
-
-    expect(key).toBe("127.0.0.1");
+  it("defaults to the socket address", () => {
+    expect(getClientKey(createRequest({
+      headers: { "x-forwarded-for": "203.0.113.10" }, remoteAddress: "127.0.0.1"
+    }))).toBe("127.0.0.1");
   });
 
-  it("ignores forwarded headers when trustProxy is never", () => {
+  it("does not honor headers from an untrusted private peer", () => {
     const req = createRequest({
-      headers: { "x-forwarded-for": "203.0.113.10" },
-      remoteAddress: "198.51.100.5"
+      headers: { "x-forwarded-for": "198.51.100.10, 203.0.113.10" }, remoteAddress: "192.168.1.44"
     });
-
-    const key = getClientKey(req, { trustProxy: "never" });
-
-    expect(key).toBe("198.51.100.5");
+    expect(getClientKey(req, { trustProxy: "trusted", trustedProxies: TRUSTED_EDGE })).toBe("192.168.1.44");
   });
 
-  it("uses x-forwarded-for when trustProxy is always", () => {
+  it("does not honor Forwarded headers from an untrusted private peer", () => {
     const req = createRequest({
-      headers: { "x-forwarded-for": "203.0.113.10" },
-      remoteAddress: "198.51.100.5"
+      headers: { forwarded: "for=203.0.113.10;proto=https" }, remoteAddress: "172.16.1.44"
     });
-
-    const key = getClientKey(req, { trustProxy: "always" });
-
-    expect(key).toBe("203.0.113.10");
+    expect(getClientKey(req, { trustProxy: "trusted", trustedProxies: TRUSTED_EDGE })).toBe("172.16.1.44");
   });
 
-  it("trusts forwarded headers when auto and remote address is private", () => {
+  it("uses a single client identity through an explicitly trusted proxy", () => {
     const req = createRequest({
-      headers: { "x-forwarded-for": "203.0.113.10" },
-      remoteAddress: "127.0.0.1"
+      headers: { "x-forwarded-for": "203.0.113.10" }, remoteAddress: "127.0.0.1"
     });
-
-    const key = getClientKey(req, { trustProxy: "auto" });
-
-    expect(key).toBe("203.0.113.10");
+    expect(getClientKey(req, { trustProxy: "trusted", trustedProxies: TRUSTED_EDGE })).toBe("203.0.113.10");
   });
 
-  it("ignores forwarded headers when auto and remote address is public", () => {
+  it("walks a trusted multi-proxy X-Forwarded-For chain right to left", () => {
     const req = createRequest({
-      headers: { "x-forwarded-for": "203.0.113.10" },
-      remoteAddress: "198.51.100.5"
+      headers: { "x-forwarded-for": "198.51.100.10, 10.24.2.8" }, remoteAddress: "10.24.1.7"
     });
-
-    const key = getClientKey(req, { trustProxy: "auto" });
-
-    expect(key).toBe("198.51.100.5");
+    expect(getClientKey(req, { trustProxy: "trusted", trustedProxies: TRUSTED_EDGE })).toBe("198.51.100.10");
   });
 
-  it("parses Forwarded header when allowed", () => {
+  it("uses the first untrusted address rather than an attacker-controlled leftmost value", () => {
     const req = createRequest({
-      headers: { forwarded: "for=203.0.113.60;proto=http;by=203.0.113.43" },
-      remoteAddress: "127.0.0.1"
+      headers: { "x-forwarded-for": "198.51.100.99, 203.0.113.10, 10.24.2.8" }, remoteAddress: "10.24.1.7"
     });
-
-    const key = getClientKey(req, { trustProxy: "auto" });
-
-    expect(key).toBe("203.0.113.60");
+    expect(getClientKey(req, { trustProxy: "trusted", trustedProxies: TRUSTED_EDGE })).toBe("203.0.113.10");
   });
 
-  it("parses bracketed IPv6 x-forwarded-for values with ports", () => {
+  it("walks an RFC 7239 Forwarded chain right to left", () => {
     const req = createRequest({
-      headers: { "x-forwarded-for": "[2001:db8::1]:443" },
-      remoteAddress: "127.0.0.1"
+      headers: { forwarded: "for=198.51.100.10;proto=https, for=10.24.2.8;proto=https" }, remoteAddress: "10.24.1.7"
     });
-
-    const key = getClientKey(req, { trustProxy: "auto" });
-
-    expect(key).toBe("2001:db8::1");
+    expect(getClientKey(req, { trustProxy: "trusted", trustedProxies: TRUSTED_EDGE })).toBe("198.51.100.10");
   });
 
-  it("falls back to remote address for invalid forwarded values", () => {
+  it("fails closed to the socket address for malformed forwarded chains", () => {
     const req = createRequest({
-      headers: {
-        "x-forwarded-for": "not-an-ip",
-        forwarded: "for=also-not-an-ip;proto=https"
-      },
-      remoteAddress: "127.0.0.1"
+      headers: { "x-forwarded-for": "198.51.100.10, unknown", forwarded: "for=198.51.100.88" }, remoteAddress: "127.0.0.1"
     });
-
-    const key = getClientKey(req, { trustProxy: "auto" });
-
-    expect(key).toBe("127.0.0.1");
+    expect(getClientKey(req, { trustProxy: "trusted", trustedProxies: TRUSTED_EDGE })).toBe("127.0.0.1");
   });
 
-  it("trusts forwarded headers when auto and remote address is unique-local IPv6", () => {
-    const req = createRequest({
-      headers: { "x-forwarded-for": "203.0.113.10" },
-      remoteAddress: "fd00::1"
+  it("handles bracketed IPv6, IPv4 ports, IPv6 CIDRs, and IPv4-mapped IPv6 socket addresses", () => {
+    const v4 = createRequest({
+      headers: { "x-forwarded-for": "[2001:db8::1]:443" }, remoteAddress: "::ffff:10.24.1.7"
     });
+    const v6 = createRequest({
+      headers: { "x-forwarded-for": "203.0.113.10:443" }, remoteAddress: "2001:db8:feed::7"
+    });
+    expect(getClientKey(v4, { trustProxy: "trusted", trustedProxies: TRUSTED_EDGE })).toBe("2001:db8::1");
+    expect(getClientKey(v6, { trustProxy: "trusted", trustedProxies: TRUSTED_EDGE })).toBe("203.0.113.10");
+  });
 
-    const key = getClientKey(req, { trustProxy: "auto" });
-
-    expect(key).toBe("203.0.113.10");
+  it("keeps the legacy always mode opt-in and unsafe", () => {
+    const req = createRequest({
+      headers: { "x-forwarded-for": "203.0.113.10" }, remoteAddress: "198.51.100.5"
+    });
+    expect(getClientKey(req, { trustProxy: "always" })).toBe("203.0.113.10");
   });
 });

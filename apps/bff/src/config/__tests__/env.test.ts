@@ -1,3 +1,5 @@
+/** Verifies environment parsing defaults and configuration failures. */
+
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 describe("BFF_ENV", () => {
@@ -71,13 +73,8 @@ describe("BFF_ENV", () => {
   });
 
   it.each([
-    ["auto", "auto"],
     ["always", "always"],
-    ["true", "always"],
-    ["1", "always"],
-    ["never", "never"],
-    ["false", "never"],
-    ["0", "never"]
+    ["never", "never"]
   ] as const)("parses BFF_TRUST_PROXY=%s as %s", async (raw, expected) => {
     process.env.INSTITUTION_ID = "test";
     process.env.BFF_TRUST_PROXY = raw;
@@ -92,6 +89,40 @@ describe("BFF_ENV", () => {
     delete process.env.BFF_TRUST_PROXY;
     const { BFF_ENV } = await import("../env");
     expect(BFF_ENV.trustProxy).toBe("never");
+  });
+
+  it("uses an explicit trusted-proxy allowlist", async () => {
+    process.env.INSTITUTION_ID = "test";
+    process.env.BFF_TRUSTED_PROXIES = "127.0.0.1, 10.24.0.0/16, 2001:db8::/32";
+    const { BFF_ENV } = await import("../env");
+    expect(BFF_ENV.trustProxy).toBe("trusted");
+    expect(BFF_ENV.trustedProxies).toEqual(["127.0.0.1", "10.24.0.0/16", "2001:db8::/32"]);
+  });
+
+  it("lets explicit BFF_TRUST_PROXY=never override a trusted-proxy allowlist", async () => {
+    process.env.INSTITUTION_ID = "test";
+    process.env.BFF_TRUST_PROXY = "never";
+    process.env.BFF_TRUSTED_PROXIES = "127.0.0.1";
+    const { BFF_ENV } = await import("../env");
+    expect(BFF_ENV.trustProxy).toBe("never");
+  });
+
+  it("rejects retired auto proxy trust", async () => {
+    process.env.INSTITUTION_ID = "test";
+    process.env.BFF_TRUST_PROXY = "auto";
+    await expect(import("../env")).rejects.toThrow("Invalid BFF_TRUST_PROXY");
+  });
+
+  it("rejects legacy boolean proxy trust values", async () => {
+    process.env.INSTITUTION_ID = "test";
+    process.env.BFF_TRUST_PROXY = "true";
+    await expect(import("../env")).rejects.toThrow("Invalid BFF_TRUST_PROXY");
+  });
+
+  it("rejects invalid trusted proxy ranges", async () => {
+    process.env.INSTITUTION_ID = "test";
+    process.env.BFF_TRUSTED_PROXIES = "10.0.0.0/33";
+    await expect(import("../env")).rejects.toThrow("Invalid BFF_TRUSTED_PROXIES entry");
   });
 
   it("defaults cache TTL to 300s", async () => {

@@ -1,6 +1,9 @@
+/** Sends JSON responses with a route-selected cache policy. */
+
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createHash } from "node:crypto";
 
+/** Serializes JSON and attaches the route-selected cache lifetime. */
 export function sendJsonWithCache(
   req: IncomingMessage,
   res: ServerResponse,

@@ -1,35 +1,111 @@
 # Frontend conventions
 
-The mobile app and responsive web export implement “The Campus Desk,” the product and visual contract in [`PRODUCT.md`](../PRODUCT.md) and [`DESIGN.md`](../DESIGN.md).
+The Expo application implements the product scope in
+[`PRODUCT.md`](../PRODUCT.md) and the token and component rules in
+[`DESIGN.md`](../DESIGN.md).
 
-## Architecture
+## Routes and data
 
-- Expo Router owns Today, Events, Rooms, Settings, and public detail routes.
-- `src/ui/theme.ts` is the only runtime token source. Do not add Tailwind, NativeWind, decorative theme layers, custom fonts, or per-screen colors.
-- Institution identity comes from `INSTITUTION_ID` at build time and the selected public pack. Preview and production builds must set it explicitly.
-- Data loaders return the payload with `source`, `updatedAt`, and `cacheAge`. Screens show saved/degraded status for the resource being rendered; connection state remains global.
-- The BFF may omit `X-Institution-Id` for compatibility. When present, it must match the app build or the client renders a configuration error.
-- Authentication and private schedules are downstream extension seams. Public routes must not present demo sign-in or private-connector copy.
+Expo Router owns Today, Events, Rooms, Settings, and the event, room, and
+schedule detail routes under `apps/mobile/app/`.
+
+Resource hooks call the BFF through `src/data/publicApi.ts`. The shared loader
+aborts superseded requests, preserves existing rows while refreshing, and
+returns loading, error, refresh, and freshness state. Persisted public data can
+be used during offline or degraded operation.
+
+The client requires `EXPO_PUBLIC_BFF_BASE_URL`. It validates BFF responses with
+the schemas in `@concourse/shared`. When a response includes
+`x-institution-id`, that ID must match the mobile build.
+
+## Theme and layout
+
+- `src/ui/designPresets.ts` owns institution preset palettes and metrics.
+- `src/ui/theme.ts` owns shared typography, spacing, and semantic colors.
+- `ThemeProvider` resolves system, light, dark, and high-contrast appearance.
+- The selected institution pack supplies the default locale, preset, and accent.
+- High-contrast mode ignores institution palette overrides.
+
+Under 900 pixels, routes use one content column and horizontally scrollable top
+navigation. At 900 pixels and above, identity and navigation share one row and
+Today uses two columns. Tab routes use up to 1400 pixels and detail content uses
+up to 1280 pixels.
+
+Do not add a second styling system, remote fonts, or per-screen theme tokens.
+Build routes from the shared components in `src/ui/` and `src/components/`.
+
+## State presentation
+
+Each public resource distinguishes:
+
+- initial loading
+- current data
+- cached or offline data
+- partial or degraded data
+- empty data
+- configuration and request errors
+
+Keep stale or selected records visible during refresh when possible. Source
+status and recovery actions must describe the resource currently on screen.
+Do not display raw server errors.
 
 ## Accessibility
 
-Target WCAG 2.2 AA on web plus VoiceOver and TalkBack. Interactive targets are at least 44×44 points. Search has a visible label and clear action; appearance and language choices use radio semantics; status changes use live regions. System font scaling remains enabled. High contrast is a fixed black/white/cyan scheme, while light and dark remain independently accessible. Loading placeholders do not animate.
+WCAG 2.2 AA is a target, not a conformance claim.
 
-Before release, manually verify keyboard focus, 200% zoom and text scaling, bold text, reduced motion, VoiceOver, TalkBack, portrait/landscape, and offline/recovery announcements. These checks cannot be inferred from unit tests.
+- Controls use at least 44 by 44 point targets.
+- Search inputs have visible labels and clear actions.
+- Language and appearance choices expose radio semantics.
+- Status changes use live regions.
+- System font scaling remains enabled.
+- Web focus is visible.
+- Loading placeholders do not animate.
+- Interaction does not depend on hover.
 
-## Responsive policy
+The Chromium suite covers keyboard use, 200 percent zoom, serious or critical
+axe findings, reduced motion, localization, high contrast, and the responsive
+workflows represented by the screenshot set. It does not establish support for
+Firefox, Safari, Edge, VoiceOver, TalkBack, native text scaling, or device
+orientation.
 
-- Under 900px: one column and bottom tabs.
-- At 900px and above: left navigation and a two-column Today layout.
-- Lists/details cap at 760px, Settings at 640px, and Today at 1040px.
-- Supported validation widths are 320, 390, 768, 1024, and 1440 pixels.
+## Browser tests
 
-The web support target is the current and previous major Chrome, Edge, Firefox, and Safari. Do not hide controls at browser zoom or depend on hover.
+Run:
 
-## Testing
+```bash
+pnpm test:web
+```
 
-Run `pnpm test:web` for the deterministic Expo web export, keyboard/search/settings journey, 200% zoom check, responsive widths, Material Icons font check, and serious/critical axe rules. It writes the current release screenshots under `docs/screenshots/`. The full `pnpm verify` gate includes this browser suite alongside typecheck, lint, unit tests, build, and BFF E2E.
+Playwright starts the fixture BFF, exports and serves the Expo web application,
+uses a fixed clock and locale where required, and writes the nine screenshots
+listed in [`DESIGN.md`](../DESIGN.md#screenshot-set).
 
-Detox selectors are `tab-today`, `tab-events`, `tab-rooms`, `tab-settings`, `events-search`, `rooms-search`, and the corresponding `*-screen`/`*-list` identifiers. E2E tests must fail when a required selector or assertion is missing; never catch a failed requirement as a passing test.
+The suite covers:
 
-Native development builds, the browser matrix, screen-reader checks, and the manual release matrix remain explicit release gates even when local JavaScript checks pass.
+- Today, Events, Rooms, Settings, and event detail workflows
+- keyboard navigation
+- search and sort behavior
+- appearance and language settings
+- 200 percent browser zoom
+- widths from 320 to 1600 pixels
+- serious or critical axe findings
+- the Material Icons font
+
+The full `pnpm verify` gate requires the exact screenshot filename set before
+and after Playwright. Review regenerated images manually because operating
+systems can render fonts and pixels differently.
+
+## Native checks
+
+Before distributing a signed native artifact, verify on target devices:
+
+- VoiceOver and TalkBack
+- large and bold text
+- reduced motion
+- portrait and landscape orientation
+- offline and recovery announcements
+- navigation and back behavior
+
+Native Detox definitions are under `apps/mobile/e2e/native/`, but CI runs them
+only when generated native projects are checked in. Playwright tests are under
+`apps/mobile/e2e/web/`.

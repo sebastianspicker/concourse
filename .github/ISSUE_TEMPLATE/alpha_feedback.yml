@@ -1,0 +1,62 @@
+# Collects structured, sanitized feedback from source-alpha evaluators.
+name: Alpha feedback
+description: Share structured feedback from evaluating or adopting the public alpha
+title: "[Alpha]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share public or sanitized information only. Never include credentials, student data, private URLs, signing material, or protected connector details.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Exact tag, package version, or commit tested
+      placeholder: 1.2.0-alpha.1
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Evaluation area
+      options:
+        - Concourse workflows
+        - Design kit / institution branding
+        - Accessibility / responsive behavior
+        - Public BFF / connectors
+        - Institution pack setup
+        - Build / deployment
+        - Documentation / developer experience
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal and context
+      description: What were you trying to evaluate or configure?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What worked and what did not?
+      description: Include expected and observed behavior plus sanitized screenshots when useful.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Environment and checks
+      description: OS, Node, pnpm, target platform, institution pack, and commands run
+      placeholder: macOS 15; Node 22.13.0; pnpm 9.0.0; web; example pack; pnpm test:web
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Public repo safety
+      options:
+        - label: I removed secrets, private endpoints, student data, internal URLs, and signing material.
+          required: true
+        - label: I checked the alpha guide, FAQ, and runbook for this topic.
+          required: true

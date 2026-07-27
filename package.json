@@ -1,7 +1,25 @@
 {
-  "name": "campus-app-kit",
+  "name": "concourse-campus-kit",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0-alpha.1",
+  "description": "Expo client and Node BFF for public university campus information.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sebastianspicker/campus-app-kit.git"
+  },
+  "homepage": "https://github.com/sebastianspicker/campus-app-kit#readme",
+  "bugs": {
+    "url": "https://github.com/sebastianspicker/campus-app-kit/issues"
+  },
+  "keywords": [
+    "accessibility",
+    "campus-app",
+    "expo",
+    "react-native",
+    "typescript",
+    "university"
+  ],
   "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=22.13.0"
@@ -9,11 +27,12 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
-    "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
-    "test:e2e": "pnpm --filter @campus/shared build && pnpm --filter @campus/institutions build && pnpm --filter @campus/bff build && node scripts/e2e-bff.mjs",
+    "lint": "eslint playwright.config.ts vitest.config.ts apps/bff/vitest.config.ts apps/mobile/app.config.ts apps/mobile/vitest.config.ts && turbo run lint",
+    "typecheck": "tsc -p tsconfig.tools.json && turbo run typecheck",
+    "test": "turbo run test && node --test scripts/serve-expo-export-port.test.mjs scripts/verify-release-metadata.test.mjs",
+    "test:e2e": "pnpm --filter @concourse/shared build && pnpm --filter @concourse/institutions build && pnpm --filter @concourse/bff build && node scripts/e2e-bff.mjs",
     "test:web": "playwright test",
+    "release:check": "node scripts/verify-release-metadata.mjs",
     "verify": "./scripts/verify-production-ready.sh",
     "setup:dev": "./scripts/setup-dev.sh"
   },
@@ -21,13 +40,14 @@
     "@axe-core/playwright": "4.12.1",
     "@playwright/test": "1.61.1",
     "@types/node": "22.19.7",
-    "@typescript-eslint/eslint-plugin": "8.54.0",
-    "@typescript-eslint/parser": "8.54.0",
+    "@typescript-eslint/eslint-plugin": "8.63.0",
+    "@typescript-eslint/parser": "8.63.0",
+    "@typescript/native": "npm:typescript@7.0.2",
     "eslint": "8.57.1",
     "eslint-plugin-react-hooks": "7.0.1",
     "tsx": "4.21.0",
     "turbo": "2.8.1",
-    "typescript": "5.9.3",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
     "vite": "6.4.2",
     "vitest": "4.1.5"
   },

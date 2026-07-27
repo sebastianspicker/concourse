@@ -1,3 +1,4 @@
+/** Parses HTTP Retry-After values into non-negative retry delays. */
 function parseRetryAfterDate(retryAfter: string): number | undefined {
   const date = new Date(retryAfter);
   if (Number.isNaN(date.getTime())) {
@@ -7,6 +8,7 @@ function parseRetryAfterDate(retryAfter: string): number | undefined {
   return Math.max(0, Math.ceil((date.getTime() - Date.now()) / 1000));
 }
 
+/** Accepts Retry-After seconds or HTTP dates and ignores absent headers. */
 export function parseRetryAfterSeconds(retryAfter: string | null): number | undefined {
   if (!retryAfter) {
     return undefined;

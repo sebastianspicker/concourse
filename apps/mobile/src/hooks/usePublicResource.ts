@@ -1,3 +1,4 @@
+/** Owns abortable fetch state and guards against late responses after refresh or unmount. */
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import type { ResourceLoadResult } from "../data/publicApiRequest";
 import { toUiError, type UiError } from "../api/uiError";
@@ -13,6 +14,7 @@ export type PublicResource<T> = {
   cacheAge: number | null;
 };
 
+/** Accepts a completion only when its controller still owns the mounted hook instance. */
 function isCurrentRequest(
   mountedRef: RefObject<boolean>,
   controllerRef: RefObject<AbortController | null>,
@@ -21,6 +23,10 @@ function isCurrentRequest(
   return mountedRef.current === true && controllerRef.current === controller;
 }
 
+/**
+ * Manages an abortable public-resource request without letting late responses overwrite
+ * newer navigation or refresh state.
+ */
 export function usePublicResource<T>(
   loader: (options: { force?: boolean; signal?: AbortSignal }) => Promise<ResourceLoadResult<T>>,
   /** Serialized dependency key. When this changes, the hook re-fetches. */
@@ -35,41 +41,52 @@ export function usePublicResource<T>(
   const [cacheAge, setCacheAge] = useState<number | null>(null);
 
   const controllerRef = useRef<AbortController | null>(null);
+  const dataRef = useRef<T | null>(null);
   const mountedRef = useRef<boolean>(false);
   const loaderRef = useRef(loader);
   loaderRef.current = loader;
 
-  const runLoad = useCallback(async (force: boolean) => {
+  /** Aborts the superseded request and returns the controller-bound load promise for this ownership epoch. */
+  const startLoad = useCallback((force: boolean) => {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    try {
-      const result = await loaderRef.current({ force, signal: controller.signal });
-      if (!isCurrentRequest(mountedRef, controllerRef, controller)) return;
-      setData(result.data);
-      setSource(result.source);
-      setUpdatedAt(result.updatedAt);
-      setCacheAge(result.cacheAge);
-      setError(null);
-    } catch (err: unknown) {
-      if (!isCurrentRequest(mountedRef, controllerRef, controller)) return;
-      const uiError = toUiError(err);
-      if (uiError !== null) setError(uiError);
-    }
+    const promise = (async () => {
+      try {
+        const result = await loaderRef.current({ force, signal: controller.signal });
+        if (!isCurrentRequest(mountedRef, controllerRef, controller)) return;
+        dataRef.current = result.data;
+        setData(result.data);
+        setSource(result.source);
+        setUpdatedAt(result.updatedAt);
+        setCacheAge(result.cacheAge);
+        setError(null);
+      } catch (err: unknown) {
+        if (!isCurrentRequest(mountedRef, controllerRef, controller)) return;
+        const uiError = toUiError(err);
+        if (uiError !== null) setError(uiError);
+      }
+    })();
+    return { controller, promise };
   }, []);
 
   useEffect(() => {
     mountedRef.current = true;
-    setLoading(true);
+    const hasExistingData = dataRef.current !== null;
+    // Keep fulfilled rows mounted while a search-key change fetches their replacement.
+    setLoading(!hasExistingData);
+    setRefreshing(hasExistingData);
+    setError(null);
 
-    const loadPromise = runLoad(false);
-    // Capture the controller that runLoad just created (set synchronously on its first line)
-    const controller = controllerRef.current;
-    loadPromise
+    const { controller, promise } = startLoad(false);
+    promise
       .catch(() => undefined)
       .finally(() => {
-        if (mountedRef.current && controllerRef.current === controller) setLoading(false);
+        if (mountedRef.current && controllerRef.current === controller) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       });
 
     return () => {
@@ -77,18 +94,19 @@ export function usePublicResource<T>(
       controllerRef.current?.abort();
       controllerRef.current = null;
     };
-    // Re-run when `key` changes (e.g. filter parameters changed)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runLoad, key]);
+  }, [startLoad, key]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
+    // A refresh owns the active request, including one started by the initial load.
+    setLoading(false);
+    const { controller, promise } = startLoad(true);
     try {
-      await runLoad(true);
+      await promise;
     } finally {
-      if (mountedRef.current) setRefreshing(false);
+      if (isCurrentRequest(mountedRef, controllerRef, controller)) setRefreshing(false);
     }
-  }, [runLoad]);
+  }, [startLoad]);
 
   return { data, error, loading, refreshing, refresh, source, updatedAt, cacheAge };
 }

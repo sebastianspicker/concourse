@@ -1,3 +1,4 @@
+/** Verifies BFF origin configuration rejects invalid URLs and memoizes valid deployment settings. */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveBffBaseUrl, _resetBffBaseUrlMemoForTests } from "../bffConfig";
 

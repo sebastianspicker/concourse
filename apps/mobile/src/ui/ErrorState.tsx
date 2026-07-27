@@ -1,4 +1,4 @@
-import React from "react";
+/** Renders recoverable error feedback with optional retry and safe back navigation. */
 import { StyleSheet, View } from "react-native";
 import { useNavigation } from "expo-router";
 import { spacing } from "./theme";
@@ -10,8 +10,15 @@ import {
 } from "./ErrorStateParts";
 import type { UiError } from "../api/uiError";
 import { useLocale } from "../i18n/LocaleContext";
+import {
+  getErrorMessage,
+  getErrorTitleKey,
+  getErrorType,
+  type ErrorType,
+} from "./errorStatePresentation";
 
-export type ErrorType = "network" | "notFound" | "generic";
+export { getErrorType } from "./errorStatePresentation";
+export type { ErrorType } from "./errorStatePresentation";
 
 export type ErrorStateProps = {
   message?: string;
@@ -31,19 +38,23 @@ const styles = StyleSheet.create({
   },
 });
 
+/** Renders an actionable, accessible failure surface with navigation-aware retry and back behavior. */
 export function ErrorState({
   message,
   error,
-  errorType = "generic",
+  errorType,
   onRetry, 
   onGoBack,
   showGoBack = false 
 }: ErrorStateProps): JSX.Element {
   const navigation = useNavigation();
   const { t } = useLocale();
-  const titleKey = errorType === "network" ? "errorTitleNetwork" : errorType === "notFound" ? "errorTitleNotFound" : "errorTitleGeneric";
+  const resolvedErrorType = getErrorType(error, errorType);
+  const titleKey = getErrorTitleKey(resolvedErrorType);
+  const resolvedMessage = getErrorMessage(error, message, t);
   const showGoBackAction = showGoBack || navigation.canGoBack();
 
+/** Uses the supplied navigation callback first, then falls back to router history when possible. */
   const handleGoBack = () => {
     if (onGoBack) {
       onGoBack();
@@ -53,10 +64,14 @@ export function ErrorState({
   };
 
   return (
-    <View style={styles.container}>
-      <ErrorStateIcon errorType={errorType} />
+    <View
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
+      style={styles.container}
+    >
+      <ErrorStateIcon errorType={resolvedErrorType} />
       <ErrorStateTitle title={t(titleKey)} />
-      <ErrorStateMessage message={error ? t(error.messageKey) : (message ?? t("errorUnknown"))} />
+      <ErrorStateMessage message={resolvedMessage} />
       <ErrorStateActions
         onRetry={onRetry}
         showGoBackAction={showGoBackAction}

@@ -1,3 +1,5 @@
+/** Exercises BFF server lifecycle behavior against a real ephemeral listener. */
+
 import { afterEach, describe, expect, it } from "vitest";
 import http from "node:http";
 import { createRequestListener } from "../server";

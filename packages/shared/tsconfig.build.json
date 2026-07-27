@@ -1,9 +1,10 @@
+// Emits the shared contract package with declarations for downstream workspaces.
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

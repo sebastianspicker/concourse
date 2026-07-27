@@ -1,9 +1,9 @@
+/** Reads theme context and fails loudly when a consumer is outside its provider. */
 import { useContext } from "react";
-import { useColorScheme } from "react-native";
-import { ColorScheme, getThemeColors, getThemeUi, type ThemeColors, type ThemeUi } from "./theme";
 import { ThemeContext } from "./themeContextValue";
-import { DEFAULT_COLOR_SCHEME, type Theme, type ThemePreference } from "./themeTypes";
+import { type Theme, type ThemePreference } from "./themeTypes";
 
+/** Returns the resolved theme and rejects use outside ThemeProvider. */
 export function useTheme(): Theme {
   const context = useContext(ThemeContext);
   if (!context) {
@@ -12,6 +12,7 @@ export function useTheme(): Theme {
   return context.theme;
 }
 
+/** Returns persisted theme controls and rejects use outside ThemeProvider. */
 export function useThemePreference(): {
   preference: ThemePreference;
   setPreference: (preference: ThemePreference) => Promise<void>;
@@ -25,33 +26,5 @@ export function useThemePreference(): {
     preference: context.preference,
     setPreference: context.setPreference,
     toggleTheme: context.toggleTheme,
-  };
-}
-
-export function useThemeColors(): ThemeColors {
-  const theme = useTheme();
-  return theme.colors;
-}
-
-export function useThemeUi(): ThemeUi {
-  const theme = useTheme();
-  return theme.ui;
-}
-
-export function useIsDarkMode(): boolean {
-  const theme = useTheme();
-  return theme.isDark;
-}
-
-export function useSystemTheme(): Theme {
-  const systemColorScheme = useColorScheme();
-  const colorScheme: ColorScheme =
-    systemColorScheme === "light" ? "light" : DEFAULT_COLOR_SCHEME;
-
-  return {
-    colors: getThemeColors(colorScheme),
-    ui: getThemeUi(colorScheme),
-    isDark: colorScheme !== "light",
-    colorScheme,
   };
 }

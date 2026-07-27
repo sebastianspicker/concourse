@@ -1,63 +1,61 @@
-import React from "react";
+/** Builds timeline-shaped schedule placeholders that preserve screen rhythm while loading. */
 import { StyleSheet, View } from "react-native";
-import { scaled, scaledRadius, spacing } from "./theme";
+import { scaled, spacing } from "./theme";
+import { getDesignPreset } from "./designPresets";
 import { useTheme } from "./ThemeContext";
+import { useLocale } from "../i18n/LocaleContext";
 import { Skeleton } from "./SkeletonPrimitive";
 
 const styles = StyleSheet.create({
-  listContainer: {
-    paddingVertical: spacing.xs,
-  },
-  listItem: {
-    marginBottom: spacing.sm,
-  },
-  scheduleItem: {
-    flexDirection: "row",
-    borderCurve: "continuous",
-  },
+  listContainer: {},
+  scheduleItem: { flexDirection: "row", alignItems: "stretch" },
   scheduleTime: {
-    width: 70,
-    paddingRight: spacing.sm,
+    width: 92,
+    justifyContent: "center",
   },
   timeEnd: {
     marginTop: spacing.xs,
   },
-  scheduleContent: {
-    flex: 1,
-    paddingLeft: spacing.md,
-    gap: spacing.xs,
-  },
+  scheduleContent: { flex: 1, justifyContent: "center", gap: spacing.xs },
   scheduleLocation: {
     marginTop: spacing.xs,
   },
 });
 
-export function SkeletonScheduleItem(): JSX.Element {
+/** Mimics a schedule row’s time rail and text blocks while data is loading. */
+export function SkeletonScheduleItem({ announceLoading = true }: { announceLoading?: boolean }): JSX.Element {
   const theme = useTheme();
+  const { t } = useLocale();
   const ui = theme.ui;
+  const metrics = getDesignPreset(theme.designPreset).metrics;
 
   return (
     <View
+      {...(announceLoading
+        ? {
+            accessibilityLabel: t("loading"),
+            accessibilityRole: "progressbar" as const,
+            accessibilityState: { busy: true },
+          }
+        : {
+            accessible: false,
+            accessibilityElementsHidden: true,
+            importantForAccessibility: "no-hide-descendants" as const,
+          })}
       style={[
         styles.scheduleItem,
         {
           backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.border,
-          borderWidth: ui.borderWidth,
-          borderRadius: scaledRadius(12, ui),
-          padding: scaled(spacing.md, ui),
+          borderBottomColor: theme.colors.border,
+          borderBottomWidth: ui.borderWidth,
+          minHeight: metrics.rowMinHeight,
+          gap: spacing.md,
+          paddingHorizontal: scaled(spacing.md, ui),
+          paddingVertical: scaled(spacing.md, ui),
         },
       ]}
     >
-      <View
-        style={[
-          styles.scheduleTime,
-          {
-            borderRightWidth: ui.borderWidth,
-            borderRightColor: theme.colors.border,
-          },
-        ]}
-      >
+      <View style={styles.scheduleTime}>
         <Skeleton width={50} height={14} borderRadius={4} />
         <Skeleton width={40} height={12} borderRadius={4} style={styles.timeEnd} />
       </View>
@@ -69,12 +67,27 @@ export function SkeletonScheduleItem(): JSX.Element {
   );
 }
 
+/** Repeats inaccessible schedule placeholders to preserve layout during loading. */
 export function SkeletonSchedule({ count = 4 }: { count?: number }): JSX.Element {
+  const theme = useTheme();
+  const { t } = useLocale();
   return (
-    <View style={styles.listContainer}>
+    <View
+      accessibilityLabel={t("loading")}
+      accessibilityRole="progressbar"
+      accessibilityState={{ busy: true }}
+      style={[
+        styles.listContainer,
+        {
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
+          borderTopWidth: theme.ui.borderWidth,
+        },
+      ]}
+    >
       {Array.from({ length: count }).map((_, index) => (
-        <View key={index} style={styles.listItem}>
-          <SkeletonScheduleItem />
+        <View key={index} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <SkeletonScheduleItem announceLoading={false} />
         </View>
       ))}
     </View>

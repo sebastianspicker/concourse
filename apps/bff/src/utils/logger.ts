@@ -1,5 +1,8 @@
+/** Writes structured BFF logs with safe metadata handling. */
+
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
+/** Emits structured logs after recursively redacting sensitive context fields. */
 export function log(
   level: LogLevel,
   message: string,
@@ -12,7 +15,6 @@ export function log(
     context: sanitizeContext(context)
   };
 
-  // eslint-disable-next-line no-console
   console.log(JSON.stringify(payload));
 }
 
@@ -32,6 +34,7 @@ function isBlocked(key: string): boolean {
   return BLOCKED_KEYS.has(key.toLowerCase());
 }
 
+/** Filters blocked context keys and recursively sanitizes the remaining log metadata. */
 function sanitizeContext(
   context: Record<string, unknown> | undefined
 ): Record<string, unknown> {
@@ -45,10 +48,11 @@ function sanitizeContext(
   return result;
 }
 
+/** Redacts nested log values while bounding recursion and handling cycles safely. */
 function sanitizeValue(value: unknown, seen = new WeakSet<object>(), depth = 0): unknown {
   if (value === null || typeof value !== "object") return value;
 
-  // Safety limit for deep objects to prevent ReDoS or stack overflow
+  // Bound recursive serialization work and prevent stack overflow.
   if (depth > 10) return "[Depth Limit]";
 
   if (seen.has(value)) {

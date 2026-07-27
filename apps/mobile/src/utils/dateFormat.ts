@@ -1,3 +1,4 @@
+/** Formats event and schedule dates using locale-aware, time-zone-aware display rules. */
 import { getRelativeTimeFormatter, getShortRelativeTimeFormatter } from "./relativeTimeFormatters";
 
 const SECOND_MS = 1000;
@@ -49,6 +50,22 @@ function getRelativeTimeUnit(diffMs: number): { unit: Intl.RelativeTimeFormatUni
   };
 }
 
+type RelativeTimeFormatterFactory = (locale?: string) => Intl.RelativeTimeFormat;
+
+/** Applies the shared relative-time calculation with the requested formatter style. */
+function formatRelativeTimeWith(
+  date: string,
+  locale: string | undefined,
+  formatterFactory: RelativeTimeFormatterFactory,
+): string {
+  const diffMs = new Date(date).getTime() - Date.now();
+  const formatter = formatterFactory(locale);
+  if (Math.abs(diffMs) < MINUTE_MS) return formatter.format(0, "second");
+
+  const { unit, value } = getRelativeTimeUnit(diffMs);
+  return formatter.format(value, unit);
+}
+
 /**
  * Format a date string for event display.
  * Shows locale-specific date and time.
@@ -57,8 +74,8 @@ function getRelativeTimeUnit(diffMs: number): { unit: Intl.RelativeTimeFormatUni
  * @param locale - Optional locale override (e.g., "en", "de", "fr")
  * @returns Formatted date string (e.g., "24.02.2026, 14:30")
  */
-export function formatEventDate(date: string, locale?: string): string {
-  return new Date(date).toLocaleString(locale);
+export function formatEventDate(date: string, locale?: string, timeZone?: string): string {
+  return new Date(date).toLocaleString(locale, timeZone ? { timeZone } : undefined);
 }
 
 /**
@@ -69,10 +86,11 @@ export function formatEventDate(date: string, locale?: string): string {
  * @param locale - Optional locale override (e.g., "en", "de", "fr")
  * @returns Formatted time string (e.g., "14:30")
  */
-export function formatScheduleTime(date: string, locale?: string): string {
+export function formatScheduleTime(date: string, locale?: string, timeZone?: string): string {
   return new Date(date).toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone,
   });
 }
 
@@ -118,19 +136,7 @@ export function formatDateWithWeekday(date: string, locale?: string): string {
  * @returns Relative time string (e.g., "in 2 hours", "yesterday", "now")
  */
 export function formatRelativeTime(date: string, locale?: string): string {
-  const now = new Date();
-  const target = new Date(date);
-  const diffMs = target.getTime() - now.getTime();
-  
-  // Handle "now" case (within 60 seconds)
-  if (Math.abs(diffMs) < 60000) {
-    return "now";
-  }
-  
-  const { unit, value } = getRelativeTimeUnit(diffMs);
-  const formatter = getRelativeTimeFormatter(locale);
-  
-  return formatter.format(value, unit);
+  return formatRelativeTimeWith(date, locale, getRelativeTimeFormatter);
 }
 
 /**
@@ -142,19 +148,7 @@ export function formatRelativeTime(date: string, locale?: string): string {
  * @returns Abbreviated relative time string (e.g., "2h ago", "in 3d")
  */
 export function formatShortRelativeTime(date: string, locale?: string): string {
-  const now = new Date();
-  const target = new Date(date);
-  const diffMs = target.getTime() - now.getTime();
-  
-  // Handle "now" case (within 60 seconds)
-  if (Math.abs(diffMs) < 60000) {
-    return "now";
-  }
-  
-  const { unit, value } = getRelativeTimeUnit(diffMs);
-  const formatter = getShortRelativeTimeFormatter(locale);
-  
-  return formatter.format(value, unit);
+  return formatRelativeTimeWith(date, locale, getShortRelativeTimeFormatter);
 }
 
 /**
@@ -171,6 +165,7 @@ export function formatCampusId(id: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** Compares an ISO date with the configured campus calendar day rather than device-local midnight. */
 export function isToday(date: string): boolean {
   const today = new Date().toISOString().split("T")[0];
   return date.startsWith(today);
@@ -184,9 +179,9 @@ export function isToday(date: string): boolean {
  * @param locale - Optional locale override (e.g., "en", "de", "fr")
  * @returns Formatted range string (e.g., "14:30 - 16:00")
  */
-export function formatTimeRange(start: string, end?: string, locale?: string): string {
-  const startTime = formatScheduleTime(start, locale);
+export function formatTimeRange(start: string, end?: string, locale?: string, timeZone?: string): string {
+  const startTime = formatScheduleTime(start, locale, timeZone);
   if (!end) return startTime;
-  const endTime = formatScheduleTime(end, locale);
+  const endTime = formatScheduleTime(end, locale, timeZone);
   return `${startTime} - ${endTime}`;
 }

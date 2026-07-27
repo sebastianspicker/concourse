@@ -1,3 +1,4 @@
+/** Contains unexpected render failures and offers a themed recovery action. */
 import React, { Component, type ReactNode } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { spacing, typography } from "../ui/theme";
@@ -47,6 +48,7 @@ interface State {
   error: Error | null;
 }
 
+/** Displays the recoverable application fallback after a descendant render failure. */
 function ErrorFallback({
   onReset,
 }: {
@@ -67,7 +69,7 @@ function ErrorFallback({
       <Pressable
         style={({ pressed }) => [
           styles.button,
-          { backgroundColor: theme.colors.accent, borderRadius: 12 },
+          { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent, borderWidth: theme.ui.borderWidth },
           pressed && styles.buttonPressed,
         ]}
         onPress={onReset}
@@ -82,18 +84,21 @@ function ErrorFallback({
   );
 }
 
+/** Captures descendant rendering failures and offers an explicit retry back into the protected subtree. */
 export class ErrorBoundary extends Component<Props, State> {
+  /** Initializes the boundary in its non-failed state before rendering descendants. */
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
+  /** Converts a descendant render failure into state that switches the boundary to its fallback. */
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
+  /** Logs the captured render failure while keeping the fallback visible to the user. */
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    // eslint-disable-next-line no-console
     console.error("react_error_boundary_caught", {
       message: error.message,
       stack: error.stack,
@@ -101,10 +106,12 @@ export class ErrorBoundary extends Component<Props, State> {
     });
   }
 
+  /** Clears captured failure state so the protected subtree can be attempted again. */
   handleReset = (): void => {
     this.setState({ hasError: false, error: null });
   };
 
+  /** Switches between protected descendants and the localized recovery surface. */
   render(): ReactNode {
     if (this.state.hasError) {
       return (

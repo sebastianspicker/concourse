@@ -1,29 +1,10 @@
+# Main source-alpha gate: install, static checks, tests, builds, and browser/service E2E.
 name: ci
 
 on:
   push:
     branches: [main, dev]
-    paths-ignore:
-      - 'AGENTS.md'
-      - 'archive/**'
-      - 'docs/archive/**'
-      - 'node_modules/**'
-      - 'vendor/**'
-      - 'third_party/**'
-      - 'third-party/**'
-      - '3rdparty/**'
-      - 'external/**'
   pull_request:
-    paths-ignore:
-      - 'AGENTS.md'
-      - 'archive/**'
-      - 'docs/archive/**'
-      - 'node_modules/**'
-      - 'vendor/**'
-      - 'third_party/**'
-      - 'third-party/**'
-      - '3rdparty/**'
-      - 'external/**'
 
 permissions:
   contents: read
@@ -73,6 +54,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
       - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
       - run: SKIP_INSTALL=1 ./scripts/verify-production-ready.sh
       - name: Upload test artifacts (if any)
         if: always()
@@ -81,6 +64,7 @@ jobs:
           name: ci-artifacts
           path: |
             test-results/**
+            playwright-report/**
             coverage/**
             junit*.xml
             junit-*.xml

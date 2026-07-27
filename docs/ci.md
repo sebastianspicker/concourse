@@ -1,37 +1,48 @@
 # CI Overview
 
-This repo uses GitHub Actions with a deterministic, least-privilege CI setup focused on fast feedback and stable results.
+This repository uses GitHub Actions for source checks, browser and service
+tests, dependency and secret scanning, CodeQL, and tag publication.
 
 ## Workflows and triggers
 
 - `ci` (push to `main` or `dev`, all PRs)
-  - Runs `./scripts/verify-production-ready.sh` (lint, typecheck, tests, build, Playwright/axe web E2E, BFF E2E, marker check).
+  - Runs the source-candidate gate in `./scripts/verify-production-ready.sh`
+    (release identity, lint, typecheck, tests, build, Playwright/axe web E2E,
+    BFF E2E, marker check).
   - Uploads test artifacts if present (e.g., `coverage/`, `test-results/`).
 - `dependency-review` (PRs only)
-  - Runs `pnpm audit --audit-level=moderate --prod` against the lockfile.
+  - Runs the pinned OSV Scanner reusable workflow against `pnpm-lock.yaml` and fails on known vulnerabilities.
 - `gitleaks` (push to `main` or `dev`, all PRs)
-  - Installs the pinned OSS `gitleaks` CLI and scans with `.gitleaks.toml`.
+  - Downloads the pinned `gitleaks` CLI, verifies it against the release
+    checksum manifest, and scans with `.gitleaks.toml`.
 - `codeql` (push to `main` or `dev`, all PRs, weekly schedule)
   - Static analysis for JavaScript/TypeScript.
 - `e2e` (push to `main` or `dev`, PRs against `main` or `dev` when app, BFF, shared package, or E2E workflow files change; also `workflow_dispatch`)
   - Runs the default BFF process-level E2E suite.
   - Runs Detox native mobile E2E only when generated native iOS or Android projects are checked in.
 - `release` (push tags matching `v*`)
-  - Validates a release build on tag push.
+  - Validates strict tag/package/Expo/changelog identity, runs the source-candidate
+    gate, smoke-tests the Node 22 BFF image on a non-default port, pushes the
+    image, and then creates the GitHub release.
+  - Hyphenated SemVer tags are GitHub prereleases and never move the `latest` image tag.
+  - Publication is not atomic. The workflow summary reports validation, image,
+    and GitHub Release job results separately.
 
-Each workflow has:
-- Minimal `permissions`
-- `concurrency` to cancel stale runs
-- `timeout-minutes` to prevent hanging
-- Caching for `pnpm` and Turbo build metadata
+Workflows declare scoped permissions. The main CI, Gitleaks, CodeQL, and
+dependency-review workflows use `concurrency` to cancel stale runs. The tag
+publication workflow remains separate so an in-progress release is not
+cancelled. Jobs owned directly by this repository declare timeouts; the
+dependency-review job delegates execution to a pinned reusable workflow. The
+main CI workflow caches pnpm and Turbo build metadata.
 
 ## Scripts
 
 | Script | Purpose |
 |--------|---------|
-| `./scripts/verify-production-ready.sh` | Used by CI: lint, typecheck, tests, build, Playwright/axe web E2E, BFF E2E, marker check. |
+| `./scripts/verify-production-ready.sh` | Main CI source-candidate gate: public-tree and screenshot evidence checks, release identity, lint, typecheck, tests, build, Playwright/axe web E2E, BFF E2E, and marker check. |
+| `pnpm release:check -- X.Y.Z[-prerelease]` | Verifies package, Expo, and changelog identity before tagging. |
 | `pnpm test:e2e` | Starts the compiled BFF on a temporary port and verifies critical public HTTP flows. |
-| `./scripts/ci-local.sh` | Local CI equivalent: install + verify-production-ready. |
+| `./scripts/ci-local.sh` | Local equivalent of the main CI job: frozen install plus the source-candidate gate. |
 | `./scripts/build.sh` | Convenience: runs `pnpm build` at repo root. |
 | `./scripts/generate-lockfile.sh` | Regenerates `pnpm-lock.yaml` (e.g. after adding deps). |
 
@@ -39,13 +50,13 @@ Each workflow has:
 
 Primary entry points:
 
-- Full CI equivalent:
+- Main CI job equivalent:
 
 ```bash
 make ci
 ```
 
-- Full CI equivalent (script):
+- Main CI job equivalent (script):
 
 ```bash
 ./scripts/ci-local.sh
@@ -58,11 +69,20 @@ make lint
 make typecheck
 make test
 make build
+make gitleaks
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+`make ci` does not replace the separate Gitleaks, OSV dependency-review,
+CodeQL, Docker publication, cross-browser, or native/manual accessibility
+gates.
+
+`pnpm typecheck` uses the native TypeScript 7 compiler. The separately available
+`tsc6` executable comes from the TypeScript 6 compatibility package used by
+compiler-API consumers; the two packages are intentionally not deduplicated.
 
 ## Secrets and repo settings
 
@@ -72,8 +92,13 @@ Repository settings to keep aligned with this public template:
 
 - Keep GitHub Advanced Security, CodeQL, secret scanning, and Dependabot alerts
   enabled when available for the repository plan.
-- Keep branch protection focused on the public gates: `ci`, `codeql`,
-  `gitleaks`, `dependency-review`, and the default BFF `e2e` workflow.
+- Select required checks from the contexts emitted by a representative pull
+  request, not from workflow filenames. The main CI and Gitleaks workflows run
+  for every pull request. CodeQL and dependency review do the same. Reconfirm
+  emitted contexts after changing workflow names, job names, or path filters.
+- Do not require `E2E Tests / E2E Tests Summary` while its pull-request trigger
+  remains path-filtered: documentation-only changes do not emit that context.
+  The always-on `ci / Verify …` job already runs both browser and BFF E2E gates.
 - Do not add CI secrets for public PR workflows. If a future private-fork job
   needs secrets, run it only on trusted branch pushes or manual dispatch.
 - CODEOWNERS protects CI, security policy, Docker runtime, shared contracts, and
@@ -87,9 +112,6 @@ Repository settings to keep aligned with this public template:
   - Pin tool versions (e.g., `corepack prepare pnpm@9.0.0 --activate`).
   - Use `--frozen-lockfile`/equivalent.
 - Prefer quick PR checks; schedule heavier checks (nightly/weekly) if needed.
-- Keep generated local artifacts out of the public docs surface. Use the ignored
-  `archive/` lane for internal audit/status packets and keep tracked docs
-  focused on current runtime behavior.
 
 ## Optional: run with act
 

@@ -1,3 +1,5 @@
+/** Builds deterministic opaque identifiers for scraped public events. */
+
 import { createHash } from "node:crypto";
 
 type EventIdInput = {

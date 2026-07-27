@@ -1,3 +1,4 @@
+# Runs process-level BFF checks and native Detox suites only when native projects exist.
 name: E2E Tests
 
 on:

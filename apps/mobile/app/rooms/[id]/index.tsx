@@ -1,41 +1,51 @@
+/** Resolves a room route to a detail view and reconciles stale list selection. */
 import { useLocalSearchParams } from "expo-router";
-import React from "react";
+import { useEffect } from "react";
 import { useRooms } from "@/hooks/useRooms";
 import { MetaRow } from "@/ui/MetaRow";
 import { ResourceDetailScreen } from "@/ui/ResourceDetailScreen";
-import { parseRouteItem } from "@/utils/routeItem";
-import { RoomSchema, type Room } from "@campus/shared";
 import { useLocale } from "@/i18n/LocaleContext";
+import { reconcileSelectedDetailRecord, selectDetailRecord, selectedRoomDetails } from "@/data/selectedDetailRecords";
+import { formatCampusId } from "@/utils/dateFormat";
 
+/** Resolves a selected room into a refreshable, reconciled detail surface. */
 export default function RoomDetailScreen(): JSX.Element {
-  const { id, item } = useLocalSearchParams<{ id: string; item?: string }>();
-  const routedRoom = parseRouteItem<Room>(item, RoomSchema);
-  const hasRoutedItem = routedRoom?.id === id;
-  const { data, loading, error, refreshing, refresh } = useRooms();
-  const room = hasRoutedItem ? routedRoom : (data?.rooms.find((entry) => entry.id === id) ?? null);
-  const effectiveLoading = hasRoutedItem ? false : loading;
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const state = useRooms();
+  const collection = state.data?.rooms ?? null;
+  const room = selectDetailRecord(
+    id,
+    collection,
+    state.source,
+    selectedRoomDetails.get(id)
+  );
   const { t } = useLocale();
+
+  useEffect(() => {
+    reconcileSelectedDetailRecord(selectedRoomDetails, id, collection, state.source);
+  }, [collection, id, state.source]);
 
   return (
     <ResourceDetailScreen
-      title={t("rooms")}
-      loading={effectiveLoading}
-      error={error}
+      loading={state.loading}
+      error={state.error}
       item={room ?? null}
       notFoundMessage={t("errorNotFound")}
       cardTitle={room ? room.name : `Room ID: ${id}`}
-      cardSubtitle={room?.campusId}
+      cardSubtitle={room?.campusId ? formatCampusId(room.campusId) : undefined}
       renderMeta={
         room
           ? () => (
               <>
-                <MetaRow label={t("campus")} value={room.campusId} />
+                <MetaRow label={t("campus")} value={formatCampusId(room.campusId)} />
               </>
             )
           : undefined
       }
-      refreshing={refreshing}
-      onRefresh={refresh}
+      cached={state.source === "persisted-cache"}
+      cacheAge={state.cacheAge}
+      refreshing={state.refreshing}
+      onRefresh={state.refresh}
     />
   );
 }

@@ -1,7 +1,9 @@
+// Applies the shared strict settings to all BFF source and test modules.
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist"
+    "outDir": "dist",
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"]
 }

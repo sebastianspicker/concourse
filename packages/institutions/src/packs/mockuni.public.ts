@@ -1,10 +1,12 @@
+/** Deterministic fictional pack used by integration tests and reproducible release evidence. */
 export const mockuniPublicPack = {
   id: "mockuni",
   name: "Technische Universität Musterstadt",
   app: {
     displayName: "TU Musterstadt",
     defaultLocale: "de",
-    accent: "#176B87"
+    designPreset: "precision",
+    accent: "#4067D0"
   },
   type: "university",
   campuses: [
@@ -27,13 +29,13 @@ export const mockuniPublicPack = {
     events: [
       {
         label: "Hochschulveranstaltungen",
-        url: "https://mock.local/events"
+        url: "https://mock.example/events"
       }
     ],
     schedules: [
       {
         label: "Vorlesungsplan",
-        url: "https://mock.local/schedule.ics"
+        url: "https://mock.example/schedule.ics"
       }
     ]
   },

@@ -1,3 +1,6 @@
+/** Implements timeout-aware JSON fetches and defensive fallback parsing of BFF failures. */
+import { raceWithAbort } from "@concourse/shared";
+import { getApiErrorDetails } from "../api/errors";
 import { parseRetryAfterSeconds } from "./retryAfter";
 
 export type BffError = {
@@ -5,11 +8,13 @@ export type BffError = {
   message: string;
 };
 
+/** Preserves non-success HTTP status, BFF code, and optional Retry-After guidance for callers. */
 export class HttpError extends Error {
   readonly status: number;
   readonly code: string;
   readonly retryAfterInSeconds: number | undefined;
 
+  /** Captures the HTTP status, machine-readable code, and optional server retry guidance. */
   constructor(opts: { message: string; status: number; code: string; retryAfterInSeconds?: number }) {
     super(opts.message);
     this.name = "HttpError";
@@ -19,11 +24,21 @@ export class HttpError extends Error {
   }
 }
 
+/** A timeout initiated by this client, distinct from a caller cancellation. */
+export class RequestTimeoutError extends Error {
+  /** Creates the distinct error used when the configured request deadline expires. */
+  constructor() {
+    super("Request timed out");
+    this.name = "RequestTimeoutError";
+  }
+}
+
 export type JsonResponse<T> = {
   data: T;
   headers: Headers;
 };
 
+/** Rejects malformed, non-HTTP, or credential-bearing BFF URLs before a client request starts. */
 function assertClientHttpUrl(url: string): void {
   let parsed: URL;
   try {
@@ -41,6 +56,7 @@ function assertClientHttpUrl(url: string): void {
   }
 }
 
+/** Fetches JSON through the deadline-aware response reader and returns only its payload. */
 export async function fetchJsonWithTimeout<T>(
   url: string,
   init?: RequestInit,
@@ -50,6 +66,7 @@ export async function fetchJsonWithTimeout<T>(
   return response.data;
 }
 
+/** Fetches and validates a JSON response while respecting caller cancellation and a hard timeout. */
 export async function fetchJsonResponseWithTimeout<T>(
   url: string,
   init?: RequestInit,
@@ -58,17 +75,27 @@ export async function fetchJsonResponseWithTimeout<T>(
   assertClientHttpUrl(url);
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   const cleanup = linkAbortSignals(controller, init?.signal);
 
   try {
-    const response = await fetch(url, {
-      ...init,
-      signal: controller.signal
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...init,
+        signal: controller.signal
+      });
+    } catch (error) {
+      if (timedOut) throw new RequestTimeoutError();
+      throw error;
+    }
 
     if (!response.ok) {
-      const bffError = await parseBffError(response);
+      const bffError = await parseBffError(response, controller.signal);
       const message =
         bffError.code === "unknown_error"
           ? `Request failed (${response.status})`
@@ -87,44 +114,43 @@ export async function fetchJsonResponseWithTimeout<T>(
       return { data: {} as T, headers: response.headers };
     }
 
-    const text = await response.text();
+    const text = await abortableResponseRead(response.text(), controller.signal);
     if (!text) {
       return { data: {} as T, headers: response.headers };
     }
-
     return { data: JSON.parse(text) as T, headers: response.headers };
+  } catch (error: unknown) {
+    // Keep the timeout semantic through response-body reads as well as the
+    // initial header fetch. Caller cancellations remain AbortError.
+    if (timedOut) throw new RequestTimeoutError();
+    throw error;
   } finally {
     cleanup();
     clearTimeout(timeoutId);
   }
 }
 
-function isErrorBody(body: unknown): body is { error: Record<string, unknown> } {
-  return (
-    typeof body === "object" &&
-    body !== null &&
-    "error" in body &&
-    typeof (body as Record<string, unknown>).error === "object" &&
-    (body as Record<string, unknown>).error !== null
-  );
+/** Races a response-body read against caller cancellation and cleans up its listener. */
+function abortableResponseRead<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  const createAbortError = () => Object.assign(new Error("Aborted"), { name: "AbortError" });
+  return raceWithAbort(promise, signal, createAbortError);
 }
 
-export async function parseBffError(response: Response): Promise<BffError> {
+/** Safely extracts a BFF error payload, falling back when an error body is malformed. */
+export async function parseBffError(response: Response, signal?: AbortSignal): Promise<BffError> {
   try {
-    const body: unknown = await response.json();
-    if (isErrorBody(body)) {
-      const code = typeof body.error.code === "string" ? body.error.code : "unknown_error";
-      const message =
-        typeof body.error.message === "string" ? body.error.message : "Unknown error";
-      return { code, message };
-    }
-  } catch {
+    const read = response.json();
+    const body: unknown = signal ? await abortableResponseRead(read, signal) : await read;
+    return getApiErrorDetails(body, "Unknown error");
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === "AbortError") throw error;
     // Non-JSON error pages still map to the generic client error below.
   }
 
   return { code: "unknown_error", message: "Unknown error" };
 }
 
+/** Propagates external cancellation into the request controller and returns listener cleanup. */
 function linkAbortSignals(
   controller: AbortController,
   external?: AbortSignal | null

@@ -1,3 +1,5 @@
+/** Applies shared text, date-range, and pagination filters to route data. */
+
 /**
  * Shared filter, search, and pagination helpers for BFF route handlers.
  */
@@ -15,6 +17,19 @@ export function applySearch<T>(
   return items.filter((item) => getText(item).toLowerCase().includes(searchLower));
 }
 
+/** Retains malformed dates while applying one inclusive range bound. */
+function applyDateBound<T>(
+  items: T[],
+  bound: Date,
+  getDate: (item: T) => string,
+  includes: (date: Date, bound: Date) => boolean
+): T[] {
+  return items.filter((item) => {
+    const date = new Date(getDate(item));
+    return Number.isNaN(date.getTime()) || includes(date, bound);
+  });
+}
+
 /**
  * Date range filter. Keeps items whose date is >= fromDate and <= toDate.
  */
@@ -25,20 +40,8 @@ export function applyDateRange<T>(
   getDate: (item: T) => string
 ): T[] {
   let result = items;
-  if (fromDate) {
-    result = result.filter((item) => {
-      const d = new Date(getDate(item));
-      if (isNaN(d.getTime())) return true;
-      return d >= fromDate;
-    });
-  }
-  if (toDate) {
-    result = result.filter((item) => {
-      const d = new Date(getDate(item));
-      if (isNaN(d.getTime())) return true;
-      return d <= toDate;
-    });
-  }
+  if (fromDate) result = applyDateBound(result, fromDate, getDate, (date, bound) => date >= bound);
+  if (toDate) result = applyDateBound(result, toDate, getDate, (date, bound) => date <= bound);
   return result;
 }
 

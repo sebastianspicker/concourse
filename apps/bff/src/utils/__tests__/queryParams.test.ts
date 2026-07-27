@@ -1,3 +1,5 @@
+/** Verifies strict query-parameter parsing and validation. */
+
 import { describe, expect, it } from "vitest";
 import type { IncomingMessage } from "node:http";
 import {

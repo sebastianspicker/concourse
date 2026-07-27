@@ -1,28 +1,9 @@
-import { useMemo } from "react";
+/** Exposes filtered room data through the shared offline-aware resource lifecycle. */
 import type { RoomsResponse } from "../api/types";
-import { fetchRooms, type RoomsFilterOptions } from "../data/publicApi";
-import { usePublicResource, type PublicResource } from "./usePublicResource";
+import { fetchRooms, type RoomsQuery } from "../data/publicApi";
+import { useOfflineResource } from "./useOfflineResource";
 
-export function useRooms(options?: RoomsFilterOptions): PublicResource<RoomsResponse> {
-  const filterKey = useMemo(
-    () => JSON.stringify({
-      campus: options?.campus, search: options?.search,
-      limit: options?.limit, offset: options?.offset
-    }),
-    [options?.campus, options?.search, options?.limit, options?.offset]
-  );
-
-  return usePublicResource<RoomsResponse>(
-    (fetchOptions) =>
-      fetchRooms({
-        force: fetchOptions.force,
-        signal: fetchOptions.signal,
-        offlineMode: true,
-        campus: options?.campus,
-        search: options?.search,
-        limit: options?.limit,
-        offset: options?.offset
-      }),
-    filterKey
-  );
+/** Loads filtered rooms through the shared abortable offline-resource lifecycle. */
+export function useRooms(options: RoomsQuery = {}) {
+  return useOfflineResource<RoomsResponse, RoomsQuery>(fetchRooms, options, JSON.stringify(options));
 }

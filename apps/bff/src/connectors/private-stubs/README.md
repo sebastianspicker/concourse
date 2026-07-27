@@ -1,6 +1,12 @@
-# Private stubs
+# Private connector stubs
 
-These modules are **stubs only**: they return empty arrays (or placeholder data) and do not call real backends. They exist so the BFF can compile and route handlers can be wired.
+These modules define inactive extension boundaries. The public BFF does not
+import them and they do not call protected systems.
 
-- **Distinguishing stub from "no data":** Responses are indistinguishable from "no data" (e.g. `[]`). For private implementations, consider returning a tagged shape (e.g. `{ stub: true, data: [] }`) or documenting clearly so callers know the connector is unimplemented.
-- **Production:** Replace stubs with real connectors in your private fork.
+ASIMUT and ILIAS stubs return tagged stub results. The StudiService status stub
+is tagged, while its room result is an empty array. A private implementation
+must define an explicit unavailable or unimplemented state instead of relying
+on an empty collection.
+
+Protected connector implementations, credentials, private endpoints, and real
+user data belong in a separately reviewed private codebase.

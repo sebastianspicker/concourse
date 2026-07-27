@@ -1,7 +1,13 @@
+/** Exercises public HfMT event retrieval, parsing, caching, and degradation behavior. */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fetchPublicEvents } from "../hfmtWebEvents";
 import { clearCache } from "../../../utils/cache";
+
+vi.mock("../../../utils/fetch", () => import("../../../__tests__/fetchTextMock").then(
+  ({ fetchTextUsingGlobalMock }) => ({ fetchTextWithTimeout: fetchTextUsingGlobalMock })
+));
 
 const institution = {
   id: "hfmt",
@@ -18,23 +24,21 @@ const institution = {
   }
 };
 
+function fixtureHtml(name: "hfmt-events.html" | "hfmt-events-fallback.html"): string {
+  return readFileSync(new URL(`../../../__fixtures__/${name}`, import.meta.url), "utf8");
+}
+
+function stubSuccessfulFetch(html: string): void {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(html)));
+}
+
 describe("fetchPublicEvents", () => {
   beforeEach(() => {
     clearCache();
     process.env.PUBLIC_EVENTS_MODE = "auto";
     process.env.PUBLIC_EVENTS_DATE = "2020-01-01T00:00:00.000Z";
 
-    const html = readFileSync(
-      new URL("../../../__fixtures__/hfmt-events.html", import.meta.url),
-      "utf8"
-    );
-
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: () => null },
-      body: null,
-      text: async () => html
-    }));
+    stubSuccessfulFetch(fixtureHtml("hfmt-events.html"));
   });
 
   afterEach(() => {
@@ -54,17 +58,7 @@ describe("fetchPublicEvents", () => {
   });
 
   it("falls back to tile attributes and anchor parsing", async () => {
-    const html = readFileSync(
-      new URL("../../../__fixtures__/hfmt-events-fallback.html", import.meta.url),
-      "utf8"
-    );
-
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: () => null },
-      body: null,
-      text: async () => html
-    }));
+    stubSuccessfulFetch(fixtureHtml("hfmt-events-fallback.html"));
 
     const { events } = await fetchPublicEvents(institution);
     expect(events.length).toBeGreaterThan(0);
@@ -88,10 +82,7 @@ describe("fetchPublicEvents", () => {
       ok: true,
       headers: { get: () => null },
       body: null,
-      text: async () => readFileSync(
-        new URL("../../../__fixtures__/hfmt-events.html", import.meta.url),
-        "utf8"
-      )
+      text: async () => fixtureHtml("hfmt-events.html")
     }));
 
     const degraded = await fetchPublicEvents(institution);

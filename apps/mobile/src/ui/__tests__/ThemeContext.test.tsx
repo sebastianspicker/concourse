@@ -1,3 +1,4 @@
+/** Verifies theme preference hydration, context updates, and provider safeguards. */
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -41,6 +42,25 @@ describe("ThemeProvider", () => {
     const tree = await render();
     expect(tree.root.findByProps({ "data-testid": "preference" }).props.children).toBe("system");
     expect(tree.root.findByProps({ "data-testid": "scheme" }).props.children).toBe("light");
+  });
+
+  it("follows the system dark appearance", async () => {
+    useColorScheme.mockReturnValue("dark");
+    const tree = await render();
+    expect(tree.root.findByProps({ "data-testid": "scheme" }).props.children).toBe("dark");
+  });
+
+  it("renders the system dark appearance while saved preferences are still loading", async () => {
+    /** Releases the deferred preference read so the test can observe post-hydration state. */
+    let resolvePreference: (value: string | null) => void = () => undefined;
+    getItem.mockReturnValue(new Promise((resolve) => { resolvePreference = resolve; }));
+    useColorScheme.mockReturnValue("dark");
+    let tree!: TestRenderer.ReactTestRenderer;
+
+    act(() => { tree = TestRenderer.create(<ThemeProvider><Probe /></ThemeProvider>); });
+    expect(tree.root.findByProps({ "data-testid": "scheme" }).props.children).toBe("dark");
+
+    await act(async () => { resolvePreference(null); await Promise.resolve(); });
   });
 
   it("loads the persisted high-contrast preference", async () => {

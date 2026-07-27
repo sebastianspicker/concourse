@@ -1,4 +1,4 @@
-import React from "react";
+/** Renders offline and cached-data notices with localized freshness context. */
 import { StyleSheet, Text, View } from "react-native";
 import { spacing, typography } from "../ui/theme";
 import { useTheme } from "../ui/ThemeContext";
@@ -7,14 +7,15 @@ import { useLocale } from "../i18n/LocaleContext";
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
     alignItems: "center",
     justifyContent: "center",
   },
   text: {
     ...typography.caption,
-    fontWeight: "600",
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
   subtext: {
     ...typography.small,
@@ -22,6 +23,7 @@ const styles = StyleSheet.create({
   },
 });
 
+/** Announces loss of connectivity with a localized, screen-reader-visible status message. */
 export function OfflineBanner({
   topPadding,
   hasOfflineData,
@@ -51,6 +53,7 @@ export function OfflineBanner({
   );
 }
 
+/** Explains that displayed content came from saved data instead of a live request. */
 export function CachedDataBanner({
   topPadding,
   cacheAge,
@@ -59,7 +62,8 @@ export function CachedDataBanner({
   cacheAge: number | null;
 }): JSX.Element {
   const theme = useTheme();
-  const ageText = cacheAge ? formatCacheAge(cacheAge) : "";
+  const { locale, t } = useLocale();
+  const ageText = cacheAge ? formatCacheAge(cacheAge, locale) : "";
 
   return (
     <View
@@ -69,7 +73,7 @@ export function CachedDataBanner({
       ]}
     >
       <Text style={[styles.text, { color: theme.colors.warning }]}>
-        Offline data{ageText ? ` (${ageText})` : ""}
+        {ageText ? t("cachedDataAge", { age: ageText }) : t("cachedData")}
       </Text>
     </View>
   );

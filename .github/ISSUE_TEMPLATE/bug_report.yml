@@ -1,3 +1,4 @@
+# Captures reproducible public-template defects without soliciting private campus data.
 name: Bug report
 description: Report something that’s broken or misleading in the template
 labels: ["bug"]
@@ -35,11 +36,26 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Logs / screenshots
-      description: Paste relevant logs or screenshots. Redact secrets, tokens, private URLs, student data, and internal institution details.
+      label: Sanitized logs
+      description: Paste only the relevant log excerpt. Redact secrets, tokens, private URLs, student data, and internal institution details.
       render: shell
     validations:
       required: false
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Attach sanitized screenshots when they clarify the visible problem.
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Exact tag, package version, or commit tested
+      placeholder: 1.2.0-alpha.1
+    validations:
+      required: true
   - type: dropdown
     id: area
     attributes:

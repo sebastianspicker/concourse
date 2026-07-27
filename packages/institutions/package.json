@@ -1,7 +1,7 @@
 {
-  "name": "@campus/institutions",
+  "name": "@concourse/institutions",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0-alpha.1",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
   "exports": {
@@ -17,6 +17,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@campus/shared": "workspace:*"
+    "@concourse/shared": "workspace:*"
   }
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/** Runs process-level HTTP checks against the compiled BFF using deterministic public fixtures. */
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import http from "node:http";
@@ -11,12 +12,14 @@ const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const serverEntry = join(repoRoot, "apps/bff/dist/server.js");
 const startupTimeoutMs = 10_000;
 
+/** Throws a concise contract failure without introducing a test-framework dependency. */
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
 }
 
+/** Reserves an ephemeral loopback port before spawning the separate BFF process. */
 async function reservePort() {
   const server = http.createServer();
   await new Promise((resolve, reject) => {
@@ -31,6 +34,7 @@ async function reservePort() {
   return address.port;
 }
 
+/** Reads one loopback response while preserving headers for contract assertions. */
 function readLoopbackResponse(port, path) {
   return new Promise((resolve, reject) => {
     const request = http.get({ hostname: "127.0.0.1", port, path }, (response) => {
@@ -43,6 +47,7 @@ function readLoopbackResponse(port, path) {
   });
 }
 
+/** Parses a response body and includes the request path in malformed-JSON failures. */
 function parseJsonBody(text, path) {
   let body;
   try {
@@ -53,6 +58,7 @@ function parseJsonBody(text, path) {
   return body;
 }
 
+/** Adapts Node's response shape to the small subset used by these checks. */
 function toResponse(incoming) {
   return {
     status: incoming.statusCode ?? 0,
@@ -65,12 +71,14 @@ function toResponse(incoming) {
   };
 }
 
+/** Requests a relative BFF path and returns both normalized response metadata and JSON. */
 async function requestJson(port, path) {
   assert(path.startsWith("/") && !path.includes("://"), `Invalid E2E request path: ${path}`);
   const { incoming, text } = await readLoopbackResponse(port, path);
   return { response: toResponse(incoming), body: parseJsonBody(text, path) };
 }
 
+/** Polls health until startup succeeds, the child exits, or the bounded deadline expires. */
 async function waitForHealth(port, child, logBuffer) {
   const deadline = Date.now() + startupTimeoutMs;
   while (Date.now() < deadline) {
@@ -90,6 +98,7 @@ async function waitForHealth(port, child, logBuffer) {
   throw new Error(`BFF did not become healthy within ${startupTimeoutMs}ms:\n${logBuffer()}`);
 }
 
+/** Stops the child gracefully and escalates only when it ignores SIGTERM. */
 async function stopServer(child) {
   if (child.exitCode !== null || child.signalCode !== null) {
     return;
@@ -105,6 +114,7 @@ async function stopServer(child) {
   }
 }
 
+/** Exercises the public routes that the mobile client depends on before release. */
 async function run() {
   assert(existsSync(serverEntry), "Missing apps/bff/dist/server.js. Run pnpm test:e2e from the repo root.");
 
@@ -125,6 +135,7 @@ async function run() {
     stdio: ["ignore", "pipe", "pipe"]
   });
 
+  /** Retains child output so startup failures include the server-side cause. */
   const appendOutput = (chunk) => {
     childOutput += chunk.toString();
   };

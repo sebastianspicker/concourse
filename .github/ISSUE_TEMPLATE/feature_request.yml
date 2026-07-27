@@ -1,3 +1,4 @@
+# Collects public-safe proposals while preserving the private-fork boundary.
 name: Feature request
 description: Suggest an improvement to the public template
 labels: ["enhancement"]
@@ -35,9 +36,9 @@ body:
     validations:
       required: true
   - type: checkboxes
-    id: boundaries
+    id: public-safety
     attributes:
-      label: Public/private boundary
+      label: Public repo safety
       options:
-        - label: This request does not require secrets, protected institution systems, private endpoints, or real SSO in the public repo.
+        - label: I removed secrets, private endpoints, student data, internal identifiers, and protected implementation details; private-fork needs are described only at a public abstraction boundary.
           required: true

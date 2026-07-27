@@ -1,3 +1,4 @@
+/** Declares Expo environment typings used by the mobile build and test environment. */
 import type { JSX as ReactJsx } from "react";
 
 declare global {
@@ -5,14 +6,13 @@ declare global {
     type Element = ReactJsx.Element;
   }
 
-  const process: {
-    env: {
+  namespace NodeJS {
+    interface ProcessEnv {
       EXPO_OS?: string;
       EXPO_PUBLIC_BFF_BASE_URL?: string;
       NODE_ENV?: string;
-      [key: string]: string | undefined;
-    };
-  };
+    }
+  }
 }
 
 export {};

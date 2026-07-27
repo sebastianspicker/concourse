@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Concourse signal board">
+  <rect x="224" y="250" width="288" height="230" fill="#4067D0"/>
+  <rect x="512" y="250" width="288" height="230" fill="#071326"/>
+  <rect x="272" y="304" width="176" height="28" fill="#FFFFFF"/>
+  <rect x="560" y="304" width="176" height="28" fill="#FFFFFF"/>
+  <rect x="224" y="558" width="576" height="24" fill="#FFBE0B"/>
+  <circle cx="224" cy="570" r="46" fill="#FFBE0B"/>
+  <circle cx="224" cy="570" r="22" fill="#FFFFFF"/>
+  <rect x="272" y="677" width="480" height="22" fill="#4067D0"/>
+  <rect x="272" y="759" width="480" height="22" fill="#4067D0"/>
+  <rect x="409" y="650" width="14" height="158" fill="#4067D0"/>
+</svg>

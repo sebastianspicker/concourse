@@ -1,10 +1,12 @@
+/** Resolves and memoizes the BFF base URL with development-safe fallback behavior. */
 let memoizedBffBaseUrl: string | null = null;
 
-/** @internal — resets memoized URL for test isolation */
+/** @internal Resets the memoized URL for test isolation. */
 export function _resetBffBaseUrlMemoForTests(): void {
   memoizedBffBaseUrl = null;
 }
 
+/** Reads and memoizes the configured BFF origin, failing before requests can use an empty URL. */
 export function resolveBffBaseUrl(): string {
   if (memoizedBffBaseUrl) return memoizedBffBaseUrl;
 
@@ -24,6 +26,7 @@ export function resolveBffBaseUrl(): string {
   return result;
 }
 
+/** Trims trailing slashes and rejects invalid or non-HTTP BFF origins. */
 function normalizeBaseUrl(input: string): string {
   const trimmed = input.trim().replace(/\/+$/, "");
   let url: URL;

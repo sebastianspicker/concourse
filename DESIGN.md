@@ -1,44 +1,96 @@
-# The Campus Desk Design System
+# Design reference
 
-## Direction
+The mobile and responsive web application use one shared token and component
+system. Runtime screenshots under [`docs/screenshots/`](docs/screenshots/) are
+the current visual evidence. The concept files under
+[`docs/mockups/concourse-quiet-chronograph/`](docs/mockups/concourse-quiet-chronograph/)
+are design references, not runtime captures.
 
-Campus App Kit uses a restrained, tonal-flat product interface. Content and current data state lead; institution identity appears through a single validated accent and product name. System typography, compact rows, dividers, and familiar controls keep the interface native and legible.
+## Token ownership
 
-## Color
+| Source | Responsibility |
+|---|---|
+| `packages/shared/src/domain/public.ts` | Allowed preset names and institution accent validation |
+| `apps/mobile/src/ui/designPresets.ts` | Preset palettes and layout metrics |
+| `apps/mobile/src/ui/theme.ts` | Shared typography, spacing, and semantic colors |
+| `apps/mobile/src/ui/ThemeProvider.tsx` | Appearance, preset, and institution accent resolution |
 
-| Role | Light | Dark |
+Screens should consume `useTheme()` and shared primitives. Do not duplicate
+preset metrics or create a screen-specific color system.
+
+## Institution presets
+
+| Preset | Bundled example | Purpose |
 |---|---|---|
-| Background | `#F5F7F8` | `#101417` |
-| Surface | `#FFFFFF` | `#171D21` |
-| Text | `#17202A` | `#F5F7F8` |
-| Muted | `#5C6873` | `#AEB8C0` |
-| Divider | `#D7DEE3` | `#3A444B` |
-| Control border | `#7A8791` | `#87949D` |
-| Default accent | `#176B87` | `#176B87` |
-| On accent | `#FFFFFF` | `#FFFFFF` |
+| `wayfinding` | `example` | Default density and geometry |
+| `atelier` | `hfmt` | Taller row rhythm |
+| `precision` | `mockuni` | Denser row rhythm |
 
-Brand accents must meet 3:1 against both standard canvases and 4.5:1 against their derived black or white foreground. Error, warning, success, and information use dedicated foreground/surface pairs; brand color never communicates error state. High contrast uses fixed black/white surfaces and cyan `#00D7FF` without institution overrides.
+Omitting `app.designPreset` selects `wayfinding`. Presets can change neutral
+colors, density, radii, and navigation width. They do not change route
+structure, control meaning, or semantic status colors. High-contrast mode uses
+its own fixed palette.
 
-## Typography
-
-Use the platform system font with scaling enabled. Screen titles are 24/30, section titles 18/24, body 16/24, labels and metadata 14/20, and supporting text 12/16. Use weight and spacing for hierarchy; do not use negative tracking, display fonts, or uppercase section eyebrows.
-
-## Spacing and Shape
-
-Use the 4, 8, 12, 16, 24, and 32 spacing scale. Radii are 4, 8, and 12 only. Controls have a minimum 44×44-point target. Surfaces are separated by tone and dividers. Shadows are reserved for temporary overlays.
+An institution accent must be a six-digit hex color, reach a 3:1 contrast ratio
+against every supported preset canvas, and support either black or white text
+at 4.5:1. Shared-schema validation rejects invalid values.
 
 ## Layout
 
-Below 900px, use bottom tabs and a one-column layout. At 900px and above, use an accessible left navigation rail; Today may use two columns. Lists and details cap at 760px, Settings at 640px, and Today at 1040px. Layouts must remain usable from 320px through 1440px and at 200% zoom without horizontal clipping.
+- Below 900 pixels, routes use one column and the top navigation can scroll.
+- At 900 pixels and above, identity and navigation share a row and Today uses
+  two content columns.
+- Tab routes use up to 1400 pixels. Detail content uses up to 1280 pixels.
+- Browser tests exercise widths from 320 to 1600 pixels, depending on the workflow.
+- Layouts must remain operable at 200 percent browser zoom.
 
 ## Components
 
-Standard shared primitives are `Screen`/`AppFrame`, `SectionHeader`, `SearchField`, `ResourceList`/`ResourceRow`, `StatusBanner`, `EmptyState`, `ErrorState`, `DetailLayout`, and `SettingsGroup`/`ChoiceRow`. Workflow composition stays local. Lists use virtualized flat rows rather than card grids. Loading skeletons are static and safe under reduced motion.
+Use existing primitives before introducing a new one:
 
-## Interaction and Motion
+- `Screen`
+- `Section`
+- `SearchBar`
+- `ResourceList` and `ResourceListItem`
+- `ResourceDetailScreen`
+- `StatusBanner`
+- `EmptyState` and `ErrorState`
+- `SettingsGroup` and `ChoiceRow`
+- skeleton and freshness components
 
-Use native navigation and visible back controls. Preserve tab, search, and sort state when opening details. Motion communicates state only and lasts no more than 150ms; there are no page, card, or row entrance sequences. Every interactive component has visible focus and accessible role, name, value/state, disabled, loading, and error behavior where applicable.
+Today places the campus clock and current state before its schedule and event
+lists. Events and Rooms provide labeled search and sortable lists. Detail
+routes preserve the selected record while data refreshes. Settings use radio
+semantics for appearance and language.
 
-## Content
+## Interaction and accessibility
 
-Use concise, localized English/German copy. State what happened, its effect, and the recovery action. Show resource-specific freshness and cached age. Never expose stack traces, raw endpoint errors, private connector language, or demo-authentication claims.
+- Shared controls define a minimum 44 by 44 point target.
+- Web controls require a visible focus treatment.
+- Appearance and language options expose radio semantics.
+- Status changes use live regions.
+- Loading placeholders are static.
+- Press feedback is brief and respects reduced-motion preferences.
+- State is never encoded by color alone.
+
+Automated Chromium tests cover the primary keyboard workflow, zoom, responsive
+layouts, reduced motion, serious or critical axe findings, localization, and
+high contrast. Before native distribution, test VoiceOver, TalkBack, text
+scaling, bold text, orientation, and offline recovery on the signed artifact.
+
+## Screenshot set
+
+`pnpm test:web` writes exactly these files:
+
+- `docs/screenshots/concourse-today-1600-light.png`
+- `docs/screenshots/concourse-today-390-light.png`
+- `docs/screenshots/concourse-events-1440-light.png`
+- `docs/screenshots/concourse-event-detail-1440-light.png`
+- `docs/screenshots/concourse-event-detail-390-light.png`
+- `docs/screenshots/concourse-rooms-1440-light.png`
+- `docs/screenshots/concourse-rooms-320-light.png`
+- `docs/screenshots/concourse-settings-1440-light.png`
+- `docs/screenshots/concourse-settings-768-high-contrast-de.png`
+
+Review the images after regeneration. Rendering can differ by operating system,
+and the tests do not perform pixel-diff approval.

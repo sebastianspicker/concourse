@@ -1,35 +1,21 @@
+/** Fetches, parses, caches, and degrades gracefully for public schedule sources. */
+
 import type { InstitutionPack } from "../../config/loader";
 import { getCached } from "../../utils/cache";
-import { createCircuitBreaker, type CircuitBreaker } from "../../utils/circuitBreaker";
 import { fetchTextWithTimeout } from "../../utils/fetch";
 import { log } from "../../utils/logger";
-import type { ScheduleItem } from "@campus/shared";
+import type { ScheduleItem } from "@concourse/shared";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { parseIcs, type ParsedIcsEvent } from "./icsParser";
+import { getPublicSourceBreaker } from "./publicSourceBreaker";
 
 import { BFF_ENV } from "../../config/env";
 
 export type FetchPublicScheduleResult = { schedule: ScheduleItem[]; degraded: boolean };
 
-const scheduleBreakers = new Map<string, CircuitBreaker>();
-
-function getScheduleBreaker(sourceUrl: string): CircuitBreaker {
-  const existing = scheduleBreakers.get(sourceUrl);
-  if (existing) {
-    return existing;
-  }
-
-  const breaker = createCircuitBreaker({
-    name: `public-schedule:${sourceUrl}`,
-    failureThreshold: 5,
-    cooldownMs: 30_000,
-  });
-  scheduleBreakers.set(sourceUrl, breaker);
-  return breaker;
-}
-
+/** Finds a fixture from either supported test working directory before reading it. */
 async function resolveFixturePath(filename: string): Promise<string> {
   // Tests may run from apps/bff or from the monorepo root.
   const candidates = [
@@ -60,6 +46,7 @@ function toScheduleItem(p: ParsedIcsEvent): ScheduleItem {
   };
 }
 
+/** Fetches configured ICS sources independently and returns partial data when one fails. */
 export async function fetchPublicSchedule(
   institution: InstitutionPack
 ): Promise<FetchPublicScheduleResult> {
@@ -70,7 +57,7 @@ export async function fetchPublicSchedule(
 
   return getCached(
     cacheKey,
-    async () => {
+    async (signal) => {
       // Mock mode is fixture-backed so schedule tests and demos do not depend
       // on external ICS availability.
       if (mode === "mock" && institution.id === "mockuni") {
@@ -92,7 +79,7 @@ export async function fetchPublicSchedule(
 
       const settledSources = await Promise.allSettled(
         sources.map(async (source: { url: string }) => {
-          const text = await getScheduleBreaker(source.url).call(() => fetchTextWithTimeout(source.url));
+          const text = await getPublicSourceBreaker("public-schedule", source.url).call(() => fetchTextWithTimeout(source.url, { signal }));
           return parseIcs(text, { rruleHorizonDays: BFF_ENV.rruleExpansionHorizonDays });
         })
       );

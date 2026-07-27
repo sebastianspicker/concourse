@@ -1,3 +1,4 @@
+// Applies shared strict checking to public contracts and their tests.
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {

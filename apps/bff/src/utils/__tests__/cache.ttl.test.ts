@@ -1,7 +1,9 @@
+/** Verifies cache expiry, refresh, and in-flight loading behavior. */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getCached, clearCache, cacheStats, destroyCache } from "../cache";
 
-describe("cache — TTL and eviction", () => {
+describe("cache: TTL and eviction", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     clearCache();
@@ -16,7 +18,7 @@ describe("cache — TTL and eviction", () => {
     const value = await getCached("key1", () => Promise.resolve("val1"), 5000);
     expect(value).toBe("val1");
 
-    // Read again — should be cached
+    // Read again; the value should be cached.
     const loader = vi.fn().mockResolvedValue("val1-fresh");
     const cached = await getCached("key1", loader, 5000);
     expect(cached).toBe("val1");
@@ -38,7 +40,6 @@ describe("cache — TTL and eviction", () => {
     // Fill up the cache: getCached adds entries up to MAX_CACHE_ENTRIES (1000)
     // We insert 1001 entries to trigger eviction
     for (let i = 0; i < 1001; i++) {
-      // eslint-disable-next-line no-await-in-loop
       await getCached(`fill-${i}`, () => Promise.resolve(`v${i}`), 300_000);
     }
 
@@ -110,5 +111,26 @@ describe("cache — TTL and eviction", () => {
     expect(first.value).toBe("first");
     expect(second.value).toBe("second");
     expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a timed-out loader accounted for until its underlying work settles", async () => {
+    let settle!: () => void;
+    const loader = vi.fn((signal: AbortSignal) => new Promise<string>((resolve) => {
+      signal.addEventListener("abort", () => undefined);
+      settle = () => resolve("late");
+    }));
+    const first = getCached("abortable", loader, 5000, { inFlightTimeoutMs: 10 });
+    const rejected = expect(first).rejects.toThrow("Cache loader timeout");
+    await vi.advanceTimersByTimeAsync(10);
+    await rejected;
+    expect(loader.mock.calls[0][0].aborted).toBe(true);
+
+    await expect(getCached("abortable", async () => "must-not-run", 5000)).rejects.toThrow("Cache loader timeout");
+    expect(loader).toHaveBeenCalledTimes(1);
+
+    settle();
+    await Promise.resolve();
+    await Promise.resolve();
+    await expect(getCached("abortable", async () => "retried", 5000)).resolves.toBe("retried");
   });
 });

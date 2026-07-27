@@ -1,3 +1,4 @@
+/** Verifies connectivity updates and offline-entry age are reflected in hook state. */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { act } from "react-test-renderer";
 import type { NetInfoState } from "@react-native-community/netinfo";
@@ -38,10 +39,24 @@ vi.mock("../../data/persistedCache", () => ({
 import { useOfflineCache } from "../useOfflineCache";
 import { getCacheStats } from "../../data/persistedCache";
 
+/** Delivers a mocked NetInfo transition to every subscribed offline-cache listener. */
 function fireNetInfo(isConnected: boolean) {
   for (const listener of mockNetInfoListeners) {
     listener({ isConnected });
   }
+}
+
+async function renderReadyOfflineCache() {
+  const hook = renderHook(() => useOfflineCache());
+  await hook.flush();
+  return hook;
+}
+
+async function setConnection(getResult: () => ReturnType<typeof useOfflineCache>, isConnected: boolean): Promise<void> {
+  await act(async () => {
+    fireNetInfo(isConnected);
+  });
+  expect(getResult().isOffline).toBe(!isConnected);
 }
 
 describe("useOfflineCache", () => {
@@ -62,36 +77,25 @@ describe("useOfflineCache", () => {
   });
 
   it("starts with isOffline=false when connected", async () => {
-    const { getResult, flush } = renderHook(() => useOfflineCache());
-    await flush();
+    const { getResult } = await renderReadyOfflineCache();
     expect(getResult().isOffline).toBe(false);
   });
 
   it("sets isOffline=true when NetInfo reports disconnected", async () => {
-    const { getResult, flush } = renderHook(() => useOfflineCache());
-    await flush();
+    const { getResult } = await renderReadyOfflineCache();
 
-    await act(async () => {
-      fireNetInfo(false);
-    });
-
-    expect(getResult().isOffline).toBe(true);
+    await setConnection(getResult, false);
   });
 
   it("sets isOffline=false again when NetInfo reports reconnected", async () => {
-    const { getResult, flush } = renderHook(() => useOfflineCache());
-    await flush();
+    const { getResult } = await renderReadyOfflineCache();
 
-    await act(async () => { fireNetInfo(false); });
-    expect(getResult().isOffline).toBe(true);
-
-    await act(async () => { fireNetInfo(true); });
-    expect(getResult().isOffline).toBe(false);
+    await setConnection(getResult, false);
+    await setConnection(getResult, true);
   });
 
   it("hasOfflineData=false when no offline keys", async () => {
-    const { getResult, flush } = renderHook(() => useOfflineCache());
-    await flush();
+    const { getResult } = await renderReadyOfflineCache();
     expect(getResult().hasOfflineData).toBe(false);
   });
 
@@ -103,16 +107,14 @@ describe("useOfflineCache", () => {
       offlineKeys: ["events", "rooms"],
     });
 
-    const { getResult, flush } = renderHook(() => useOfflineCache());
-    await flush();
+    const { getResult } = await renderReadyOfflineCache();
 
     expect(getResult().hasOfflineData).toBe(true);
     expect(getResult().cacheAge).toBeGreaterThanOrEqual(0);
   });
 
   it("checkOfflineStatus refreshes hasOfflineData", async () => {
-    const { getResult, flush } = renderHook(() => useOfflineCache());
-    await flush();
+    const { getResult } = await renderReadyOfflineCache();
     expect(getResult().hasOfflineData).toBe(false);
 
     vi.mocked(getCacheStats).mockResolvedValue({

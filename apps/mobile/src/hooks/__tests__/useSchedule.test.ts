@@ -1,11 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook } from "./testUtils";
+/** Verifies schedule loading forwards filters through the shared resource lifecycle. */
+import { describe, expect } from "vitest";
+import { defineResourceSuccessCase } from "./resourceTestCases";
 import { useSchedule } from "../useSchedule";
-import { clearCache } from "../../data/cache";
-import { clearPersistedCache } from "../../data/persistedCache";
-import { _resetBffBaseUrlMemoForTests } from "../../utils/bffConfig";
+import type { ScheduleResponse } from "../../api/types";
 
-const mockSchedule = {
+const mockSchedule: ScheduleResponse = {
   schedule: [
     {
       id: "schedule-1",
@@ -19,33 +18,10 @@ const mockSchedule = {
 };
 
 describe("useSchedule", () => {
-  beforeEach(async () => {
-    process.env.EXPO_PUBLIC_BFF_BASE_URL = "http://localhost:4000";
-    _resetBffBaseUrlMemoForTests();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify(mockSchedule),
-      headers: { get: () => null },
-    }));
-    clearCache();
-    await clearPersistedCache();
-  });
-
-  afterEach(async () => {
-    vi.unstubAllGlobals();
-    delete process.env.EXPO_PUBLIC_BFF_BASE_URL;
-    await clearPersistedCache();
-  });
-
-  it("loads schedule", async () => {
-    const { getResult, flush, unmount } = renderHook(useSchedule);
-
-    expect(getResult().loading).toBe(true);
-    await flush();
-
-    expect(getResult().loading).toBe(false);
-    expect(getResult().data?.schedule.length).toBe(1);
-    unmount();
+  defineResourceSuccessCase({
+    assertLoaded: (data) => expect(data?.schedule.length).toBe(1),
+    body: mockSchedule,
+    hook: useSchedule,
+    testName: "loads schedule",
   });
 });

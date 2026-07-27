@@ -1,21 +1,13 @@
+# Blocks pull requests that introduce known vulnerabilities into the frozen lockfile.
 name: dependency-review
 
 on:
   pull_request:
-    paths-ignore:
-      - 'AGENTS.md'
-      - 'archive/**'
-      - 'docs/archive/**'
-      - 'node_modules/**'
-      - 'vendor/**'
-      - 'third_party/**'
-      - 'third-party/**'
-      - '3rdparty/**'
-      - 'external/**'
 
 permissions:
+  actions: read
   contents: read
-  pull-requests: read
+  security-events: write
 
 concurrency:
   group: dependency-review-${{ github.ref }}
@@ -24,19 +16,8 @@ concurrency:
 jobs:
   review:
     name: Dependency Review
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          persist-credentials: false
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '22.13.0'
-      - name: Enable corepack (pnpm@9.0.0)
-        run: |
-          corepack enable
-          corepack prepare pnpm@9.0.0 --activate
-      - name: Audit production dependencies
-        run: pnpm audit --audit-level=moderate --prod
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+    with:
+      scan-args: --lockfile=pnpm-lock.yaml
+      upload-sarif: false
+      fail-on-vuln: true

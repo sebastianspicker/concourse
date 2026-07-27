@@ -1,3 +1,4 @@
+# Defines the whitespace contract shared by editors and command-line tooling.
 root = true
 
 [*]
@@ -10,4 +11,3 @@ trim_trailing_whitespace = true
 
 [*.md]
 trim_trailing_whitespace = false
-

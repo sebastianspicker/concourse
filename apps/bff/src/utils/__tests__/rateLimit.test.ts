@@ -1,3 +1,5 @@
+/** Verifies fixed-window rate-limit accounting and cleanup. */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   checkRateLimit,
@@ -52,7 +54,7 @@ describe("rateLimit", () => {
   it("retryAfter is at least 1 when blocked near window end", () => {
     checkRateLimit("near-end", { limit: 1, windowMs: 1000 });
 
-    // Advance to 999ms — 1ms before window resets
+    // Advance to 999ms, which is 1ms before the window resets.
     vi.setSystemTime(999);
     const result = checkRateLimit("near-end", { limit: 1, windowMs: 1000 });
 

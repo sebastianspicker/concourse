@@ -1,3 +1,5 @@
+/** Verifies reusable route filtering and pagination helpers. */
+
 import { describe, it, expect } from "vitest";
 import { applySearch, applyDateRange, applyPagination } from "../filterHelpers";
 

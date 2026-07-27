@@ -1,5 +1,6 @@
+/** Audits every bundled institution pack for schema validity and referential integrity. */
 import { describe, expect, it } from "vitest";
-import { InstitutionPackSchema } from "@campus/shared";
+import { InstitutionPackSchema } from "@concourse/shared";
 import { getInstitutionPack } from "../packs";
 import { examplePublicPack } from "../packs/example.public";
 import { hfmtPublicPack } from "../packs/hfmt.public";

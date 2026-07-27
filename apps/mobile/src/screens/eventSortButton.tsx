@@ -1,23 +1,27 @@
-import React from "react";
+/** Provides an accessible sort-direction control for event results. */
 import { Pressable, StyleSheet, Text } from "react-native";
 import type { SortDirection } from "@/screens/eventsScreenHelpers";
-import { scaledRadius, spacing, typography } from "@/ui/theme";
+import { spacing, typography } from "@/ui/theme";
 import { useTheme } from "@/ui/ThemeContext";
+import { useLocale } from "@/i18n/LocaleContext";
 
 const styles = StyleSheet.create({
   sortButton: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+    justifyContent: "center",
   },
   sortText: {
     ...typography.caption,
-    fontWeight: "600",
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
   pressed: {
     opacity: 0.7,
   },
 });
 
+/** Toggles chronological order with an accessible label that describes the next sort action. */
 export function EventSortButton({
   sortDirection,
   onToggleSort
@@ -26,7 +30,8 @@ export function EventSortButton({
   onToggleSort: () => void;
 }): JSX.Element {
   const theme = useTheme();
-  const ui = theme.ui;
+  const { t } = useLocale();
+  const direction = sortDirection === "asc" ? t("sortDescending") : t("sortAscending");
 
   return (
     <Pressable
@@ -35,16 +40,15 @@ export function EventSortButton({
         styles.sortButton,
         {
           borderColor: theme.colors.border,
-          borderWidth: ui.borderWidth,
-          borderRadius: scaledRadius(8, ui),
+          borderWidth: theme.ui.borderWidth,
         },
         pressed && styles.pressed,
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`Sort by date ${sortDirection === "asc" ? "descending" : "ascending"}`}
+      accessibilityLabel={t("sortEventsAccessibility", { direction })}
     >
       <Text style={[styles.sortText, { color: theme.colors.text }]}>
-        {sortDirection === "asc" ? "↑ Oldest" : "↓ Newest"}
+        {sortDirection === "asc" ? t("sortEventsAscending") : t("sortEventsDescending")}
       </Text>
     </Pressable>
   );

@@ -1,42 +1,51 @@
-# Mobile (Campus App Kit)
+# Mobile application
 
-This is the public Expo app for the Campus App Kit.
+`@concourse/mobile` is the Expo Router client for native and responsive web
+targets.
 
-## Local development
+## Run locally
 
-Install from the repo root:
-
-```bash
-pnpm install
-```
-
-Start the app:
+From the repository root:
 
 ```bash
-pnpm --filter @campus/mobile start
+cp apps/mobile/.env.example apps/mobile/.env
+INSTITUTION_ID=hfmt pnpm --filter @concourse/mobile start
 ```
 
-If you use a dev client:
+Set `EXPO_PUBLIC_BFF_BASE_URL` in `apps/mobile/.env` before starting. Run a BFF
+with the same institution ID in a separate terminal.
+
+`start` launches Expo for Expo Go. Use `dev` only when a compatible development
+client is already installed:
 
 ```bash
-pnpm --filter @campus/mobile dev
+INSTITUTION_ID=hfmt pnpm --filter @concourse/mobile dev
 ```
 
-## Configuration
+## Build configuration
 
-This app expects a BFF base URL:
+- Preview builds require `INSTITUTION_ID` and a valid HTTP(S)
+  `EXPO_PUBLIC_BFF_BASE_URL`.
+- Production builds additionally require `MOBILE_BUNDLE_IDENTIFIER` and
+  `MOBILE_ANDROID_PACKAGE`.
+- Production config rejects the template and legacy application identifiers.
+- The repository does not include EAS project linkage, signing credentials, or
+  generated native projects.
 
-- Set `EXPO_PUBLIC_BFF_BASE_URL` in development and production.
-- Set `INSTITUTION_ID` for preview and production builds; local development defaults to the example public pack.
-- For local development, use the BFF URL reachable from your simulator, emulator, or device.
+See [`../../docs/deploy/mobile.md`](../../docs/deploy/mobile.md) for the EAS
+profiles and owner-managed release inputs.
 
-The UI, accessibility, localization, and responsive contracts are documented in [`../../docs/frontend.md`](../../docs/frontend.md).
-
-## Releases (EAS)
-
-From `apps/mobile/`:
+## Tests
 
 ```bash
-pnpm build:preview
-pnpm build:production
+pnpm --filter @concourse/mobile test
+pnpm test:web
 ```
+
+The package tests cover data loading, caching, configuration, screens, shared
+components, themes, localization, and utilities. The root browser command
+exports the web application and runs Chromium workflows, axe checks, responsive
+checks, and screenshot capture.
+
+Browser and native end-to-end tests are documented in
+[`e2e/README.md`](e2e/README.md).

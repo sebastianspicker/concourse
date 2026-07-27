@@ -1,5 +1,7 @@
+/** Defines the cross-layer error vocabulary shared by the BFF and mobile client. */
 import { z } from "zod";
 
+/** Stable semantic categories used to map internal failures onto public HTTP responses. */
 export const ErrorKind = {
   NOT_FOUND: "not_found",
   VALIDATION: "validation",
@@ -11,6 +13,7 @@ export const ErrorKind = {
 
 export type ErrorKindValue = (typeof ErrorKind)[keyof typeof ErrorKind];
 
+/** Runtime schema for validating errors that cross a package or network boundary. */
 const ErrorKindEnum = z.enum([
   ErrorKind.NOT_FOUND,
   ErrorKind.VALIDATION,
@@ -34,6 +37,8 @@ export const ErrorResponseSchema = z.object({
 
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
 
+// Keeping the mapping beside the shared error kinds prevents route-specific
+// status choices from drifting between otherwise equivalent failures.
 const STATUS_BY_KIND: Record<ErrorKindValue, number> = {
   [ErrorKind.NOT_FOUND]: 404,
   [ErrorKind.VALIDATION]: 400,
@@ -43,10 +48,12 @@ const STATUS_BY_KIND: Record<ErrorKindValue, number> = {
   [ErrorKind.TIMEOUT]: 504,
 };
 
+/** Returns the canonical HTTP status for a shared semantic error kind. */
 export function httpStatusForKind(kind: ErrorKindValue): number {
   return STATUS_BY_KIND[kind];
 }
 
+/** Builds a schema-compatible public error without coupling callers to object layout. */
 export function createAppError(
   kind: ErrorKindValue,
   code: string,

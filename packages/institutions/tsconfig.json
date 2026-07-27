@@ -1,3 +1,4 @@
+// Applies shared strict checking to institution-pack source and tests.
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {

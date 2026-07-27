@@ -1,10 +1,10 @@
 {
-  "name": "@campus/bff",
+  "name": "@concourse/bff",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0-alpha.1",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "predev": "pnpm --filter @campus/shared build && pnpm --filter @campus/institutions build",
+    "predev": "pnpm --filter @concourse/shared build && pnpm --filter @concourse/institutions build",
     "dev": "tsx watch --env-file=.env src/server.ts",
     "dev:once": "tsx --env-file=.env src/server.ts",
     "start": "node dist/server.js",
@@ -13,8 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@campus/institutions": "workspace:*",
-    "@campus/shared": "workspace:*",
+    "@concourse/institutions": "workspace:*",
+    "@concourse/shared": "workspace:*",
     "rrule": "2.8.1",
     "zod": "3.25.76"
   },

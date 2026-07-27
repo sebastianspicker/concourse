@@ -1,4 +1,6 @@
-import { RoomsResponseSchema } from "@campus/shared";
+/** Serves filtered room data from the selected institution configuration. */
+
+import { RoomsResponseSchema } from "@concourse/shared";
 import { parseQueryParams, parseRoomsFilter } from "../utils/queryParams";
 import { applySearch, applyPagination } from "../utils/filterHelpers";
 import { createJsonRoute } from "./createJsonRoute";

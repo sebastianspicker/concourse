@@ -1,3 +1,6 @@
+/** Defines accessible color tokens, scalable UI metrics, and contrast-aware theme utilities. */
+import { getContrastRatio } from "@concourse/shared";
+
 export type ColorScheme = "light" | "dark" | "highContrast";
 
 export type ThemeColors = {
@@ -7,6 +10,12 @@ export type ThemeColors = {
   muted: string;
   accent: string;
   accentText: string;
+  /** Yellow current-time rule and other time-critical signal states. */
+  signal: string;
+  signalText: string;
+  /** Midnight panel treatment used by the "next" status band. */
+  inverseSurface: string;
+  inverseText: string;
   border: string;
   controlBorder: string;
   error: string;
@@ -31,47 +40,55 @@ export type ThemeUi = {
 };
 
 export const lightColors: ThemeColors = {
-  background: "#F5F7F8",
+  background: "#EEF1F6",
   surface: "#FFFFFF",
-  text: "#17202A",
-  muted: "#5C6873",
-  accent: "#176B87",
+  text: "#0B1424",
+  muted: "#4A5A72",
+  accent: "#3B5FCF",
   accentText: "#FFFFFF",
-  border: "#D7DEE3",
-  controlBorder: "#7A8791",
-  error: "#A12027",
-  errorSurface: "#FBEAEC",
-  success: "#1E6B45",
-  successSurface: "#E8F4ED",
-  warning: "#6B4E00",
-  warningSurface: "#FFF4CF",
-  info: "#175F79",
-  infoSurface: "#E5F3F7",
-  overlay: "rgba(16, 20, 23, 0.48)",
-  disabled: "#66727C",
-  placeholder: "#5C6873",
+  signal: "#E8A800",
+  signalText: "#3A2A00",
+  inverseSurface: "#0B1424",
+  inverseText: "#FFFFFF",
+  border: "#C5CDD8",
+  controlBorder: "#536177",
+  error: "#B42318",
+  errorSurface: "#FFF1F0",
+  success: "#176B45",
+  successSurface: "#EDF8F1",
+  warning: "#765100",
+  warningSurface: "#FFF5D7",
+  info: "#3B5FCF",
+  infoSurface: "#EEF1FF",
+  overlay: "rgba(11, 20, 36, 0.68)",
+  disabled: "#65738A",
+  placeholder: "#536177",
 };
 
 export const darkColors: ThemeColors = {
-  background: "#101417",
-  surface: "#171D21",
-  text: "#F5F7F8",
-  muted: "#AEB8C0",
-  accent: "#58B6D1",
-  accentText: "#101417",
-  border: "#3A444B",
-  controlBorder: "#87949D",
-  error: "#FFB4B8",
-  errorSurface: "#4A1E22",
-  success: "#8DD9AD",
-  successSurface: "#173B28",
-  warning: "#E9CA70",
-  warningSurface: "#433714",
-  info: "#8ED4E8",
-  infoSurface: "#163641",
+  background: "#08111F",
+  surface: "#0E1A2C",
+  text: "#EEF1F6",
+  muted: "#C0CAD9",
+  accent: "#8EA7FF",
+  accentText: "#0B1424",
+  signal: "#FFDC75",
+  signalText: "#0B1424",
+  inverseSurface: "#EEF1F6",
+  inverseText: "#0B1424",
+  border: "#536177",
+  controlBorder: "#C0CAD9",
+  error: "#FFB4AB",
+  errorSurface: "#4A1717",
+  success: "#9DE8B9",
+  successSurface: "#123C2C",
+  warning: "#FFDC75",
+  warningSurface: "#493800",
+  info: "#B9C6FF",
+  infoSurface: "#17275A",
   overlay: "rgba(0, 0, 0, 0.72)",
-  disabled: "#87949D",
-  placeholder: "#AEB8C0",
+  disabled: "#AAB6C8",
+  placeholder: "#C0CAD9",
 };
 
 export const highContrastColors: ThemeColors = {
@@ -81,6 +98,10 @@ export const highContrastColors: ThemeColors = {
   muted: "#FFFFFF",
   accent: "#00D7FF",
   accentText: "#000000",
+  signal: "#FFE600",
+  signalText: "#000000",
+  inverseSurface: "#FFFFFF",
+  inverseText: "#000000",
   border: "#FFFFFF",
   controlBorder: "#FFFFFF",
   error: "#FFB3B3",
@@ -124,52 +145,50 @@ export const uiSchemes: Record<ColorScheme, ThemeUi> = {
   highContrast: highContrastUi,
 };
 
-export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
+export const spacing = { xs: 4, sm: 8, md: 12, lg: 20, xl: 28, xxl: 40 } as const;
 
 export const typography = {
-  heading: { fontSize: 24, fontWeight: "700" as const, lineHeight: 30 },
-  subheading: { fontSize: 18, fontWeight: "600" as const, lineHeight: 24 },
-  body: { fontSize: 16, lineHeight: 24 },
-  caption: { fontSize: 14, lineHeight: 20 },
+  display: { fontSize: 36, fontWeight: "700" as const, lineHeight: 40, letterSpacing: -1.1 },
+  heading: { fontSize: 28, fontWeight: "700" as const, lineHeight: 34, letterSpacing: -0.7 },
+  subheading: { fontSize: 20, fontWeight: "700" as const, lineHeight: 26, letterSpacing: -0.35 },
+  body: { fontSize: 16, lineHeight: 23, letterSpacing: -0.1 },
+  caption: { fontSize: 13, lineHeight: 18, letterSpacing: 0.05 },
   small: { fontSize: 12, lineHeight: 16 },
   relative: {
-    heading: { fontSize: 24, fontWeight: "700" as const, lineHeight: 30, allowFontScaling: true },
-    subheading: { fontSize: 18, fontWeight: "600" as const, lineHeight: 24, allowFontScaling: true },
-    body: { fontSize: 16, lineHeight: 24, allowFontScaling: true },
-    caption: { fontSize: 14, lineHeight: 20, allowFontScaling: true },
+    display: { fontSize: 36, fontWeight: "700" as const, lineHeight: 40, letterSpacing: -1.1, allowFontScaling: true },
+    heading: { fontSize: 28, fontWeight: "700" as const, lineHeight: 34, letterSpacing: -0.7, allowFontScaling: true },
+    subheading: { fontSize: 20, fontWeight: "700" as const, lineHeight: 26, letterSpacing: -0.35, allowFontScaling: true },
+    body: { fontSize: 16, lineHeight: 23, letterSpacing: -0.1, allowFontScaling: true },
+    caption: { fontSize: 13, lineHeight: 18, letterSpacing: 0.05, allowFontScaling: true },
   },
 } as const;
 
-export const borderRadius = { sm: 4, md: 8, lg: 12, xl: 12, full: 9999 } as const;
+export const borderRadius = { sm: 0, md: 0, lg: 0, xl: 0, full: 9999 } as const;
 
-// Temporary overlays may opt into this; content surfaces stay flat.
-export const shadows = {
-  sm: {},
-  md: {},
-  lg: {},
-  xl: {},
-} as const;
+/** Signal Board uses ruled surfaces rather than elevation. Kept for route compatibility. */
+export const shadows = { sm: {}, md: {}, lg: {}, xl: {} } as const;
 
-export const durations = { instant: 0, fast: 150, normal: 150, slow: 150 } as const;
+export const durations = { instant: 0, fast: 140, normal: 420, slow: 650 } as const;
 export const zIndex = { base: 0, dropdown: 10, sticky: 20, fixed: 30, modal: 40, popover: 50, tooltip: 60 } as const;
 
+/** Selects the semantic color palette for the resolved scheme. */
 export function getThemeColors(colorScheme: ColorScheme): ThemeColors {
   return colorSchemes[colorScheme];
 }
 
+/** Selects border, radius, and typography scaling for the resolved scheme. */
 export function getThemeUi(colorScheme: ColorScheme): ThemeUi {
   return uiSchemes[colorScheme];
 }
 
+/** Chooses readable foreground text from the background luminance calculation. */
 export function getContrastTextColor(backgroundColor: string): string {
-  const hex = backgroundColor.replace("#", "");
-  const red = Number.parseInt(hex.slice(0, 2), 16);
-  const green = Number.parseInt(hex.slice(2, 4), 16);
-  const blue = Number.parseInt(hex.slice(4, 6), 16);
-  const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
-  return luminance > 0.5 ? "#000000" : "#FFFFFF";
+  return getContrastRatio(backgroundColor, "#000000") >= getContrastRatio(backgroundColor, "#FFFFFF")
+    ? "#000000"
+    : "#FFFFFF";
 }
 
+/** Appends an alpha channel to a hex color for translucent UI states. */
 export function withOpacity(color: string, opacity: number): string {
   const hex = color.replace("#", "");
   const red = Number.parseInt(hex.slice(0, 2), 16);
@@ -178,14 +197,17 @@ export function withOpacity(color: string, opacity: number): string {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
+/** Applies the active density scale and rounds dimensions to whole pixels. */
 export function scaled(value: number, ui: ThemeUi): number {
   return Math.round(value * ui.controlScale);
 }
 
+/** Scales and caps corner radii so presets do not create pill-shaped controls. */
 export function scaledRadius(value: number, ui: ThemeUi): number {
   return Math.min(12, Math.round(value * ui.borderRadiusScale));
 }
 
+/** Scales font sizes according to the active institutional UI preset. */
 export function scaledFont(value: number, ui: ThemeUi): number {
   return Math.round(value * ui.fontScale);
 }

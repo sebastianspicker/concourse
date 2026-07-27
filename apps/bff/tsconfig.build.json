@@ -1,11 +1,12 @@
+// Emits only deployable BFF source while excluding tests and fixtures.
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
     "declaration": false,
     "sourceMap": true,
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "rootDir": "src",
     "outDir": "dist"
   },

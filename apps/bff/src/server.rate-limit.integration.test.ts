@@ -1,3 +1,5 @@
+/** Exercises rate limiting through the BFF request listener. */
+
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { createRequestListener } from "./server";

@@ -1,7 +1,8 @@
-import React from "react";
+/** Renders localized result-count feedback for event search and sorting. */
 import { StyleSheet, Text } from "react-native";
 import { typography } from "@/ui/theme";
 import { useTheme } from "@/ui/ThemeContext";
+import { useLocale } from "@/i18n/LocaleContext";
 
 const styles = StyleSheet.create({
   resultCount: {
@@ -10,6 +11,7 @@ const styles = StyleSheet.create({
   },
 });
 
+/** Announces the filtered event count after loading completes, without duplicating empty-state copy. */
 export function EventResultCount({
   loading,
   resultCount,
@@ -20,11 +22,12 @@ export function EventResultCount({
   search: string;
 }): JSX.Element | null {
   const theme = useTheme();
+  const { t } = useLocale();
   if (loading) return null;
   return (
-    <Text style={[styles.resultCount, { color: theme.colors.muted }]}>
-      {resultCount} {resultCount === 1 ? "event" : "events"}
-      {search ? ` for "${search}"` : ""}
+    <Text accessibilityLiveRegion="polite" style={[styles.resultCount, { color: theme.colors.muted }]}>
+      {t(resultCount === 1 ? "eventResultCountOne" : "eventResultCountOther", { count: resultCount })}
+      {search ? `: ${search}` : ""}
     </Text>
   );
 }

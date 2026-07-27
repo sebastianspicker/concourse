@@ -1,3 +1,4 @@
+/** Tracks connectivity, offline-marked cache presence, and the newest saved entry’s age. */
 import { useState, useEffect, useCallback } from "react";
 import NetInfo from "@react-native-community/netinfo";
 import { getCacheStats } from "../data/persistedCache";
@@ -9,6 +10,7 @@ type OfflineCacheState = {
   checkOfflineStatus: () => Promise<void>;
 };
 
+/** Subscribes to connectivity and reports whether saved offline entries are available. */
 export function useOfflineCache(): OfflineCacheState {
   const [isOffline, setIsOffline] = useState(false);
   const [hasOfflineData, setHasOfflineData] = useState(false);
@@ -23,24 +25,21 @@ export function useOfflineCache(): OfflineCacheState {
         setCacheAge(Date.now() - stats.newestEntry);
       }
     } catch {
-      // Silently ignore — cache stats are non-critical
+      // Cache statistics are best-effort and must not block connectivity updates.
     }
   }, []);
   
   useEffect(() => {
     let mounted = true;
 
-    // Check initial connection state
     NetInfo.fetch().then((state) => {
       if (mounted) setIsOffline(!state.isConnected);
     });
 
-    // Subscribe to connection changes
     const unsubscribe = NetInfo.addEventListener((state) => {
       if (mounted) setIsOffline(!state.isConnected);
     });
 
-    // Check offline data status
     checkOfflineStatus();
 
     return () => {

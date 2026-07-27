@@ -1,35 +1,36 @@
+/** Fetches, parses, caches, and degrades gracefully for public HfMT event sources. */
+
 import type { InstitutionPack } from "../../config/loader";
-import type { PublicEvent } from "@campus/shared";
+import type { PublicEvent } from "@concourse/shared";
 import { getCached } from "../../utils/cache";
-import { createCircuitBreaker, type CircuitBreaker } from "../../utils/circuitBreaker";
 import { fetchTextWithTimeout } from "../../utils/fetch";
 import { log } from "../../utils/logger";
 import { parseDateTimeInTimeZone } from "../../utils/timeZone";
 import { buildEventId } from "./eventId";
+import { getPublicSourceBreaker } from "./publicSourceBreaker";
 import { BFF_ENV } from "../../config/env";
 import mockuniEventsFixture from "../../__fixtures__/mockuni-events.json";
 
 const DEFAULT_TIME_ZONE = "Europe/Berlin";
 const MAX_EVENTS_PER_SOURCE = 8;
-const eventsBreakers = new Map<string, CircuitBreaker>();
-
-function getEventsBreaker(sourceUrl: string): CircuitBreaker {
-  const existing = eventsBreakers.get(sourceUrl);
-  if (existing) {
-    return existing;
-  }
-
-  const breaker = createCircuitBreaker({
-    name: `public-events:${sourceUrl}`,
-    failureThreshold: 5,
-    cooldownMs: 30_000,
-  });
-  eventsBreakers.set(sourceUrl, breaker);
-  return breaker;
-}
-
 export type FetchPublicEventsResult = { events: PublicEvent[]; degraded: boolean };
 
+function sourceLabelEvents(
+  sources: Array<{ url: string; label: string }>,
+  now: Date
+): PublicEvent[] {
+  return sources.map((source) => {
+    const date = now.toISOString();
+    return {
+      id: buildEventId({ sourceUrl: source.url, title: source.label, date }),
+      title: source.label,
+      date,
+      sourceUrl: source.url
+    };
+  });
+}
+
+/** Collects event sources independently so one failed upstream yields a degraded partial result. */
 export async function fetchPublicEvents(
   institution: InstitutionPack
 ): Promise<FetchPublicEventsResult> {
@@ -43,7 +44,7 @@ export async function fetchPublicEvents(
 
   return getCached(
     cacheKey,
-    async (): Promise<FetchPublicEventsResult> => {
+    async (signal): Promise<FetchPublicEventsResult> => {
       if (mode === "mock") {
         // Mock mode is deterministic for tests and demos; real deployments
         // should keep PUBLIC_EVENTS_MODE unset so public sources are fetched.
@@ -51,16 +52,8 @@ export async function fetchPublicEvents(
           const fixtureEvents = mockuniEventsFixture.events as PublicEvent[];
           return { events: fixtureEvents, degraded: false };
         }
-        // Fallback: create basic mock events from source labels
-        const mockEvents = sources.map((source: { url: string; label: string }) => {
-          const date = now.toISOString();
-          return {
-            id: buildEventId({ sourceUrl: source.url, title: source.label, date }),
-            title: source.label,
-            date,
-            sourceUrl: source.url
-          };
-        });
+        // Keep non-fixture mock institutions usable without fetching external sources.
+        const mockEvents = sourceLabelEvents(sources, now);
         return { events: mockEvents, degraded: false };
       }
 
@@ -68,7 +61,7 @@ export async function fetchPublicEvents(
       const timeZone = institution.timezone ?? DEFAULT_TIME_ZONE;
       const settledSources = await Promise.allSettled(
         sources.map(async (source: { url: string; label: string }) => {
-          const html = await getEventsBreaker(source.url).call(() => fetchTextWithTimeout(source.url));
+          const html = await getPublicSourceBreaker("public-events", source.url).call(() => fetchTextWithTimeout(source.url, { signal }));
           return extractEventsFromHtml(html, source.url, timeZone);
         })
       );
@@ -91,15 +84,7 @@ export async function fetchPublicEvents(
         return { events: deduped.slice(0, MAX_EVENTS_PER_SOURCE), degraded: anyFailed };
       }
 
-      const fallbackEvents = sources.map((source: { url: string; label: string }) => {
-        const date = now.toISOString();
-        return {
-          id: buildEventId({ sourceUrl: source.url, title: source.label, date }),
-          title: source.label,
-          date,
-          sourceUrl: source.url
-        };
-      });
+      const fallbackEvents = sourceLabelEvents(sources, now);
 
       // Returning source labels is a degraded fallback: it keeps the app usable
       // during upstream HTML changes without pretending the data is fresh.
@@ -111,6 +96,7 @@ export async function fetchPublicEvents(
   );
 }
 
+/** Uses HfMT-specific markup first, then generic blocks when the page structure changes. */
 function extractEventsFromHtml(
   html: string,
   sourceUrl: string,
@@ -123,6 +109,7 @@ function extractEventsFromHtml(
   return extractGenericEvents(html, sourceUrl);
 }
 
+/** Tries article blocks, then event tiles, then generic anchors as markup changes. */
 function extractHfmtEvents(
   html: string,
   sourceUrl: string,
@@ -163,6 +150,7 @@ function extractEventsFromBlocks(
   return events;
 }
 
+/** Builds one public event from a title and link, using the epoch when no date is parseable. */
 function extractEventFromBlock(
   block: string,
   sourceUrl: string,
@@ -183,6 +171,7 @@ function extractEventFromBlock(
   };
 }
 
+/** Extracts generic anchor links for sources that do not expose HfMT event-card markup. */
 function extractGenericEvents(
   html: string,
   sourceUrl: string
@@ -274,6 +263,7 @@ function parseHtmlDateTime(value: string): string | null {
   return Number.isNaN(parsed.valueOf()) ? null : parsed.toISOString();
 }
 
+/** Parses German textual dates in the institution time zone rather than server local time. */
 function parseGermanDate(block: string, timeZone: string): string | null {
   const dateTimeMatch = block.match(GERMAN_DATE_TIME_PATTERN);
   if (dateTimeMatch) {
@@ -298,6 +288,7 @@ function parseMatchedGermanDate(match: RegExpMatchArray, timeZone: string): stri
   );
 }
 
+/** Prefers machine-readable datetime attributes before parsing locale-dependent page text. */
 function extractDate(block: string, timeZone: string): string | null {
   const datetimeMatch = block.match(HTML_DATETIME_PATTERN);
   if (datetimeMatch) {
@@ -324,6 +315,7 @@ function extractHref(block: string, sourceUrl: string): string | null {
   return safeResolveUrl(hrefMatch[1], sourceUrl);
 }
 
+/** Resolves relative links but rejects malformed hrefs instead of aborting the source parse. */
 function safeResolveUrl(href: string, sourceUrl: string): string | null {
   try {
     const url = new URL(href, sourceUrl);

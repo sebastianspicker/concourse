@@ -1,3 +1,4 @@
+# Declares workspace packages and mirrors dependency overrides for newer pnpm clients.
 packages:
   - apps/*
   - packages/*

@@ -1,27 +1,38 @@
-import { formatEventDate, formatRelativeTime, formatScheduleTime, formatTimeRange } from "@/utils/dateFormat";
-import { serializeRouteItem } from "@/utils/routeItem";
-import type { PublicEvent, ScheduleItem } from "@campus/shared";
+/** Provides time-zone-aware cards, freshness selection, and typed links for the Today screen. */
+import { formatRelativeTime, formatScheduleTime, formatTimeRange } from "@/utils/dateFormat";
+import type { PublicEvent, ScheduleItem } from "@concourse/shared";
 import type { UiError } from "@/api/uiError";
+import { getCampusDayRange } from "@/utils/campusTime";
+import {
+  getEventAccessibilityLabel as getListEventAccessibilityLabel,
+  getEventCard as getListEventCard,
+} from "./eventsScreenHelpers";
+
+export { getEventHref } from "./eventsScreenHelpers";
 
 export type SortDirection = "asc" | "desc";
 
-export function getLocalDayRange(): { from: string; to: string } {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-
-  const end = new Date(start);
-  end.setHours(23, 59, 59, 999);
-
-  return {
-    from: start.toISOString(),
-    to: end.toISOString()
-  };
+/** Converts the current instant into inclusive campus-day query bounds. */
+export function getLocalDayRange(date: Date, timeZone: string): { from: string; to: string } {
+  return getCampusDayRange(date, timeZone);
 }
 
+/** Identifies unavailable schedule data so Today can avoid implying that an empty list is current. */
 export function isScheduleUnavailable(error: UiError | null): boolean {
   return error?.kind === "unavailableSource" || error?.kind === "notFound";
 }
 
+type FreshnessResource = { source: "network" | "memory-cache" | "persisted-cache" | null; updatedAt: number | null };
+
+/** Chooses the least misleading timestamp when schedule data is unavailable or independently stale. */
+export function getTodayFreshnessUpdatedAt(today: FreshnessResource, schedule: FreshnessResource, scheduleUnavailable: boolean): number | null {
+  if (today.source !== "network" || (!scheduleUnavailable && schedule.source !== "network")) return null;
+  const timestamps = [today.updatedAt, scheduleUnavailable ? null : schedule.updatedAt]
+    .filter((value): value is number => typeof value === "number");
+  return timestamps.length > 0 ? Math.min(...timestamps) : null;
+}
+
+/** Selects the localized greeting key from the campus-local hour. */
 export function getGreeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -29,6 +40,7 @@ export function getGreeting(): string {
   return "Good evening";
 }
 
+/** Formats the heading date in the active locale and institution time zone. */
 export function getFormattedDate(): string {
   return new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -37,6 +49,7 @@ export function getFormattedDate(): string {
   });
 }
 
+/** Sorts a copied schedule list by start time in the requested direction. */
 export function sortScheduleItems(items: ScheduleItem[], direction: SortDirection): ScheduleItem[] {
   return [...items].sort((a, b) => {
     const dateA = new Date(a.startsAt).getTime();
@@ -45,35 +58,60 @@ export function sortScheduleItems(items: ScheduleItem[], direction: SortDirectio
   });
 }
 
-export function getEventCard(event: PublicEvent): { title: string; subtitle: string } {
+/** Shapes a today event into localized card text for the compact list. */
+export function getEventCard(event: PublicEvent, locale: string, timeZone: string): { title: string; subtitle: string } {
+  const card = getListEventCard(event, locale, timeZone);
   return {
-    title: event.title,
-    subtitle: `${formatEventDate(event.date)} · ${formatRelativeTime(event.date)}`
+    ...card,
+    subtitle: `${card.subtitle} · ${formatRelativeTime(event.date, locale)}`
   };
 }
 
-export function getEventAccessibilityLabel(event: PublicEvent): string {
-  return `${event.title}. ${formatEventDate(event.date)}. ${formatRelativeTime(event.date)}.`;
+/** Produces the spoken event summary used by screen-reader list navigation. */
+export function getEventAccessibilityLabel(event: PublicEvent, locale: string, timeZone: string): string {
+  return `${getListEventAccessibilityLabel(event, locale, timeZone)} ${formatRelativeTime(event.date, locale)}.`;
 }
 
-export function getEventHref(event: PublicEvent): { pathname: "/events/[id]"; params: { id: string } } {
-  return { pathname: "/events/[id]", params: { id: event.id } };
-}
-
-export function getScheduleCard(item: ScheduleItem): { title: string; subtitle: string } {
+/** Shapes a schedule item into localized time and course display text. */
+export function getScheduleCard(item: ScheduleItem, locale: string, timeZone: string, toBeAnnounced: string): { title: string; subtitle: string; leading: string } {
   return {
     title: item.title,
-    subtitle: `${formatTimeRange(item.startsAt, item.endsAt)} · ${item.location ?? "TBA"}`
+    subtitle: item.location ?? toBeAnnounced,
+    leading: formatTimeRange(item.startsAt, item.endsAt, locale, timeZone),
   };
 }
 
-export function getScheduleAccessibilityLabel(item: ScheduleItem): string {
-  return `${item.title}. ${formatScheduleTime(item.startsAt)}. Location: ${item.location ?? "TBA"}.`;
+/** Prefers the ongoing schedule item, otherwise returns the nearest future item. */
+export function getCurrentOrNextScheduleId(items: ScheduleItem[], now = new Date()): string | undefined {
+  const nowMs = now.getTime();
+  const current = items.find((item) => {
+    const startsAt = Date.parse(item.startsAt);
+    const endsAt = item.endsAt ? Date.parse(item.endsAt) : Number.NaN;
+    return Number.isFinite(startsAt) && Number.isFinite(endsAt) && startsAt <= nowMs && nowMs < endsAt;
+  });
+  if (current) return current.id;
+
+  let next: ScheduleItem | undefined;
+  let nextStart = Number.POSITIVE_INFINITY;
+  for (const item of items) {
+    const startsAt = Date.parse(item.startsAt);
+    if (Number.isFinite(startsAt) && startsAt > nowMs && startsAt < nextStart) {
+      next = item;
+      nextStart = startsAt;
+    }
+  }
+  return next?.id;
 }
 
+/** Builds spoken schedule context from the course, room, and localized time. */
+export function getScheduleAccessibilityLabel(item: ScheduleItem, locale: string, timeZone: string, location: string, toBeAnnounced: string): string {
+  return `${item.title}. ${formatScheduleTime(item.startsAt, locale, timeZone)}. ${location}: ${item.location ?? toBeAnnounced}.`;
+}
+
+/** Returns the typed detail-route state required to preserve a selected schedule item. */
 export function getScheduleHref(item: ScheduleItem): {
   pathname: "/schedule/[id]";
-  params: { id: string; item: string };
+  params: { id: string };
 } {
-  return { pathname: "/schedule/[id]", params: { id: item.id, item: serializeRouteItem(item) } };
+  return { pathname: "/schedule/[id]", params: { id: item.id } };
 }

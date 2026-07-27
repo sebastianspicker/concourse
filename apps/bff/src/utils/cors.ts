@@ -1,3 +1,6 @@
+/** Builds CORS headers only for explicitly allowed browser origins. */
+
+/** Returns browser CORS headers only when the request origin matches an allowed origin. */
 export function getCorsHeaders(
   requestOrigin: string | undefined,
   allowedOrigins: string[]

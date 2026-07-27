@@ -1,15 +1,5 @@
-[allowlist]
-description = "Campus App Kit allowlist"
-paths = [
-  '''pnpm-lock.yaml''',
-  '''apps/bff/src/__fixtures__/''',
-  '''AGENTS\.md''',
-  '''archive/''',
-  '''docs/archive/''',
-  '''node_modules/''',
-  '''vendor/''',
-  '''third_party/''',
-  '''third-party/''',
-  '''3rdparty/''',
-  '''external/''',
-]
+# Extends Gitleaks' built-in detectors without broad path-level exemptions.
+title = "Concourse Campus Kit secret scanning"
+
+[extend]
+useDefault = true

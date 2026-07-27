@@ -1,3 +1,4 @@
+/** Metro configuration for the mobile monorepo bundle. */
 const { getDefaultConfig } = module.require("expo/metro-config");
 const path = module.require("path");
 

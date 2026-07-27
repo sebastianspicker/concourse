@@ -1,3 +1,4 @@
+/** Defines typed public-resource fetchers and query normalization for BFF endpoints. */
 import type {
   EventsResponse,
   RoomsResponse,
@@ -9,106 +10,86 @@ import {
   RoomsResponseSchema,
   TodayResponseSchema,
   ScheduleResponseSchema
-} from "@campus/shared";
-import { getCachedJson } from "./publicApiRequest";
-import type { ResourceLoadResult } from "./publicApiRequest";
+} from "@concourse/shared";
+import type { ZodType } from "zod";
+import {
+  getCachedJson,
+  type RequestControls,
+  type ResourceLoadResult
+} from "./publicApiRequest";
 
-export type EventsFilterOptions = {
-  force?: boolean;
-  signal?: AbortSignal;
+export type EventsQuery = {
   search?: string;
   from?: string;
   to?: string;
   limit?: number;
   offset?: number;
-  offlineMode?: boolean;
 };
 
-export function fetchEvents(options?: EventsFilterOptions): Promise<ResourceLoadResult<EventsResponse>> {
-  const queryParams: Record<string, string> = {};
-  if (options?.search) queryParams.search = options.search;
-  if (options?.from) queryParams.from = options.from;
-  if (options?.to) queryParams.to = options.to;
-  if (options?.limit !== undefined) queryParams.limit = String(options.limit);
-  if (options?.offset !== undefined) queryParams.offset = String(options.offset);
+type PublicRequestOptions<Q> = Q & RequestControls;
 
-  return getCachedJson("/events", EventsResponseSchema, "events", {
-    force: options?.force,
-    signal: options?.signal,
-    queryParams,
-    offlineMode: options?.offlineMode
-  });
+/** Drops empty query values and stringifies the remaining parameters for the BFF request. */
+function serializeQuery(query: Record<string, string | number | undefined>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(query).flatMap(([key, value]) => value === undefined || value === "" ? [] : [[key, String(value)]])
+  );
 }
 
-export type RoomsFilterOptions = {
-  force?: boolean;
-  signal?: AbortSignal;
+/** Delegates a schema-checked public endpoint request with its cache key and refresh controls. */
+function fetchPublicResource<T>(
+  path: string,
+  schema: ZodType<T>,
+  keySuffix: string,
+  query: Record<string, string | number | undefined>,
+  controls: RequestControls
+): Promise<ResourceLoadResult<T>> {
+  return getCachedJson(path, schema, keySuffix, { ...controls, queryParams: serializeQuery(query) });
+}
+
+/** Requests the `/events` collection after separating transport controls from endpoint filters. */
+export function fetchEvents(options: PublicRequestOptions<EventsQuery> = {}): Promise<ResourceLoadResult<EventsResponse>> {
+  const { force, signal, offlineMode, ...query } = options;
+
+  return fetchPublicResource("/events", EventsResponseSchema, "events", query, { force, signal, offlineMode });
+}
+
+export type RoomsQuery = {
   campus?: string;
   search?: string;
   limit?: number;
   offset?: number;
-  offlineMode?: boolean;
 };
 
-export function fetchRooms(options?: RoomsFilterOptions): Promise<ResourceLoadResult<RoomsResponse>> {
-  const queryParams: Record<string, string> = {};
-  if (options?.campus) queryParams.campus = options.campus;
-  if (options?.search) queryParams.search = options.search;
-  if (options?.limit !== undefined) queryParams.limit = String(options.limit);
-  if (options?.offset !== undefined) queryParams.offset = String(options.offset);
+/** Requests the `/rooms` collection while forwarding only room query filters. */
+export function fetchRooms(options: PublicRequestOptions<RoomsQuery> = {}): Promise<ResourceLoadResult<RoomsResponse>> {
+  const { force, signal, offlineMode, ...query } = options;
 
-  return getCachedJson("/rooms", RoomsResponseSchema, "rooms", {
-    force: options?.force,
-    signal: options?.signal,
-    queryParams,
-    offlineMode: options?.offlineMode
-  });
+  return fetchPublicResource("/rooms", RoomsResponseSchema, "rooms", query, { force, signal, offlineMode });
 }
 
-export type TodayFetchOptions = {
-  force?: boolean;
-  signal?: AbortSignal;
-  offlineMode?: boolean;
+export type TodayQuery = {
   date?: string;
 };
 
-export function fetchToday(options?: TodayFetchOptions): Promise<ResourceLoadResult<TodayResponse>> {
-  const queryParams: Record<string, string> = {};
-  if (options?.date) queryParams.date = options.date;
+/** Requests the `/today` summary using the shared validation and cache pipeline. */
+export function fetchToday(options: PublicRequestOptions<TodayQuery> = {}): Promise<ResourceLoadResult<TodayResponse>> {
+  const { force, signal, offlineMode, ...query } = options;
 
-  return getCachedJson("/today", TodayResponseSchema, "today", {
-    force: options?.force,
-    signal: options?.signal,
-    queryParams,
-    offlineMode: options?.offlineMode
-  });
+  return fetchPublicResource("/today", TodayResponseSchema, "today", query, { force, signal, offlineMode });
 }
 
-export type ScheduleFilterOptions = {
-  force?: boolean;
-  signal?: AbortSignal;
+export type ScheduleQuery = {
   search?: string;
   from?: string;
   to?: string;
   campus?: string;
   limit?: number;
   offset?: number;
-  offlineMode?: boolean;
 };
 
-export function fetchSchedule(options?: ScheduleFilterOptions): Promise<ResourceLoadResult<ScheduleResponse>> {
-  const queryParams: Record<string, string> = {};
-  if (options?.search) queryParams.search = options.search;
-  if (options?.from) queryParams.from = options.from;
-  if (options?.to) queryParams.to = options.to;
-  if (options?.campus) queryParams.campus = options.campus;
-  if (options?.limit !== undefined) queryParams.limit = String(options.limit);
-  if (options?.offset !== undefined) queryParams.offset = String(options.offset);
+/** Requests the `/schedule` timeline after normalizing its optional filters. */
+export function fetchSchedule(options: PublicRequestOptions<ScheduleQuery> = {}): Promise<ResourceLoadResult<ScheduleResponse>> {
+  const { force, signal, offlineMode, ...query } = options;
 
-  return getCachedJson("/schedule", ScheduleResponseSchema, "schedule", {
-    force: options?.force,
-    signal: options?.signal,
-    queryParams,
-    offlineMode: options?.offlineMode
-  });
+  return fetchPublicResource("/schedule", ScheduleResponseSchema, "schedule", query, { force, signal, offlineMode });
 }

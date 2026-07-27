@@ -1,188 +1,251 @@
-# Campus App Kit
+# Concourse Campus Kit
 
-[![CI](https://github.com/sebastianspicker/campus-app-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/sebastianspicker/campus-app-kit/actions/workflows/ci.yml)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node 22](https://img.shields.io/badge/node-%3E%3D22.13-green.svg)](.nvmrc)
-[![pnpm 9](https://img.shields.io/badge/pnpm-9-orange.svg)](package.json)
+Concourse Campus Kit is a TypeScript workspace for presenting public university
+information. It contains an Expo application, a Node.js backend-for-frontend
+(BFF), shared Zod schemas, and public institution configuration.
 
-A public, privacy-safe starter for building a university campus app with **React Native + Expo** and an optional **Backend-for-Frontend (BFF)**.
+The current version is `1.2.0-alpha.1`. This checkout is a source candidate. It
+does not include a hosted service, signed mobile application, EAS project,
+store listing, private connector implementation, or user authentication flow.
 
----
+## Capabilities
 
-## Quick Start
+- Today, Events, Rooms, Settings, event detail, room detail, and schedule detail
+  routes for native and responsive web targets
+- Public HTML event and ICS schedule ingestion through the BFF
+- Institution-defined public rooms, identity, locale, timezone, accent, and
+  layout preset
+- Shared response validation in the BFF and client
+- Client-side persisted caching with current, cached, degraded, offline, empty,
+  and error states
+- English and German text plus system, light, dark, and high-contrast appearance
+- BFF caching, request timeouts, bounded recurrence expansion, circuit breaking,
+  rate limiting, CORS, request IDs, security headers, and optional bearer auth
+- Vitest tests, process-level BFF tests, and Chromium Playwright tests with axe
+
+## Limitations
+
+- The client requires a reachable BFF and does not fetch campus sources directly.
+- Public connectors depend on upstream HTML and ICS formats.
+- Private schedules, room occupancy, protected campus systems, SSO, and student
+  data are outside this repository.
+- The included bearer token guard is a deployment option for a private or
+  network-restricted BFF. It is not a user authentication system.
+- `ios/` and `android/` projects, signing configuration, EAS linkage, and native
+  binaries are not checked in.
+- Automated browser testing covers Chromium. Native screen readers, native text
+  scaling, device orientation, and other browser engines require separate checks.
+- Workspace packages are private and are not published to a package registry.
+
+## Requirements
+
+- Node.js 22.13 or newer. CI uses 22.13.0 and [`.nvmrc`](.nvmrc) records that version.
+- Corepack
+- pnpm 9.0.0, selected through Corepack
+- Playwright Chromium for browser tests
+- Expo Go or an institution-owned development client for device testing
+- Docker only for the container workflows
+
+## Installation
+
+From the repository root:
 
 ```bash
-# Install dependencies
-pnpm install --frozen-lockfile
-
-# Configure the mobile app's BFF URL
+corepack pnpm@9.0.0 install --frozen-lockfile
+cp apps/bff/.env.example apps/bff/.env
 cp apps/mobile/.env.example apps/mobile/.env
-
-# Start BFF and mobile in parallel
-INSTITUTION_ID=hfmt pnpm dev
 ```
 
-Then open the mobile app with a dev client. For a physical device, edit
-`apps/mobile/.env` so `EXPO_PUBLIC_BFF_BASE_URL` points to the BFF URL reachable
-from that device.
+The setup script performs the frozen install, creates missing local environment
+files without overwriting existing files, builds the workspace, and runs the
+type checker:
 
-For Expo Go, run `pnpm --filter @campus/mobile start` instead of `pnpm dev`.
-
-**Prerequisites:** Node.js 22.13 or newer, pnpm 9. See [Runbook](docs/runbook.md) for detailed setup.
-
----
-
-## Features
-
-- **Mobile app** – Expo SDK 57 with Expo Router; responsive Today, Events, Rooms, Settings, and public detail screens
-- **BFF** – Optional Node.js API with public connectors, rate limiting, HTTP caching, CORS, circuit breaker
-- **Institution packs** – Public config per institution; easy to add more
-- **Shared types** – Zod schemas used by both BFF and mobile
-
-## Campus Desk screenshots (deterministic public data)
-
-| Today on mobile | Events on desktop |
-|---|---|
-| ![Today screen at 390 pixels in light theme](docs/screenshots/campus-desk-today-390-light.png) | ![Events screen at 1440 pixels in light theme](docs/screenshots/campus-desk-events-1440-light.png) |
-
-| Rooms on small mobile | Settings in German high contrast |
-|---|---|
-| ![Rooms screen at 320 pixels in light theme](docs/screenshots/campus-desk-rooms-320-light.png) | ![Settings screen in German high-contrast mode](docs/screenshots/campus-desk-settings-768-high-contrast-de.png) |
-
----
-
-## Project Structure
-
+```bash
+corepack pnpm@9.0.0 setup:dev
 ```
-apps/
-  mobile/         Expo React Native app (Expo Router)
-  bff/            Optional BFF API (public connectors + private stubs)
-packages/
-  shared/         Domain types + Zod schemas
-  institutions/   Public institution packs
-docs/             Architecture, runbook, CI, deployment
-```
-
-Internal planning, audit, ledger, status, and deprecated-doc packets are not
-part of the public docs surface. Keep them in the ignored local `archive/` lane
-or in a private fork.
-
-## How to Read This Repo
-
-Start with the runtime path, then branch out:
-
-1. Mobile screens in `apps/mobile/app/` call hooks in `apps/mobile/src/hooks/`.
-2. Hooks call `apps/mobile/src/data/publicApi.ts`, which validates BFF responses with schemas from `@campus/shared`.
-3. The BFF entry point is `apps/bff/src/server.ts`; data routes live in `apps/bff/src/routes/`.
-4. Routes call public connectors in `apps/bff/src/connectors/public/` and load public institution packs from `packages/institutions/src/packs/`.
-5. `packages/shared/src/domain/` is the contract between BFF and mobile. Update schemas there before changing response shapes.
-
-Private integrations should implement the stubs under `apps/bff/src/connectors/private-stubs/` in a private fork. This public repo should keep only public sources, public institution metadata, and mock fixtures.
-
-See [Architecture](docs/architecture.md) for data flow diagrams and design decisions.
-
----
 
 ## Configuration
 
-| Context | Required Variables |
-|--------|---------------------|
-| **BFF** | `INSTITUTION_ID` (e.g., `hfmt`) |
-| **Mobile runtime** | `EXPO_PUBLIC_BFF_BASE_URL` |
-| **Mobile preview/production build** | `INSTITUTION_ID`, `EXPO_PUBLIC_BFF_BASE_URL` |
+Use the same institution ID in the BFF and mobile application.
 
-Additional options: `BFF_PORT`, `CORS_ORIGINS`, `BFF_TRUST_PROXY`. See [Runbook → Configuration](docs/runbook.md#configuration) for full details.
+| Runtime | Required values |
+|---|---|
+| BFF | `INSTITUTION_ID` |
+| Local mobile development | `EXPO_PUBLIC_BFF_BASE_URL`; set `INSTITUTION_ID` when the BFF does not use `example` |
+| EAS preview | `INSTITUTION_ID`, `EXPO_PUBLIC_BFF_BASE_URL` |
+| EAS production | Preview values plus `MOBILE_BUNDLE_IDENTIFIER` and `MOBILE_ANDROID_PACKAGE` |
 
----
+The bundled institution IDs are `example`, `hfmt`, and `mockuni`.
+`mockuni` is deterministic test data. Institution packs live in
+[`packages/institutions/src/packs/`](packages/institutions/src/packs/).
 
-## Development Commands
+BFF options:
 
-| Command | Description |
-|--------|-------------|
-| `pnpm dev` | Run BFF + mobile in parallel |
-| `pnpm verify` | Full CI check (install, lint, typecheck, tests, build, browser/BFF E2E, marker scan) |
-| `pnpm lint` | Lint all packages |
-| `pnpm typecheck` | TypeScript check |
-| `pnpm test` | Run tests |
-| `pnpm test:e2e` | Run deterministic BFF HTTP E2E tests |
-| `pnpm test:web` | Export the Expo web app and run Playwright/axe checks |
-| `pnpm build` | Build all packages |
+| Variable | Default | Purpose |
+|---|---:|---|
+| `BFF_PORT` | `4000` | Listening port |
+| `CORS_ORIGINS` | none | Comma-separated allowed origins |
+| `BFF_DEFAULT_CACHE_TTL` | `300` | Public source cache TTL in seconds, from 1 to 86400 |
+| `RRULE_EXPANSION_HORIZON_DAYS` | `90` | ICS recurrence horizon, from 1 to 366 days |
+| `BFF_REQUIRE_AUTH` | disabled | Enables the bearer token guard for `1`, `true`, `yes`, or `on` |
+| `BFF_AUTH_TOKEN` | none | Required when bearer auth is enabled |
+| `BFF_TRUSTED_PROXIES` | none | Comma-separated proxy IP addresses or CIDR ranges |
+| `BFF_TRUST_PROXY` | `never` | `never`, `always`, or implicit `trusted` through `BFF_TRUSTED_PROXIES` |
 
----
+`PUBLIC_EVENTS_MODE` and `PUBLIC_EVENTS_DATE` are deterministic fixture controls
+used by tests. Do not set them in a normal deployment.
 
-## E2E Tests
+See [Runbook](docs/runbook.md#configuration) for validation rules and proxy behavior.
 
-The default E2E gate is process-level and starts the real compiled BFF on a
-temporary local port with `INSTITUTION_ID=mockuni` and `PUBLIC_EVENTS_MODE=mock`.
-It covers the public HTTP flows consumed by the mobile app: health, events,
-rooms, schedule, today, and invalid query handling.
+## Usage
+
+Set `EXPO_PUBLIC_BFF_BASE_URL` in `apps/mobile/.env` to an address reachable by
+the target browser, simulator, emulator, or device.
+
+Run the BFF and Expo Go in separate terminals:
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm test:e2e
+# Terminal 1
+INSTITUTION_ID=hfmt corepack pnpm@9.0.0 --filter @concourse/bff dev
+
+# Terminal 2
+INSTITUTION_ID=hfmt corepack pnpm@9.0.0 --filter @concourse/mobile start
 ```
 
-Native mobile E2E tests use Detox under `apps/mobile/e2e/`. They require
-generated native iOS or Android projects and simulator/emulator tooling, so they
-are separate from the clean-checkout default gate.
+For an installed development client, replace `start` with `dev`.
 
----
+The BFF exposes:
 
-## Documentation
+- `GET /health`
+- `GET /events`
+- `GET /rooms`
+- `GET /schedule`
+- `GET /today`
 
-- [Product context](PRODUCT.md)
-- [Campus Desk design system](DESIGN.md)
-- [Frontend conventions and release checks](docs/frontend.md)
+`GET /today` accepts an optional `date=YYYY-MM-DD` query parameter. Data routes
+return `404 not_found` when the selected pack has no source for that route.
+Partial public-source results include `_degraded: true` and
+`x-data-degraded: true`.
 
-| Doc | Description |
-|-----|-------------|
-| [Runbook](docs/runbook.md) | Setup, config, commands, troubleshooting |
-| [Architecture](docs/architecture.md) | Design overview and diagrams |
-| [Connectors](docs/connectors.md) | BFF connectors and stubs |
-| [Institutions](docs/institutions.md) | Institution pack configuration |
-| [Deploy](docs/deploy/) | Deployment guides (BFF, mobile) |
-| [FAQ](docs/faq.md) | Frequently asked questions |
+## Repository structure
 
----
+```text
+apps/
+  bff/            Node.js BFF, public connectors, and private extension stubs
+  mobile/         Expo Router application and native E2E definitions
+packages/
+  institutions/  Public institution packs
+  shared/        Shared schemas and domain types
+docs/             Architecture, operations, deployment, and UI references
+infra/            Local Docker Compose configuration
+scripts/          Setup, validation, release, and test helpers
+```
 
-## Status
+Key entry points:
 
-- **Version:** 1.1.0
-- **Public scope:** Expo mobile starter, optional Node BFF, public connectors,
-  public institution packs, shared schemas, and mock fixtures
-- **Private scope:** secrets, SSO, private endpoints, private connectors,
-  internal planning/status ledgers, and deprecated audit packets
-- **Changelog:** See [CHANGELOG.md](CHANGELOG.md)
+- BFF server: [`apps/bff/src/server.ts`](apps/bff/src/server.ts)
+- Mobile routes: [`apps/mobile/app/`](apps/mobile/app/)
+- Public response schemas: [`packages/shared/src/domain/public.ts`](packages/shared/src/domain/public.ts)
+- Institution registry: [`packages/institutions/src/packs.ts`](packages/institutions/src/packs.ts)
 
----
+## Development workflow
+
+Use root commands so Turbo runs packages in dependency order.
+
+| Command | Result |
+|---|---|
+| `pnpm lint` | ESLint for root files and all packages |
+| `pnpm typecheck` | Root tool config and package TypeScript checks |
+| `pnpm test` | Package tests and root script tests |
+| `pnpm build` | Shared packages, institution packs, BFF, and mobile TypeScript build |
+| `pnpm test:e2e` | Compiled BFF process tests over local HTTP |
+| `pnpm test:web` | Expo web export and Chromium workflow, accessibility, responsive, and screenshot tests |
+| `pnpm release:check` | Version, Expo identity, and changelog checks |
+| `pnpm verify` | Complete source-candidate gate |
+
+No formatter is configured. ESLint checks code-quality rules for the configured
+source and configuration files; it does not lint Markdown.
+
+Install Chromium once before the browser gate:
+
+```bash
+pnpm exec playwright install chromium
+```
+
+## Testing
+
+The default verification command is:
+
+```bash
+pnpm verify
+```
+
+It performs a frozen install unless `SKIP_INSTALL=1`, checks release metadata
+and the tracked public tree, runs lint, type checks, tests, builds, Chromium
+tests, screenshot checks, BFF HTTP tests, and a source marker scan.
+
+Browser and native end-to-end tests are grouped under
+[`apps/mobile/e2e/`](apps/mobile/e2e/). Detox tests are skipped by CI unless
+generated native projects are present.
+
+## Deployment and operation
+
+- [BFF deployment](docs/deploy/bff.md) covers the production Docker image,
+  runtime variables, health checks, and reverse proxies.
+- [Mobile deployment](docs/deploy/mobile.md) covers EAS profiles and required
+  owner-managed values.
+- [Release process](docs/release.md) covers version tags, the GHCR image, and
+  GitHub Releases.
+- [Runbook](docs/runbook.md) covers local operation and failure diagnosis.
+
+The tag workflow publishes a versioned BFF image and a GitHub Release after
+validation. It does not build mobile binaries. Prereleases do not update the
+`latest` image tag.
 
 ## Troubleshooting
 
-| Symptom | Typical Cause | Fix |
-|--------|---------------|-----|
-| Generic 500 on data routes | Connector or Zod throw | Check BFF logs for details |
-| BFF fails at startup | Missing `INSTITUTION_ID` | Set `INSTITUTION_ID=hfmt` |
-| Mobile "Missing BFF base URL" | Wrong env variable | Set `EXPO_PUBLIC_BFF_BASE_URL` |
-| Empty events/rooms/schedule | Missing config or upstream failure | Check `publicSources` / `publicRooms` |
-| Rate limit issues | trustProxy / forwarded headers | See runbook for proxy setup |
-| Events/schedule wrong time | Timezone/date parsing | ICS TZID and German dates are parsed as local time; check server timezone |
+| Symptom | Check |
+|---|---|
+| BFF exits at startup | Set a known `INSTITUTION_ID` and check environment validation output |
+| Client reports a missing BFF URL | Set `EXPO_PUBLIC_BFF_BASE_URL` to a reachable HTTP(S) origin |
+| Client reports an institution mismatch | Use the same institution ID for the BFF and mobile build |
+| Data route returns `404 not_found` | Confirm the selected pack configures that source or room list |
+| Response is degraded or unavailable | Check BFF logs and the configured public upstream |
+| All proxied clients share a rate-limit bucket | Configure exact values in `BFF_TRUSTED_PROXIES` |
+| Browser tests cannot launch | Install Chromium with `pnpm exec playwright install chromium` |
+| Lockfile validation fails | Run `pnpm install`, review `pnpm-lock.yaml`, then retry with `--frozen-lockfile` |
 
----
+More detail is available in [Runbook](docs/runbook.md#troubleshooting).
 
-## Security & Privacy
+## Security considerations
 
-- No secrets or private endpoints in this repo
-- Public connectors only; private connectors belong in a separate (private) repo
-- See [SECURITY.md](SECURITY.md) and [Threat Model](docs/threat-model-lite.md)
+Only public source URLs and synthetic fixtures belong in this repository. Do
+not commit credentials, private endpoints, protected campus data, signing
+material, or logs containing personal data.
 
----
+Keep `BFF_TRUST_PROXY=never` unless the deployment has a reviewed proxy
+boundary. Prefer an exact `BFF_TRUSTED_PROXIES` allowlist over `always`. Store
+bearer tokens and signing keys in deployment secret storage.
+
+Report vulnerabilities through the private channel described in
+[SECURITY.md](SECURITY.md).
 
 ## Contributing
 
-Contributions welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and run `pnpm verify` before opening a PR.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a change and
+[SUPPORT.md](SUPPORT.md) before opening an issue. Pull requests should include
+tests for behavior changes, documentation for changed contracts, and the
+relevant verification results.
 
----
+## Additional documentation
+
+- [Architecture](docs/architecture.md)
+- [Institution packs](docs/institutions.md)
+- [Connectors](docs/connectors.md)
+- [Frontend conventions](docs/frontend.md)
+- [Design reference](DESIGN.md)
+- [CI](docs/ci.md)
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+This repository is licensed under the MIT License. See [LICENSE](LICENSE).

@@ -1,4 +1,4 @@
-import React from "react";
+/** Contains accessible icon, copy, and action primitives shared by error surfaces. */
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { scaled, scaledFont, spacing, typography } from "./theme";
 import { useTheme } from "./ThemeContext";
@@ -53,16 +53,18 @@ const styles = StyleSheet.create({
   },
 });
 
+/** Chooses a distinct icon for network, not-found, and generic failures. */
 function getErrorIcon(errorType: ErrorType): "wifi-off" | "search-off" | "error-outline" {
   if (errorType === "network") return "wifi-off";
   if (errorType === "notFound") return "search-off";
   return "error-outline";
 }
 
+/** Renders the failure icon inside a themed circular affordance. */
 export function ErrorStateIcon({ errorType }: { errorType: ErrorType }): JSX.Element {
   const theme = useTheme();
   const ui = theme.ui;
-  const iconCircleSize = scaled(80, ui);
+  const iconCircleSize = scaled(56, ui);
 
   return (
     <View style={styles.iconContainer}>
@@ -70,26 +72,29 @@ export function ErrorStateIcon({ errorType }: { errorType: ErrorType }): JSX.Ele
         style={[
           styles.iconCircle,
           {
-            borderColor: theme.colors.accent,
-            borderWidth: ui.emphasisBorderWidth,
+            backgroundColor: theme.colors.errorSurface,
+            borderColor: theme.colors.error,
+            borderWidth: ui.borderWidth,
             width: iconCircleSize,
             height: iconCircleSize,
             borderRadius: Math.round(iconCircleSize / 2),
           },
         ]}
       >
-        <MaterialIcons name={getErrorIcon(errorType)} size={36} color={theme.colors.error} />
+        <MaterialIcons name={getErrorIcon(errorType)} size={28} color={theme.colors.error} />
       </View>
     </View>
   );
 }
 
+/** Displays the localized failure title with the shared error-state typography. */
 export function ErrorStateTitle({ title }: { title: string }): JSX.Element {
   const theme = useTheme();
   const ui = theme.ui;
 
   return (
     <Text
+      accessibilityRole="header"
       style={[
         styles.title,
         {
@@ -104,6 +109,7 @@ export function ErrorStateTitle({ title }: { title: string }): JSX.Element {
   );
 }
 
+/** Displays selectable diagnostic copy so users can report or copy it accurately. */
 export function ErrorStateMessage({ message }: { message: string }): JSX.Element {
   const theme = useTheme();
   const ui = theme.ui;
@@ -125,6 +131,7 @@ export function ErrorStateMessage({ message }: { message: string }): JSX.Element
   );
 }
 
+/** Presents retry and optional back navigation actions in the prescribed order. */
 export function ErrorStateActions({
   onRetry,
   showGoBackAction,
@@ -141,7 +148,6 @@ export function ErrorStateActions({
   const bodyLineHeight = scaledFont(typography.body.lineHeight, ui);
   const buttonPaddingHorizontal = scaled(spacing.lg, ui);
   const buttonPaddingVertical = scaled(spacing.sm, ui);
-  const buttonRadius = scaled(8, ui);
 
   return (
     <View style={styles.actionsContainer}>
@@ -154,7 +160,7 @@ export function ErrorStateActions({
               backgroundColor: theme.colors.accent,
               paddingHorizontal: buttonPaddingHorizontal,
               paddingVertical: buttonPaddingVertical,
-              borderRadius: buttonRadius,
+              minHeight: scaled(44, ui),
             },
             pressed && styles.buttonPressed
           ]}
@@ -187,7 +193,7 @@ export function ErrorStateActions({
               borderWidth: ui.borderWidth,
               paddingHorizontal: buttonPaddingHorizontal,
               paddingVertical: buttonPaddingVertical,
-              borderRadius: buttonRadius,
+              minHeight: scaled(44, ui),
             },
             pressed && styles.buttonPressed
           ]}

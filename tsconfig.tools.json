@@ -1,0 +1,14 @@
+// Type-checks repository tooling separately from application source packages.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": [
+    "playwright.config.ts",
+    "vitest.config.ts",
+    "apps/bff/vitest.config.ts",
+    "apps/mobile/app.config.ts",
+    "apps/mobile/vitest.config.ts"
+  ]
+}

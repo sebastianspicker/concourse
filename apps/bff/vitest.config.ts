@@ -1,3 +1,5 @@
+/** Configures the BFF Vitest environment and test discovery. */
+
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({

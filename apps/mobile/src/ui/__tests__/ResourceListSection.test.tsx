@@ -1,7 +1,11 @@
+/** Verifies list sections switch correctly among loading, error, empty, and populated content. */
 import { describe, expect, it, vi } from "vitest";
 import TestRenderer from "react-test-renderer";
 import React from "react";
-import { ResourceListSection, ResourceListSectionProps } from "../ResourceListSection";
+import {
+  ResourceListSection,
+  type ResourceListSectionProps
+} from "../ResourceListSection";
 
 // Mock dependencies
 vi.mock("../EmptyState", () => ({
@@ -79,11 +83,9 @@ describe("ResourceListSection", () => {
     
     expect(section.props.children[0].props.children).toBe("Test Items");
     
-    // Should render list items
     const listItems = instance.findAllByProps({ "data-testid": "list-item" });
     expect(listItems).toHaveLength(3);
     
-    // Should not show loading or error
     expect(() => instance.findByProps({ "data-testid": "skeleton-list" })).toThrow();
     expect(() => instance.findByProps({ "data-testid": "error-state" })).toThrow();
   });
@@ -107,7 +109,6 @@ describe("ResourceListSection", () => {
     
     expect(skeleton.props.children).toContain("Loading 3 items");
     
-    // Should not show items or empty state while loading
     expect(() => instance.findByProps({ "data-testid": "list-item" })).toThrow();
     expect(() => instance.findByProps({ "data-testid": "empty-state" })).toThrow();
   });
@@ -121,7 +122,6 @@ describe("ResourceListSection", () => {
     
     expect(errorState.props.children).toBe("Failed to load items");
     
-    // Should not show items or loading when there's an error
     expect(() => instance.findByProps({ "data-testid": "list-item" })).toThrow();
     expect(() => instance.findByProps({ "data-testid": "skeleton-list" })).toThrow();
   });
@@ -170,7 +170,6 @@ describe("ResourceListSection", () => {
     
     const instance = tree.root;
     
-    // Should show loading, not error
     expect(instance.findByProps({ "data-testid": "skeleton-list" })).toBeDefined();
     expect(() => instance.findByProps({ "data-testid": "error-state" })).toThrow();
   });
@@ -181,7 +180,6 @@ describe("ResourceListSection", () => {
     
     const instance = tree.root;
     
-    // Should show error, not empty state
     expect(instance.findByProps({ "data-testid": "error-state" })).toBeDefined();
     expect(() => instance.findByProps({ "data-testid": "empty-state" })).toThrow();
   });
@@ -245,10 +243,8 @@ describe("ResourceListSection", () => {
     
     const instance = tree.root;
     
-    // Should show empty state
     expect(instance.findByProps({ "data-testid": "empty-state" })).toBeDefined();
     
-    // Should not show other states
     expect(() => instance.findByProps({ "data-testid": "skeleton-list" })).toThrow();
     expect(() => instance.findByProps({ "data-testid": "error-state" })).toThrow();
     expect(() => instance.findByProps({ "data-testid": "list-item" })).toThrow();

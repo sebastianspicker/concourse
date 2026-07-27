@@ -1,3 +1,4 @@
+/** Re-exports the shared public-resource response contracts consumed by the mobile client. */
 export type {
   EventsResponse,
   RoomsResponse,
@@ -6,4 +7,4 @@ export type {
   PublicEvent,
   Room,
   ScheduleItem
-} from "@campus/shared";
+} from "@concourse/shared";

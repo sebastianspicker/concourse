@@ -1,3 +1,5 @@
+/** Verifies CORS header policy for configured BFF origins. */
+
 import { describe, expect, it } from "vitest";
 import { getCorsHeaders } from "../cors";
 

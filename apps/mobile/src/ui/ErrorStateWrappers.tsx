@@ -1,6 +1,7 @@
-import React from "react";
+/** Supplies network, not-found, and generic defaults around the common error surface. */
 import { ErrorState } from "./ErrorState";
 
+/** Preconfigures ErrorState for recoverable network failures. */
 export function NetworkError({
   message = "Please check your internet connection and try again.",
   onRetry
@@ -17,6 +18,7 @@ export function NetworkError({
   );
 }
 
+/** Preconfigures ErrorState for a resource that no longer exists. */
 export function NotFoundError({
   message = "The item you're looking for doesn't exist or has been removed.",
   showGoBack = true
@@ -33,6 +35,7 @@ export function NotFoundError({
   );
 }
 
+/** Preconfigures ErrorState for failures without a specialized recovery path. */
 export function GenericError({
   message = "An unexpected error occurred. Please try again.",
   onRetry

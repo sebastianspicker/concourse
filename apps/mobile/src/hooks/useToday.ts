@@ -1,23 +1,38 @@
+/** Tracks the institution-local date and loads today’s resources across date rollovers. */
+import { useEffect, useState } from "react";
 import type { TodayResponse } from "../api/types";
+import { getInstitutionTimeZone } from "../config/institution";
 import { fetchToday } from "../data/publicApi";
-import { usePublicResource, type PublicResource } from "./usePublicResource";
+import type { PublicResource } from "./usePublicResource";
+import { useOfflineResource } from "./useOfflineResource";
+import { getCampusDate, millisecondsUntilNextCampusDay } from "../utils/campusTime";
 
-function getLocalDateParam(date = new Date()): string {
-  // `/today` is campus-day scoped. Send the device's local YYYY-MM-DD so a
-  // late-night mobile client does not inherit the BFF host's UTC date boundary.
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+/** Tracks the configured campus date and refreshes at its next local-day boundary. */
+export function useCampusDate(timeZone = getInstitutionTimeZone()): string {
+  const [currentInstant, setCurrentInstant] = useState(() => new Date());
+
+  useEffect(() => {
+/** Advances the local clock state so date-scoped queries refresh at campus midnight. */
+    const refreshDate = () => setCurrentInstant(new Date());
+    let timeout: ReturnType<typeof setTimeout>;
+/** Schedules the next campus-day rollover and recursively re-arms the timer. */
+    const scheduleNextRefresh = () => {
+      const now = new Date();
+      timeout = setTimeout(() => {
+        refreshDate();
+        scheduleNextRefresh();
+      }, millisecondsUntilNextCampusDay(now, timeZone));
+    };
+    refreshDate();
+    scheduleNextRefresh();
+    return () => clearTimeout(timeout);
+  }, [timeZone]);
+
+  return getCampusDate(currentInstant, timeZone);
 }
 
+/** Loads the campus-local Today summary and refreshes its date boundary at midnight. */
 export function useToday(): PublicResource<TodayResponse> {
-  return usePublicResource<TodayResponse>((options) =>
-    fetchToday({
-      force: options.force,
-      signal: options.signal,
-      offlineMode: true,
-      date: getLocalDateParam()
-    })
-  );
+  const campusDate = useCampusDate();
+  return useOfflineResource<TodayResponse, { date: string }>(fetchToday, { date: campusDate }, campusDate);
 }

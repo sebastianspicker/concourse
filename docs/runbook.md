@@ -1,206 +1,178 @@
-# RUNBOOK
+# Runbook
 
-## Prerequisites
+## Local operation
 
-- Node.js 22.13 or newer (see `.nvmrc`)
-- pnpm 9 (see `package.json#packageManager`)
-- Expo Go or a dev client for mobile testing (optional)
-
-## Install
+Install from the repository root:
 
 ```bash
-pnpm install --frozen-lockfile
+corepack pnpm@9.0.0 install --frozen-lockfile
 ```
 
-## Local development
-
-Run the BFF (public API):
+Create local configuration:
 
 ```bash
-INSTITUTION_ID=hfmt pnpm --filter @campus/bff dev
+cp apps/bff/.env.example apps/bff/.env
+cp apps/mobile/.env.example apps/mobile/.env
 ```
 
-Run the mobile app:
+Run the BFF:
 
 ```bash
-pnpm --filter @campus/mobile start
+INSTITUTION_ID=hfmt pnpm --filter @concourse/bff dev
 ```
 
-Run the mobile app with a dev client:
+Run Expo Go in another terminal:
 
 ```bash
-pnpm --filter @campus/mobile dev
+INSTITUTION_ID=hfmt pnpm --filter @concourse/mobile start
 ```
+
+Use `pnpm --filter @concourse/mobile dev` only when a compatible development
+client is already installed. The repository does not include that binary.
 
 ## Configuration
 
-BFF:
-- `INSTITUTION_ID` (required; available ids live in `packages/institutions/src/packs/`)
-- `BFF_PORT` (optional; default `4000`)
-- `BFF_REQUIRE_AUTH` (optional; unset/`0`/`false`/`no`/`off` disables bearer auth, `1`/`true`/`yes`/`on` requires it; invalid non-empty values fail closed)
-- `BFF_AUTH_TOKEN` (required when `BFF_REQUIRE_AUTH` enables bearer auth; use a long random secret from private infrastructure)
-- `CORS_ORIGINS` (optional; comma-separated; use `*` for development)
-- `BFF_TRUST_PROXY` (optional; default `never`). Controls which source the BFF uses for the client IP (rate limiting, logs):
-  - `never`: ignore forwarded headers; use `socket.remoteAddress` only
-  - `auto`: trust `X-Forwarded-For`/`Forwarded` only when the direct peer is a private/loopback address (e.g. a reverse proxy on the same host)
-  - `always`: always use the forwarded client IP — only use this when the BFF is behind a trusted proxy
+### BFF
 
-  Forwarded values are ignored by default. When proxy trust is enabled, forwarded values are validated as IPv4/IPv6; invalid values fall back to the direct peer address.
+| Variable | Validation and behavior |
+|---|---|
+| `INSTITUTION_ID` | Required. Must match a key in `packages/institutions/src/packs.ts`. |
+| `BFF_PORT` | Optional. Integer from 1 to 65535. Default `4000`. |
+| `CORS_ORIGINS` | Optional comma-separated origins. No origins are allowed by default. `*` is suitable only for development. |
+| `BFF_DEFAULT_CACHE_TTL` | Optional integer from 1 to 86400 seconds. Default `300`. |
+| `RRULE_EXPANSION_HORIZON_DAYS` | Optional integer from 1 to 366 days. Default `90`. |
+| `BFF_REQUIRE_AUTH` | Optional. `1`, `true`, `yes`, and `on` enable auth. Unset, `0`, `false`, `no`, and `off` disable it. Other non-empty values fail validation. |
+| `BFF_AUTH_TOKEN` | Required when `BFF_REQUIRE_AUTH` enables auth. Protect it as a secret. |
+| `BFF_TRUSTED_PROXIES` | Optional comma-separated IP addresses or CIDR ranges. Enables trusted-proxy mode when `BFF_TRUST_PROXY` is unset. |
+| `BFF_TRUST_PROXY` | Optional. Default `never`. Accepts `never` or `always`; `auto` and boolean aliases are rejected. |
+| `APP_VERSION` | Optional image or deployment version reported by `/health`. |
 
-Mobile:
-- `EXPO_PUBLIC_BFF_BASE_URL` (required in development and production; set it to the BFF URL reachable from the mobile runtime)
-- `INSTITUTION_ID` (required for preview and production builds; local development defaults to the `example` public pack)
+`BFF_TRUSTED_PROXIES` is the preferred proxy configuration. The BFF accepts
+forwarding headers only when the immediate peer is allowlisted, then walks the
+chain from right to left through known proxies. Invalid chains and untrusted
+peers use the socket address.
 
-See the root `.env.example`, `apps/bff/.env.example`, and `apps/mobile/.env.example` files for concise variable lists.
+`BFF_TRUST_PROXY=always` trusts forwarding headers from every peer. Use it only
+when the BFF is isolated behind an edge that replaces all forwarding headers.
 
-## Format and lint
+### Mobile application
 
-Formatting is enforced via ESLint (no separate formatter configured).
+| Variable | Validation and behavior |
+|---|---|
+| `EXPO_PUBLIC_BFF_BASE_URL` | Required by the running client. Preview and production config require a valid HTTP(S) URL. |
+| `INSTITUTION_ID` | Required for preview and production. Local development defaults to `example`. |
+| `EXPO_PUBLIC_INSTITUTION_ID` | Build-time fallback when `INSTITUTION_ID` is not set. Prefer `INSTITUTION_ID`. |
+| `MOBILE_BUNDLE_IDENTIFIER` | Required for production. Template identifiers are rejected. |
+| `MOBILE_ANDROID_PACKAGE` | Required for production. Template identifiers are rejected. |
+
+The BFF and mobile application must use the same institution ID. When the BFF
+returns `x-institution-id`, the client rejects a mismatch.
+
+## Endpoint behavior
+
+| Endpoint | Behavior |
+|---|---|
+| `GET /health` | Process, version, selected institution, pack loading, uptime, and heap status. Does not probe upstream sources. |
+| `GET /events` | Normalized public events from configured HTML sources. |
+| `GET /rooms` | Public rooms declared by the selected institution pack. |
+| `GET /schedule` | Normalized occurrences from configured public ICS sources. |
+| `GET /today` | Events for a campus-local date plus public rooms. Accepts `date=YYYY-MM-DD`. |
+
+`/health` returns 200 for `ok` and `warning`, 503 for `error`, and
+`Cache-Control: no-store`. Bearer auth, when enabled, also protects `/health`.
+
+Data routes return `404 not_found` when the selected pack has no source for the
+route. Partial event or schedule results can include `_degraded: true` and the
+`x-data-degraded: true` response header. Degraded BFF results are not cached.
+
+## Validation
 
 ```bash
 pnpm lint
-```
-
-## Typecheck
-
-```bash
 pnpm typecheck
-```
-
-## Build
-
-```bash
-pnpm build
-```
-
-## Tests
-
-```bash
 pnpm test
+pnpm build
+pnpm test:web
+pnpm test:e2e
 ```
 
-## Verification (full loop)
+Run the complete local gate with:
 
 ```bash
 pnpm verify
 ```
 
-`pnpm verify` runs a frozen dependency install, lint, typecheck, unit and integration tests, build, Playwright/axe web E2E, deterministic BFF E2E, and a placeholder-marker scan.
+No formatter is configured. `pnpm lint` checks code-quality rules for the
+configured source and configuration files; it does not lint Markdown.
 
-## Security checks (minimum baseline)
+## Logs and request IDs
 
-Secret scan (local, if `gitleaks` is installed):
+The BFF writes structured log records. Each response includes
+`x-request-id`. A valid incoming `x-request-id` is retained; otherwise the
+server creates one. Use this value to correlate route errors with server logs.
 
-```bash
-gitleaks detect --config .gitleaks.toml
-```
-
-SAST (CI-only):
-- GitHub Actions runs CodeQL in `.github/workflows/codeql.yml`.
-
-SCA / dependency review:
-- GitHub Actions runs `pnpm audit --audit-level=moderate --prod` in `.github/workflows/dependency-review.yml`.
-- Equivalent local audit (uses the npm registry):
-
-```bash
-pnpm audit --audit-level=moderate --prod
-```
-
-## Quick start (one command)
-
-From repo root, with one terminal:
-
-```bash
-INSTITUTION_ID=hfmt pnpm dev
-```
-
-This runs BFF and mobile in parallel. For BFF only: `INSTITUTION_ID=hfmt pnpm --filter @campus/bff dev`. For mobile only: `pnpm --filter @campus/mobile start`.
-
-## Auth (optional, for private forks)
-
-The public template has no mobile login; tabs are reachable without authentication. A private fork that requires login must add a reviewed session provider and route guard. No demo session or placeholder login implementation is included in the public app.
-
-The BFF can enforce a simple bearer-token guard for private fork smoke tests or internal deployments:
-
-```bash
-BFF_REQUIRE_AUTH=1
-BFF_AUTH_TOKEN=CHANGE_ME_LONG_RANDOM_TOKEN
-```
-
-Accepted enabled values are `1`, `true`, `yes`, and `on`. Accepted disabled values are unset, `0`, `false`, `no`, and `off`. Any other non-empty `BFF_REQUIRE_AUTH` value returns `500 auth_misconfigured` instead of serving routes unauthenticated.
-
-## Fast loop
-
-Use this for quick local checks during development:
-
-```bash
-pnpm lint
-pnpm typecheck
-```
-
-## Health endpoint
-
-`GET /health` returns `Cache-Control: no-store` and reports BFF process status,
-the selected institution id, uptime, institution-pack loading, and heap memory
-status. It returns HTTP 200 for `ok` and `warning`, and HTTP 503 for `error`
-when the selected institution pack cannot be loaded. It does not probe public
-upstream websites or ICS feeds; data routes surface those source failures with
-normal route errors or degraded responses.
-
-## BFF endpoints (semantics)
-
-- **GET /events** – Public events from configured sources (see connectors).
-- **GET /today** – Aggregate home view: events filtered to “today” plus `rooms`. Accepts an optional `date=YYYY-MM-DD` query parameter so the mobile app can send its local date instead of relying on server UTC. Also respects `PUBLIC_EVENTS_DATE` env var for test fixtures.
-- **GET /rooms**, **GET /schedule** – Rooms and schedule from institution config.
-
-Responses may include `_degraded: true` / header `x-data-degraded` when data is partial or fallback. When a route has no configured sources, the BFF returns `404 not_found` with a descriptive message instead of an empty payload.
-
-### BFF request flow
-
-```mermaid
-flowchart TD
-  A[Request] --> B[Parse URL]
-  B --> C[CORS headers]
-  C --> D[Rate limit]
-  D --> E{Allowed?}
-  E -->|No| F[429]
-  E -->|Yes| G{OPTIONS?}
-  G -->|Yes| H[204]
-  G -->|No| I{GET?}
-  I -->|No| J[405]
-  I -->|Yes| K{Path?}
-  K -->|/health| L[Health handler]
-  K -->|Data route| M[Load institution]
-  M --> N{Loaded?}
-  N -->|No| O[404/500]
-  N -->|Yes| P[Route handler]
-  P --> Q[JSON + cache headers]
-```
-
-## Empty or missing data
-
-If `/events`, `/rooms`, or `/schedule` return `404 not_found` or unexpectedly empty arrays, check:
-
-- **BFF:** `publicSources.events`, `publicSources.schedules`, and `publicRooms` in the institution pack (e.g. `packages/institutions/src/packs/*.ts`). Missing or empty config yields `404 not_found` for the affected route.
-- **Environment:** `INSTITUTION_ID` must match a pack that defines those sources.
-- **Upstream:** Public connectors fetch from external URLs; if those fail, the BFF may return partial or empty data. Check BFF logs for fetch/parse errors.
-
-## Frontend styling
-
-The mobile app uses React Native `StyleSheet` values backed by the single token source in `apps/mobile/src/ui/theme.ts`. Tailwind and NativeWind are intentionally not part of the runtime. See [`frontend.md`](frontend.md) for the component, accessibility, and responsive conventions.
-
-## OTA Code Signing (EAS Update)
-
-If you use EAS Update, enable code signing and keep private keys out of this repo:
-
-1. Generate code signing keys locally.
-2. Store private keys in a secret manager (GitHub Actions Secrets, 1Password, Vault).
-3. Configure EAS Update to use signing.
-4. Rotate keys if they ever leak.
+The BFF logs public source failures without returning internal error details to
+clients. `/health` does not establish that public event or schedule sources are
+reachable.
 
 ## Troubleshooting
 
-- If the mobile app cannot reach the BFF, set `EXPO_PUBLIC_BFF_BASE_URL` to the BFF URL. The mobile app now requires this in both development and production.
-- If `pnpm` reports lockfile drift after an intentional dependency change, run `pnpm install` from the repo root and review the resulting `pnpm-lock.yaml` diff. CI and clean checkouts should continue to use `pnpm install --frozen-lockfile`.
-- If TypeScript builds fail, ensure each package is built in dependency order by running `pnpm build` from the repo root.
-- To skip install or the TODO/FIXME marker scan during verify: `SKIP_INSTALL=1 pnpm verify` or `SKIP_MARKER_CHECK=1 pnpm verify`.
+### The BFF does not start
+
+- Confirm Node is at least 22.13 and the install used pnpm 9.0.0.
+- Confirm `INSTITUTION_ID` is `example`, `hfmt`, `mockuni`, or a newly registered pack.
+- Check numeric ranges for `BFF_PORT`, `BFF_DEFAULT_CACHE_TTL`, and
+  `RRULE_EXPANSION_HORIZON_DAYS`.
+- If auth is enabled, set a non-empty `BFF_AUTH_TOKEN`.
+- Remove invalid entries from `BFF_TRUSTED_PROXIES`.
+
+### The client cannot reach the BFF
+
+- Set `EXPO_PUBLIC_BFF_BASE_URL` in `apps/mobile/.env`.
+- Use an address reachable from the target device. A physical device usually
+  cannot use the development machine's `localhost`.
+- Confirm the BFF port and `CORS_ORIGINS`.
+- Confirm the client and BFF use the same institution ID.
+
+### A data route returns 404
+
+Inspect the selected pack in `packages/institutions/src/packs/`. Events require
+`publicSources.events`, schedules require `publicSources.schedules`, and rooms
+require `publicRooms`. Today requires at least an event source or a room list.
+
+### Data is empty or degraded
+
+- Check the configured source URL from the BFF host.
+- Check BFF logs for public fetch or parse failures.
+- Confirm event timestamps fall on the requested institution-local date.
+- Confirm the institution timezone is a valid IANA timezone.
+
+### Rate limiting uses the wrong client address
+
+Keep socket-address behavior with `BFF_TRUST_PROXY=never`, or add the exact
+proxy IP addresses and CIDR ranges to `BFF_TRUSTED_PROXIES`. Do not enable
+`always` on an exposed BFF.
+
+### Browser tests fail to launch
+
+```bash
+pnpm exec playwright install chromium
+pnpm test:web
+```
+
+### Lockfile validation fails
+
+After an intentional dependency change, run `pnpm install` and review the
+`pnpm-lock.yaml` diff. Clean checkouts and CI use `--frozen-lockfile`.
+
+## Security checks
+
+If Gitleaks is installed locally:
+
+```bash
+gitleaks detect --redact --source . --verbose --config .gitleaks.toml
+```
+
+`make gitleaks` runs the pinned containerized scanner. GitHub Actions also runs
+Gitleaks, CodeQL, and OSV lockfile analysis. Do not place secrets or private
+source URLs in command output, issue reports, or test fixtures.

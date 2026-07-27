@@ -1,7 +1,39 @@
+/** Exercises BFF HTTP integration behavior across public routes. */
+
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import request from "supertest";
+import { expectErrorEnvelope } from "./__tests__/httpMocks";
 import { createRequestListener } from "./server";
 import { clearRateLimitBuckets } from "./utils/rateLimit";
+
+async function rateLimitedHealthRequest() {
+  const app = createRequestListener();
+  for (let index = 0; index < 65; index += 1) {
+    await request(app).get("/health");
+  }
+  return request(app).get("/health").expect(429);
+}
+
+function healthyResponse() {
+  return request(createRequestListener()).get("/health").expect(200);
+}
+
+function requireAuthentication() {
+  process.env.BFF_REQUIRE_AUTH = "1";
+  process.env.BFF_AUTH_TOKEN = "test-token";
+}
+
+function expectRateLimitedResponse(
+  res: Awaited<ReturnType<typeof rateLimitedHealthRequest>>,
+) {
+  expectErrorEnvelope(res.body);
+  expect(res.body.error.code).toBe("rate_limited");
+}
+
+function expectNotFoundResponse(res: { body: Record<string, unknown> }) {
+  expect(res.body).toHaveProperty("error");
+  expect(res.body.error).toMatchObject({ code: "not_found" });
+}
 
 describe("BFF server integration", () => {
   beforeAll(() => {
@@ -19,27 +51,15 @@ describe("BFF server integration", () => {
     it("returns 404 for unknown path", async () => {
       const app = createRequestListener();
       const res = await request(app).get("/unknown").expect(404);
-      expect(res.body).toHaveProperty("error");
-      expect(res.body.error).toMatchObject({ code: "not_found" });
+      expectNotFoundResponse(res);
     });
 
-    it("returns 405 for POST to data route", async () => {
-      const app = createRequestListener();
-      const res = await request(app).post("/events").expect(405);
-      expect(res.body).toHaveProperty("error");
-      expect(res.body.error).toMatchObject({ code: "method_not_allowed" });
-    });
-
-    it("returns 405 for PUT to data route", async () => {
-      const app = createRequestListener();
-      const res = await request(app).put("/events").expect(405);
-      expect(res.body).toHaveProperty("error");
-      expect(res.body.error).toMatchObject({ code: "method_not_allowed" });
-    });
-
-    it("returns 405 for DELETE to data route", async () => {
-      const app = createRequestListener();
-      const res = await request(app).delete("/events").expect(405);
+    it.each([
+      ["POST", () => request(createRequestListener()).post("/events")],
+      ["PUT", () => request(createRequestListener()).put("/events")],
+      ["DELETE", () => request(createRequestListener()).delete("/events")],
+    ])("returns 405 for %s to data route", async (_method, sendRequest) => {
+      const res = await sendRequest().expect(405);
       expect(res.body).toHaveProperty("error");
       expect(res.body.error).toMatchObject({ code: "method_not_allowed" });
     });
@@ -49,8 +69,7 @@ describe("BFF server integration", () => {
       const app = createRequestListener();
       const res = await request(app).get("/no-such-endpoint").expect(404);
 
-      expect(res.body).toHaveProperty("error");
-      expect(res.body.error).toMatchObject({ code: "not_found" });
+      expectNotFoundResponse(res);
     });
   });
 
@@ -65,21 +84,14 @@ describe("BFF server integration", () => {
       expect(res.body).toHaveProperty("events");
     });
 
-    it("handles invalid limit parameter", async () => {
+    it.each([
+      ["invalid", "abc"],
+      ["negative", "-1"],
+      ["extremely large", "999999999"],
+    ])("handles %s limit parameter", async (_description, limit) => {
       const app = createRequestListener();
-      const res = await request(app)
-        .get("/events?limit=abc")
-        .expect(400);
-      
-      expect(res.body.error.code).toBe("bad_request");
-    });
+      const res = await request(app).get(`/events?limit=${limit}`).expect(400);
 
-    it("handles negative limit parameter", async () => {
-      const app = createRequestListener();
-      const res = await request(app)
-        .get("/events?limit=-1")
-        .expect(400);
-      
       expect(res.body.error.code).toBe("bad_request");
     });
 
@@ -92,14 +104,6 @@ describe("BFF server integration", () => {
       expect(res.body).toHaveProperty("events");
     });
 
-    it("handles extremely large limit parameter", async () => {
-      const app = createRequestListener();
-      const res = await request(app)
-        .get("/events?limit=999999999")
-        .expect(400);
-      
-      expect(res.body.error.code).toBe("bad_request");
-    });
   });
 
   describe("404 Not Found handling", () => {
@@ -134,47 +138,26 @@ describe("BFF server integration", () => {
 
   describe("429 Rate Limit handling", () => {
     it("returns 429 when rate limit exceeded", async () => {
-      const app = createRequestListener();
-      const limit = 65;
-      for (let i = 0; i < limit; i++) {
-        await request(app).get("/health");
-      }
-      const res = await request(app).get("/health").expect(429);
-      expect(res.body).toHaveProperty("error");
-      expect(res.body.error).toMatchObject({ code: "rate_limited" });
+      const res = await rateLimitedHealthRequest();
+      expectRateLimitedResponse(res);
       expect(res.headers["retry-after"]).toBeDefined();
     });
 
     it("includes retry-after header in rate limit response", async () => {
-      const app = createRequestListener();
-      const limit = 65;
-      for (let i = 0; i < limit; i++) {
-        await request(app).get("/health");
-      }
-      const res = await request(app).get("/health").expect(429);
+      const res = await rateLimitedHealthRequest();
       const retryAfter = parseInt(res.headers["retry-after"], 10);
       expect(retryAfter).toBeGreaterThan(0);
     });
 
     it("rate limit response includes proper error body", async () => {
-      const app = createRequestListener();
-      const limit = 65;
-      for (let i = 0; i < limit; i++) {
-        await request(app).get("/health");
-      }
-      const res = await request(app).get("/health").expect(429);
+      const res = await rateLimitedHealthRequest();
       
-      expect(res.body).toHaveProperty("error");
-      expect(res.body.error).toHaveProperty("code");
-      expect(res.body.error).toHaveProperty("message");
-      expect(res.body.error.code).toBe("rate_limited");
+      expectRateLimitedResponse(res);
     });
 
     it("ignores spoofed forwarded headers in the default proxy mode", async () => {
       const app = createRequestListener();
-      const limit = 65;
-
-      for (let i = 0; i < limit; i++) {
+      for (let index = 0; index < 65; index += 1) {
         await request(app).get("/health").set("X-Forwarded-For", "192.168.1.1");
       }
       const res1 = await request(app)
@@ -194,8 +177,7 @@ describe("BFF server integration", () => {
   describe("500 Internal Server Error handling", () => {
     it("handles unexpected errors gracefully", async () => {
       // Verify the health endpoint continues to work as a baseline
-      const app = createRequestListener();
-      const res = await request(app).get("/health").expect(200);
+      const res = await healthyResponse();
 
       // Health endpoint should still work
       expect(res.body).toHaveProperty("status", "ok");
@@ -207,9 +189,7 @@ describe("BFF server integration", () => {
       // Test that error responses have consistent structure
       const res = await request(app).get("/unknown-route").expect(404);
       
-      expect(res.body).toHaveProperty("error");
-      expect(res.body.error).toHaveProperty("code");
-      expect(res.body.error).toHaveProperty("message");
+      expectErrorEnvelope(res.body);
       expect(typeof res.body.error.code).toBe("string");
       expect(typeof res.body.error.message).toBe("string");
     });
@@ -271,45 +251,26 @@ describe("BFF server integration", () => {
   });
 
   describe("health endpoint", () => {
-    it("returns 200 for GET /health", async () => {
-      const app = createRequestListener();
-      const res = await request(app).get("/health").expect(200);
-      expect(res.body).toMatchObject({ status: "ok" });
-    });
-
-    it("returns version in health response", async () => {
-      const app = createRequestListener();
-      const res = await request(app).get("/health").expect(200);
-      expect(res.body).toHaveProperty("version");
-    });
-
-    it("returns institution in health response", async () => {
-      const app = createRequestListener();
-      const res = await request(app).get("/health").expect(200);
-      expect(res.body).toHaveProperty("institution");
-    });
-
-    it("returns uptime in health response", async () => {
-      const app = createRequestListener();
-      const res = await request(app).get("/health").expect(200);
-      expect(res.body).toHaveProperty("uptime");
-      // Uptime is returned as a formatted string
-      expect(typeof res.body.uptime).toBe("string");
-    });
-
-    it("returns checks in health response", async () => {
-      const app = createRequestListener();
-      const res = await request(app).get("/health").expect(200);
-      expect(res.body).toHaveProperty("checks");
-      expect(res.body.checks).toHaveProperty("institutionPack");
-      expect(res.body.checks).toHaveProperty("memory");
+    it.each([
+      ["returns 200 for GET /health", (res: { body: Record<string, unknown> }) => expect(res.body).toMatchObject({ status: "ok" })],
+      ["returns version in health response", (res: { body: Record<string, unknown> }) => expect(res.body).toHaveProperty("version")],
+      ["returns institution in health response", (res: { body: Record<string, unknown> }) => expect(res.body).toHaveProperty("institution")],
+      ["returns uptime in health response", (res: { body: Record<string, unknown> }) => {
+        expect(res.body).toHaveProperty("uptime");
+        expect(typeof res.body.uptime).toBe("string");
+      }],
+      ["returns checks in health response", (res: { body: Record<string, unknown> }) => {
+        expect(res.body).toHaveProperty("checks");
+        expect(res.body.checks).toMatchObject({ institutionPack: expect.anything(), memory: expect.anything() });
+      }],
+    ])("%s", async (_name, assertion) => {
+      assertion(await healthyResponse());
     });
   });
 
   describe("auth guard", () => {
     it("returns 401 when auth is required and no bearer token is provided", async () => {
-      process.env.BFF_REQUIRE_AUTH = "1";
-      process.env.BFF_AUTH_TOKEN = "test-token";
+      requireAuthentication();
       const app = createRequestListener();
 
       const res = await request(app).get("/health").expect(401);
@@ -317,8 +278,7 @@ describe("BFF server integration", () => {
     });
 
     it("allows requests when auth is required and a bearer token is present", async () => {
-      process.env.BFF_REQUIRE_AUTH = "1";
-      process.env.BFF_AUTH_TOKEN = "test-token";
+      requireAuthentication();
       const app = createRequestListener();
 
       const res = await request(app)
@@ -402,31 +362,6 @@ describe("BFF server integration", () => {
       const res = await request(app).get("/today").expect(200);
       expect(res.body).toHaveProperty("events");
       // Schedule may not be present if no schedules configured
-    });
-  });
-
-  describe("rate limiting", () => {
-    it("returns 429 when rate limit exceeded", async () => {
-      const app = createRequestListener();
-      const limit = 65;
-      for (let i = 0; i < limit; i++) {
-        await request(app).get("/health");
-      }
-      const res = await request(app).get("/health").expect(429);
-      expect(res.body).toHaveProperty("error");
-      expect(res.body.error).toMatchObject({ code: "rate_limited" });
-      expect(res.headers["retry-after"]).toBeDefined();
-    });
-
-    it("includes retry-after header in rate limit response", async () => {
-      const app = createRequestListener();
-      const limit = 65;
-      for (let i = 0; i < limit; i++) {
-        await request(app).get("/health");
-      }
-      const res = await request(app).get("/health").expect(429);
-      const retryAfter = parseInt(res.headers["retry-after"], 10);
-      expect(retryAfter).toBeGreaterThan(0);
     });
   });
 

@@ -1,3 +1,4 @@
+/** Serves deterministic, privacy-safe BFF responses for browser accessibility and screenshot tests. */
 import { createServer } from "node:http";
 
 const port = Number.parseInt(process.env.MOCK_BFF_PORT ?? "4400", 10);
@@ -17,8 +18,10 @@ const rooms = [
 const schedule = [
   { id: "orientation", title: "Campus orientation", startsAt: "2026-09-14T08:00:00.000Z", endsAt: "2026-09-14T09:30:00.000Z", location: "Auditorium", campusId: "main" },
   { id: "welcome-session", title: "Welcome session", startsAt: "2026-09-14T10:00:00.000Z", endsAt: "2026-09-14T11:00:00.000Z", location: "Seminar room 204", campusId: "main" },
+  { id: "open-rehearsal", title: "Open rehearsal", startsAt: "2026-09-14T12:00:00.000Z", endsAt: "2026-09-14T13:00:00.000Z", location: "Studio A", campusId: "main" },
 ];
 
+/** Sends uncached JSON with the same public headers exposed by the real BFF. */
 function sendJson(response, status, body) {
   response.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
@@ -30,10 +33,13 @@ function sendJson(response, status, body) {
   response.end(JSON.stringify(body));
 }
 
+/** Applies the browser fixture's case-insensitive search behavior. */
 function includesSearch(value, search) {
   return !search || value.toLocaleLowerCase().includes(search.toLocaleLowerCase());
 }
 
+// Route handlers stay data-only so the request dispatcher can enforce methods
+// and CORS consistently for every fixture endpoint.
 const getHandlers = new Map([
   ["/health", (_url, response) => sendJson(response, 200, { status: "ok" })],
   ["/events", (url, response) => {
@@ -50,6 +56,7 @@ const getHandlers = new Map([
   ["/today", (_url, response) => sendJson(response, 200, { events, rooms, _sourcesConfigured: true })],
 ]);
 
+/** Dispatches a supported GET route or returns the public not-found shape. */
 function handleGet(url, response) {
   const handler = getHandlers.get(url.pathname);
   if (handler) {
@@ -59,6 +66,7 @@ function handleGet(url, response) {
   sendJson(response, 404, { error: { code: "not_found", message: "Not found" } });
 }
 
+/** Enforces the minimal CORS and method contract expected by the exported app. */
 function handleRequest(request, response) {
   if (request.method === "OPTIONS") {
     response.writeHead(204, { "access-control-allow-origin": webOrigin, "access-control-allow-methods": "GET, OPTIONS" });

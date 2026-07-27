@@ -1,3 +1,4 @@
+# Keeps generated, private, and internal work products out of the public source tree.
 ### Dependencies
 node_modules/
 .pnpm-store/
@@ -6,17 +7,14 @@ node_modules/
 dist/
 build/
 .next/
+*.tsbuildinfo
+release-notes.md
+
+### Test artifacts
 coverage/
 .coverage
 htmlcov/
 .nyc_output/
-*.tsbuildinfo
-*.log
-npm-debug.log*
-pnpm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-release-notes.md
 test-results/
 junit.xml
 junit-*.xml
@@ -24,16 +22,22 @@ junit-*.xml
 *.xcresult
 *.sarif
 *.sarif.json
-reports/
 playwright-report/
 blob-report/
 apps/mobile/artifacts/
 apps/mobile/detox-artifacts/
+.vitest/
+
+### Runtime logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 ### Tooling caches
 .turbo/
 .cache/
-.vitest/
 .codegraph/
 .eslintcache
 .parcel-cache/
@@ -93,32 +97,28 @@ AUDIT.md
 HARNESS_PRINCIPLES.md
 code_review.md
 deprecated/
-external/
-vendor/
-third_party/
-third-party/
-3rdparty/
 docs/agent/
 docs/archive/
 docs/deprecated/
 docs/source-audit/
 docs/function-audit.md
-docs/*-audit.md
-docs/*-review.md
-docs/*-status.md
-docs/*-ledger.md
-docs/*-plan.md
-docs/*-findings.md
 docs/architecture-map.md
 docs/code-index.md
 docs/verification-baseline.md
 scripts/topology_inventory.sh
-plans/
 plan.md
 plan-status.md
 plan-findings-ledger.md
 progress.md
+RELEASE_STATUS.md
 DECISIONS.md
 FINDINGS.md
 LOG.md
 REFACTOR_PLAN.md
+IMPLEMENTATION_BACKLOG.md
+BUGS_AND_FIXES.md
+BUGS_AND_FIXES_ARCHIVE.md
+OPEN_IMPROVEMENTS_AND_PLAN.md
+REMEDIATION.md
+REMEDIATION_PLAN.md
+REMEDIATION_LEDGER.md

@@ -1,37 +1,11 @@
+/** Exercises public event-route filtering and successful responses. */
+
 import { beforeEach, describe, expect, it } from "vitest";
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { handleEvents } from "../events";
 import institution from "../../__fixtures__/institution.public.json";
 import eventsFixture from "../../__fixtures__/events.json";
+import { invokeRoute } from "../../__tests__/httpMocks";
 import { clearCache } from "../../utils/cache";
-
-function createMockResponse(): {
-  response: ServerResponse;
-  getBody: () => string | undefined;
-  getStatus: () => number | undefined;
-} {
-  let body: string | undefined;
-  let status: number | undefined;
-
-  const response = {
-    setHeader() {
-      return undefined;
-    },
-    writeHead(code: number) {
-      status = code;
-      return response;
-    },
-    end(chunk?: string) {
-      body = chunk;
-    }
-  } as unknown as ServerResponse;
-
-  return {
-    response,
-    getBody: () => body,
-    getStatus: () => status
-  };
-}
 
 describe("GET /events", () => {
   beforeEach(() => {
@@ -41,21 +15,16 @@ describe("GET /events", () => {
   });
 
   it("returns public events", async () => {
-    const { response, getBody, getStatus } = createMockResponse();
+    const result = await invokeRoute(handleEvents, institution);
 
-    await handleEvents({} as IncomingMessage, response, institution);
-
-    expect(getStatus()).toBe(200);
-    expect(JSON.parse(getBody() ?? "{}")).toEqual(eventsFixture);
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual(eventsFixture);
   });
 
   it("includes _total equal to events array length", async () => {
-    const { response, getBody, getStatus } = createMockResponse();
+    const result = await invokeRoute(handleEvents, institution);
 
-    await handleEvents({} as IncomingMessage, response, institution);
-
-    expect(getStatus()).toBe(200);
-    const body = JSON.parse(getBody() ?? "{}");
-    expect(body._total).toBe(body.events.length);
+    expect(result.status).toBe(200);
+    expect(result.body._total).toBe(result.body.events.length);
   });
 });

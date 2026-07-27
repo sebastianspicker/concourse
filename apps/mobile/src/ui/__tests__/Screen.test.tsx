@@ -1,3 +1,4 @@
+/** Verifies the screen shell applies scrolling, width constraints, and refresh affordances. */
 import React from "react";
 import TestRenderer from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";
@@ -8,6 +9,7 @@ vi.mock("react-native", () => ({
   RefreshControl: ({ refreshing, onRefresh }: { refreshing: boolean; onRefresh: () => void }) => <button data-testid="refresh-control" data-refreshing={refreshing} onClick={onRefresh} />,
   ScrollView: ({ children, refreshControl }: { children: React.ReactNode; refreshControl?: React.ReactNode }) => <div data-testid="scroll-view">{refreshControl}{children}</div>,
   View: ({ children, testID }: { children: React.ReactNode; testID?: string }) => <div data-testid={testID}>{children}</div>,
+  useWindowDimensions: () => ({ width: 390 }),
   StyleSheet: { create: (styles: object) => styles },
 }));
 

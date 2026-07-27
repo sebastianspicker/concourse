@@ -1,65 +1,18 @@
+/** Covers invalid schedule-route requests and upstream failure responses. */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { handleSchedule } from "../schedule";
 import institution from "../../__fixtures__/institution.public.json";
+import { invokeRoute, stubScheduleFixtureFetch } from "../../__tests__/httpMocks";
 import { clearCache } from "../../utils/cache";
-import { readFileSync } from "node:fs";
 
-function createMockResponse(): {
-  response: ServerResponse;
-  getBody: () => string | undefined;
-  getStatus: () => number | undefined;
-  getHeaders: () => Record<string, string>;
-} {
-  let body: string | undefined;
-  let status: number | undefined;
-  const headers: Record<string, string> = {};
+vi.mock("../../utils/fetch", async () => ({
+  fetchTextWithTimeout: (await import("../../__tests__/fetchTextMock")).fetchTextUsingGlobalMock
+}));
 
-  const response = {
-    setHeader(key: string, value: string) {
-      headers[key.toLowerCase()] = value;
-      return undefined;
-    },
-    writeHead(code: number) {
-      status = code;
-      return response;
-    },
-    end(chunk?: string) {
-      body = chunk;
-    },
-    headersSent: false,
-    writableEnded: false
-  } as unknown as ServerResponse;
-
-  return {
-    response,
-    getBody: () => body,
-    getStatus: () => status,
-    getHeaders: () => headers
-  };
-}
-
-function createMockRequest(url: string, method = "GET"): IncomingMessage {
-  return {
-    url,
-    method,
-    headers: { host: "localhost:4000" }
-  } as unknown as IncomingMessage;
-}
-
-describe("GET /schedule — negative paths", () => {
+describe("GET /schedule: negative paths", () => {
   beforeEach(() => {
-    clearCache();
-    const ics = readFileSync(
-      new URL("../../__fixtures__/schedule.ics", import.meta.url),
-      "utf8"
-    );
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: () => null },
-      body: null,
-      text: async () => ics
-    }));
+    stubScheduleFixtureFetch(clearCache);
   });
 
   afterEach(() => {
@@ -67,36 +20,25 @@ describe("GET /schedule — negative paths", () => {
   });
 
   it("handles invalid limit query param (non-numeric)", async () => {
-    const req = createMockRequest("/schedule?limit=abc");
-    const { response, getStatus, getBody } = createMockResponse();
+    const result = await invokeRoute(handleSchedule, institution, "/schedule?limit=abc");
 
-    await handleSchedule(req, response, institution);
-
-    expect(getStatus()).toBe(400);
-    const body = JSON.parse(getBody() ?? "{}");
-    expect(body.error.code).toBe("bad_request");
+    expect(result.status).toBe(400);
+    expect(result.body.error.code).toBe("bad_request");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("handles negative offset query param", async () => {
-    const req = createMockRequest("/schedule?offset=-1");
-    const { response, getStatus, getBody } = createMockResponse();
+    const result = await invokeRoute(handleSchedule, institution, "/schedule?offset=-1");
 
-    await handleSchedule(req, response, institution);
-
-    expect(getStatus()).toBe(200);
-    const body = JSON.parse(getBody() ?? "{}");
-    expect(body).toHaveProperty("schedule");
+    expect(result.status).toBe(200);
+    expect(result.body).toHaveProperty("schedule");
   });
 
   it("handles negative limit query param", async () => {
-    const req = createMockRequest("/schedule?limit=-5");
-    const { response, getStatus, getBody } = createMockResponse();
+    const result = await invokeRoute(handleSchedule, institution, "/schedule?limit=-5");
 
-    await handleSchedule(req, response, institution);
-
-    expect(getStatus()).toBe(400);
-    const body = JSON.parse(getBody() ?? "{}");
-    expect(body.error.code).toBe("bad_request");
+    expect(result.status).toBe(400);
+    expect(result.body.error.code).toBe("bad_request");
   });
 
   it("returns 404 when institution has no schedule sources configured", async () => {
@@ -104,41 +46,28 @@ describe("GET /schedule — negative paths", () => {
       ...institution,
       publicSources: { ...institution.publicSources, schedules: [] }
     };
-    const req = createMockRequest("/schedule");
-    const { response, getStatus, getBody } = createMockResponse();
+    const result = await invokeRoute(handleSchedule, noScheduleInstitution, "/schedule");
 
-    await handleSchedule(req, response, noScheduleInstitution);
-
-    expect(getStatus()).toBe(404);
-    const body = JSON.parse(getBody() ?? "{}");
-    expect(body.error.code).toBe("not_found");
+    expect(result.status).toBe(404);
+    expect(result.body.error.code).toBe("not_found");
   });
 
   it("returns 500 when upstream connector throws", async () => {
     clearCache();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Upstream timeout")));
-    const req = createMockRequest("/schedule");
-    const { response, getStatus, getBody } = createMockResponse();
+    const result = await invokeRoute(handleSchedule, institution, "/schedule");
 
-    await handleSchedule(req, response, institution);
-
-    const statusCode = getStatus();
-    expect(statusCode).toBe(500);
-    const body = JSON.parse(getBody() ?? "{}");
-    expect(body.error.code).toBe("internal_error");
+    expect(result.status).toBe(500);
+    expect(result.body.error.code).toBe("internal_error");
   });
 
   it("response body contains schedule array matching schema shape", async () => {
-    const req = createMockRequest("/schedule");
-    const { response, getStatus, getBody } = createMockResponse();
+    const result = await invokeRoute(handleSchedule, institution, "/schedule");
 
-    await handleSchedule(req, response, institution);
-
-    expect(getStatus()).toBe(200);
-    const body = JSON.parse(getBody() ?? "{}");
-    expect(body).toHaveProperty("schedule");
-    expect(Array.isArray(body.schedule)).toBe(true);
-    for (const item of body.schedule) {
+    expect(result.status).toBe(200);
+    expect(result.body).toHaveProperty("schedule");
+    expect(Array.isArray(result.body.schedule)).toBe(true);
+    for (const item of result.body.schedule) {
       expect(item).toHaveProperty("id");
       expect(item).toHaveProperty("title");
       expect(item).toHaveProperty("startsAt");
@@ -146,13 +75,13 @@ describe("GET /schedule — negative paths", () => {
   });
 
   it("handles invalid date range parameters gracefully", async () => {
-    const req = createMockRequest("/schedule?from=not-a-date&to=also-not");
-    const { response, getStatus, getBody } = createMockResponse();
+    const result = await invokeRoute(
+      handleSchedule,
+      institution,
+      "/schedule?from=not-a-date&to=also-not"
+    );
 
-    await handleSchedule(req, response, institution);
-
-    expect(getStatus()).toBe(200);
-    const body = JSON.parse(getBody() ?? "{}");
-    expect(body).toHaveProperty("schedule");
+    expect(result.status).toBe(200);
+    expect(result.body).toHaveProperty("schedule");
   });
 });

@@ -1,4 +1,4 @@
-import React from "react";
+/** Renders labeled detail metadata with predictable visual and spoken grouping. */
 import { StyleSheet, Text, View } from "react-native";
 import { scaled, scaledFont, spacing, typography } from "./theme";
 import { useTheme } from "./ThemeContext";
@@ -6,22 +6,27 @@ import { useTheme } from "./ThemeContext";
 const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
     gap: spacing.md,
   },
   label: {
     ...typography.caption,
-    fontWeight: "500",
-    minWidth: 80,
+    fontWeight: "700",
+    letterSpacing: 0.75,
+    textTransform: "uppercase",
+    flexBasis: 104,
+    flexGrow: 0,
   },
   value: {
     ...typography.body,
     flex: 1,
-    textAlign: "right",
+    flexBasis: 160,
+    textAlign: "left",
   },
 });
 
+/** Aligns a detail label and value while preserving selectable source text. */
 export function MetaRow({
   label,
   value
@@ -44,7 +49,7 @@ export function MetaRow({
         {
           borderBottomColor: theme.colors.border,
           borderBottomWidth: ui.borderWidth,
-          paddingVertical: scaled(spacing.sm, ui),
+          paddingVertical: scaled(spacing.md, ui),
         },
       ]}
     >
@@ -70,7 +75,6 @@ export function MetaRow({
             lineHeight: bodyLineHeight,
           },
         ]}
-        numberOfLines={2}
       >
         {value}
       </Text>

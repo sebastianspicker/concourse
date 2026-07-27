@@ -1,3 +1,4 @@
+/** Verifies virtualized lists preserve loading, empty, and recoverable-error semantics. */
 import React from "react";
 import TestRenderer from "react-test-renderer";
 import { describe, expect, it, vi } from "vitest";

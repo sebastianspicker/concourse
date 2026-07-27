@@ -1,91 +1,150 @@
 # Release Process
 
-## Versioning
+The live checkout may contain a release candidate without implying that a tag,
+GitHub prerelease, or container image exists. The tag workflow has separate
+image and GitHub Release jobs, so publication is not atomic. Establish current
+state by checking the workflow result, GitHub Releases, and GHCR separately.
 
-Semantic Versioning:
+## Versioning and channels
 
-- MAJOR: breaking changes
-- MINOR: new features, backward compatible
-- PATCH: bug fixes, backward compatible
+Concourse Campus Kit uses Semantic Versioning:
+
+- `X.Y.Z-alpha.N`, `X.Y.Z-beta.N`, or `X.Y.Z-rc.N`: public prerelease
+- `X.Y.Z`: stable release
+
+Every tag creates a matching GitHub release and version-specific BFF image.
+Prereleases are marked as such on GitHub and do not move
+`ghcr.io/<owner>/<repo>/bff:latest`; stable releases additionally move that tag.
+Never reuse or move an existing version tag.
+
+The repository/package SemVer and native marketing version have related but
+different formats. For `1.2.0-alpha.1`, every `package.json` uses
+`1.2.0-alpha.1`, while `apps/mobile/app.json` uses the platform-safe base
+version `1.2.0`. EAS owns incrementing native build numbers remotely.
 
 ## Prerequisites
 
-Before tagging a release:
+Before tagging:
 
-1. CI checks pass on the current default branch (`main`)
-2. `CHANGELOG.md` has a section for the new version
-3. All `package.json` files have the new version
-4. Public docs are up to date and the release commit does not include ignored
-   local archive, audit, plan, ledger, or status artifacts
+1. Required checks pass on the exact default-branch commit being tagged.
+2. `CHANGELOG.md` contains a dated, non-empty section for the exact version.
+3. All five package manifests and the Expo marketing version agree.
+4. Public docs use candidate wording until publication and runtime
+   screenshots reflect the exact candidate.
+5. The candidate contains no ignored files, credentials, signing material, or
+   private-integration artifacts.
+6. Manual accessibility/native gates are recorded by the release owner when a
+   signed preview or store artifact is in scope.
 
-## Release Steps
+## Prepare the candidate
 
-### 1. Update Version
+### 1. Set the identity
 
-Bump the `version` field in each `package.json`:
+Update the `version` field in:
 
-- `package.json` (root)
+- `package.json`
 - `apps/bff/package.json`
 - `apps/mobile/package.json`
 - `packages/shared/package.json`
 - `packages/institutions/package.json`
 
-### 2. Update Changelog
+Set `apps/mobile/app.json#expo.version` and the fallback in
+`apps/mobile/app.config.ts` to the numeric `X.Y.Z` base.
 
-Add a section to `CHANGELOG.md`:
+Also update public-facing version references in `README.md`, this guide, and
+the issue-form placeholders under `.github/ISSUE_TEMPLATE/`.
+Use candidate wording until the tag workflow succeeds. Changelog comparison
+and release links should be added only when their targets exist. These
+references are reviewed release inputs even though `pnpm release:check` only
+enforces package, Expo, and changelog-section identity.
+
+### 2. Finalize release notes
+
+Move candidate notes from `[Unreleased]` into:
 
 ```markdown
-## [X.Y.Z] - YYYY-MM-DD
+## [X.Y.Z-alpha.N] - YYYY-MM-DD
 
 ### Added
-- New feature
 
-### Changed
-- Changed feature
-
-### Fixed
-- Bug fix
-
-### Removed
-- Removed feature
+- User-visible change
 ```
 
-### 3. Commit and Tag
+### 3. Reproduce the gates
 
 ```bash
-git add package.json apps/bff/package.json apps/mobile/package.json \
-  packages/shared/package.json packages/institutions/package.json CHANGELOG.md
-git commit -m "chore: release vX.Y.Z"
-git tag vX.Y.Z
-git push origin vX.Y.Z
+corepack enable
+corepack prepare pnpm@9.0.0 --activate
+pnpm install --frozen-lockfile
+pnpm exec playwright install chromium
+pnpm release:check -- X.Y.Z-alpha.N
+pnpm verify
 ```
 
-### 4. Automated Release
+`pnpm release:check` rejects malformed SemVer, build metadata that cannot be a
+Docker tag, package drift, Expo base-version drift, a missing dated changelog
+heading, or an empty release-note section.
 
-Pushing the tag triggers the release workflow:
+The full `pnpm verify` source-candidate gate also rejects tracked files that match
+the repository's ignore policy.
 
-1. Validate: runs all CI checks
-2. Create Release: creates a GitHub release with the changelog section for that version
-3. Build Docker: builds and pushes the BFF image to GHCR (`ghcr.io/[owner]/campus-app-kit/bff:[version]`)
-4. Notify: posts a summary to the GitHub Actions step summary
+### 4. Commit and tag
 
-## Mobile App Release
-
-Mobile releases are handled via EAS:
+After review, create the release commit and an annotated tag from the same
+commit:
 
 ```bash
-cd apps/mobile
-pnpm build:preview
-pnpm build:production
+git tag -a vX.Y.Z-alpha.N -m "Concourse Campus Kit X.Y.Z-alpha.N"
+git push origin vX.Y.Z-alpha.N
 ```
 
-Submit to stores using EAS Submit or manually via the app store consoles.
+## Automated publication
 
-## Rollback
+The tag workflow runs in this order:
 
-If a release has critical issues:
+1. validates tag, package, Expo, and changelog identity;
+2. installs Chromium and runs the full release gate;
+3. builds the BFF on Node 22.13 with the version embedded in `/health`;
+4. smoke-tests the image with `BFF_PORT=4100`;
+5. pushes the verified version tag, plus `latest` only for stable versions; and
+6. creates a GitHub prerelease or stable release from the matching changelog.
 
-1. Delete the GitHub release
-2. Delete the git tag (`git push origin :vX.Y.Z`)
-3. Revert the version commit
-4. Cut a hotfix release
+The GitHub release job waits for the image job. If GitHub Release creation fails
+after the image push, the image can remain public without a matching GitHub
+release. The workflow summary reports each job result separately. Mobile
+binaries are not produced by the public tag workflow.
+
+## Partial publication recovery
+
+After any failed tag workflow, inspect both GitHub Releases and the versioned
+GHCR tag before taking action. Do not assume that a failed workflow published
+nothing.
+
+- If the versioned image exists but the GitHub Release does not, keep the tag
+  unchanged while diagnosing the release job. A transient failed job may be
+  rerun against the same tag commit.
+- If the GitHub Release exists but another required artifact is missing, mark
+  the release state clearly before directing users to it.
+- If recovery requires a source change, do not move or reuse the tag. Prepare
+  the next prerelease version.
+
+## Mobile distribution
+
+The adopting institution must configure its own EAS project, bundle/package
+identifiers, signing, public BFF URL, and institution pack. See
+[Deploy: Mobile](deploy/mobile.md).
+
+```bash
+pnpm --filter @concourse/mobile build:preview
+pnpm --filter @concourse/mobile build:production
+```
+
+Do not describe a source alpha as a signed mobile release unless the candidate
+was built, installed, and checked on the target devices.
+
+## Correcting a release
+
+Do not retag a published version. Fix the default branch, add a new changelog
+section, and publish the next prerelease or patch version. If a published image
+has a security defect, mark the GitHub release clearly, remove the affected
+package according to the registry policy, and disclose the replacement version.

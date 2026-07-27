@@ -1,3 +1,5 @@
+/** Verifies deterministic identifiers for public event sources. */
+
 import { describe, expect, it } from "vitest";
 import { buildEventId } from "../eventId";
 

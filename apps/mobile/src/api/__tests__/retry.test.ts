@@ -1,3 +1,4 @@
+/** Verifies retry attempts honor backoff limits, cancellation, and server retry guidance. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { withRetry } from "../retry";
 
@@ -8,6 +9,21 @@ function mockSetTimeoutImmediate(delays: number[]): void {
     if (typeof fn === "function") fn();
     return 0;
   }) as typeof setTimeout);
+}
+
+function failWithNetworkErrorThenSucceed(failureCount: number) {
+  const operation = vi.fn();
+  for (let attempt = 0; attempt < failureCount; attempt += 1) {
+    operation.mockRejectedValueOnce(new TypeError("network"));
+  }
+  return operation.mockResolvedValueOnce("ok");
+}
+
+async function collectNetworkRetryDelays(baseDelayMs: number): Promise<number[]> {
+  const delays: number[] = [];
+  mockSetTimeoutImmediate(delays);
+  await withRetry(failWithNetworkErrorThenSucceed(3), { retries: 3, baseDelayMs, maxDelayMs: 30_000 });
+  return delays;
 }
 
 describe("withRetry", () => {
@@ -76,7 +92,7 @@ describe("withRetry", () => {
   });
 });
 
-describe("withRetry — exponential backoff", () => {
+describe("withRetry: exponential backoff", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.stubGlobal("crypto", {
@@ -94,16 +110,7 @@ describe("withRetry — exponential backoff", () => {
   });
 
   it("exponential delay progression: baseDelay * 2^attempt with midpoint jitter", async () => {
-    const delays: number[] = [];
-    mockSetTimeoutImmediate(delays);
-
-    const fn = vi.fn()
-      .mockRejectedValueOnce(new TypeError("network"))
-      .mockRejectedValueOnce(new TypeError("network"))
-      .mockRejectedValueOnce(new TypeError("network"))
-      .mockResolvedValueOnce("ok");
-
-    await withRetry(fn, { retries: 3, baseDelayMs: 1000 });
+    const delays = await collectNetworkRetryDelays(1000);
 
     // With crypto midpoint randomness, jitter factor is 0, so delays are exact:
     // attempt 1: 1000 * 2^1 = 2000
@@ -116,17 +123,8 @@ describe("withRetry — exponential backoff", () => {
   });
 
   it("max delay cap: never exceeds maxDelayMs", async () => {
-    const delays: number[] = [];
-    mockSetTimeoutImmediate(delays);
-
-    const fn = vi.fn()
-      .mockRejectedValueOnce(new TypeError("network"))
-      .mockRejectedValueOnce(new TypeError("network"))
-      .mockRejectedValueOnce(new TypeError("network"))
-      .mockResolvedValueOnce("ok");
-
-    // baseDelay 10000 * 2^3 = 80000, but maxDelayMs is 30000
-    await withRetry(fn, { retries: 3, baseDelayMs: 10000, maxDelayMs: 30000 });
+    // baseDelay 10000 * 2^3 = 80000, but the helper's maxDelayMs is 30000.
+    const delays = await collectNetworkRetryDelays(10_000);
 
     for (const d of delays) {
       expect(d).toBeLessThanOrEqual(30000);
@@ -147,7 +145,6 @@ describe("withRetry — exponential backoff", () => {
         .mockRejectedValueOnce(new TypeError("network"))
         .mockResolvedValueOnce("ok");
 
-      // eslint-disable-next-line no-await-in-loop
       await withRetry(fn, { retries: 1, baseDelayMs: 1000 });
       vi.restoreAllMocks();
     }
@@ -173,13 +170,12 @@ describe("withRetry — exponential backoff", () => {
     expect(delays[0]).toBe(5000); // 5 seconds * 1000
   });
 
-  it("does not retry 4xx (400, 403, 404) — client errors are not transient", async () => {
+  it("does not retry 4xx (400, 403, 404) because client errors are not transient", async () => {
     for (const status of [400, 403, 404]) {
       const err = new Error(`status ${status}`);
       (err as { status?: number }).status = status;
       const fn = vi.fn().mockRejectedValue(err);
 
-      // eslint-disable-next-line no-await-in-loop
       await expect(withRetry(fn, { retries: 3, baseDelayMs: 1 })).rejects.toThrow();
       expect(fn).toHaveBeenCalledTimes(1);
     }

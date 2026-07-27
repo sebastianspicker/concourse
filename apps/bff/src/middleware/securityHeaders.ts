@@ -1,5 +1,8 @@
+/** Applies baseline browser security headers to BFF responses. */
+
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+/** Sets restrictive browser headers because BFF responses contain data, not executable content. */
 export function guardSecurityHeaders(
   _req: IncomingMessage,
   res: ServerResponse

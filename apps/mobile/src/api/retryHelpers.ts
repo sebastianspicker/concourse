@@ -1,9 +1,11 @@
+/** Classifies retryable failures and implements cancellable retry timing. */
 export function createAbortError(): Error {
   const error = new Error("Request aborted");
   error.name = "AbortError";
   return error;
 }
 
+/** Narrows transport failures that expose status and optional server retry guidance. */
 function isHttpLikeError(err: unknown): err is { status: number; retryAfterInSeconds?: number } {
   return (
     typeof err === "object" &&
@@ -13,6 +15,7 @@ function isHttpLikeError(err: unknown): err is { status: number; retryAfterInSec
   );
 }
 
+/** Allows retries only for retryable HTTP failures within the configured attempt budget. */
 export function shouldRetry(err: unknown): boolean {
   if (err instanceof Error && err.name === "AbortError") return false;
 
@@ -25,6 +28,7 @@ export function shouldRetry(err: unknown): boolean {
   return err instanceof TypeError;
 }
 
+/** Normalizes the injected random source to a bounded jitter fraction. */
 function randomUnitInterval(): number {
   const bytes = new Uint32Array(1);
   if (globalThis.crypto?.getRandomValues) {
@@ -34,6 +38,7 @@ function randomUnitInterval(): number {
   return 0.5;
 }
 
+/** Applies symmetric jitter to an exponential delay without producing negative waits. */
 function backoffWithJitter(
   baseDelayMs: number,
   attempt: number,
@@ -48,6 +53,7 @@ function backoffWithJitter(
   return Math.min(Math.floor(withJitter), maxDelayMs);
 }
 
+/** Prefers server Retry-After guidance, otherwise computes capped exponential backoff. */
 export function getRetryDelayMs(
   err: unknown,
   baseDelayMs: number,
@@ -61,6 +67,7 @@ export function getRetryDelayMs(
     : backoffWithJitter(baseDelayMs, attempt, multiplier, maxDelayMs);
 }
 
+/** Waits for the requested delay unless cancellation aborts the retry loop first. */
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -68,10 +75,12 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       return;
     }
 
+/** Removes the abort listener and timer after the retry wait settles. */
     const cleanup = () => {
       signal?.removeEventListener("abort", onAbort);
     };
 
+/** Rejects the pending retry delay with the standard abort error. */
     const onAbort = () => {
       clearTimeout(timer);
       cleanup();

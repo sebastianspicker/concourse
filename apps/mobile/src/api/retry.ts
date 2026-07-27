@@ -1,5 +1,7 @@
+/** Retries transient requests with abort-aware exponential backoff. */
 import { createAbortError, getRetryDelayMs, shouldRetry, sleep } from "./retryHelpers";
 
+/** Retries transient request failures with abort-aware backoff and server retry-after guidance. */
 export async function withRetry<T>(
   fn: () => Promise<T>,
   options?: { retries?: number; baseDelayMs?: number; multiplier?: number; maxDelayMs?: number; signal?: AbortSignal }

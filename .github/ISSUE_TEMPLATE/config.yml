@@ -1,5 +1,9 @@
+# Routes support and security reports to the correct public or private channel.
 blank_issues_enabled: false
 contact_links:
+  - name: Alpha and support guide
+    url: https://github.com/sebastianspicker/campus-app-kit/blob/main/SUPPORT.md
+    about: Check supported scope and safe reporting guidance before filing.
   - name: Security vulnerability
     url: https://github.com/sebastianspicker/campus-app-kit/security/advisories/new
     about: Report vulnerabilities privately. Do not open public security issues.

@@ -1,13 +1,16 @@
+/** Defines normalized API failures and safely parses BFF error responses. */
 export type ApiError = {
   code: string;
   message: string;
   status: number;
 };
 
+/** Carries the normalized BFF code and status through retry and UI error handling. */
 export class ApiErrorException extends Error {
   readonly code: string;
   readonly status: number;
 
+  /** Preserves the normalized API code and status on a throwable error instance. */
   constructor(error: ApiError) {
     super(error.message);
     this.name = "ApiError";
@@ -16,7 +19,8 @@ export class ApiErrorException extends Error {
   }
 }
 
-function hasErrorField(body: unknown): body is { error: Record<string, unknown> } {
+/** Narrows unknown API payloads to objects carrying the expected error member. */
+export function hasApiErrorEnvelope(body: unknown): body is { error: Record<string, unknown> } {
   return (
     typeof body === "object" &&
     body !== null &&
@@ -26,20 +30,23 @@ function hasErrorField(body: unknown): body is { error: Record<string, unknown> 
   );
 }
 
-export function parseApiError(response: Response, body?: unknown): ApiError {
-  const status = response.status;
-
-  if (hasErrorField(body)) {
-    const code =
-      typeof body.error.code === "string"
-        ? body.error.code
-        : "unknown_error";
-    const message =
-      typeof body.error.message === "string"
-        ? body.error.message
-        : `Request failed (${status})`;
-    return { code, message, status };
+/** Reads a stable code and message from an error envelope or returns caller-provided fallback copy. */
+export function getApiErrorDetails(
+  body: unknown,
+  fallbackMessage: string,
+): Pick<ApiError, "code" | "message"> {
+  if (!hasApiErrorEnvelope(body)) {
+    return { code: "unknown_error", message: fallbackMessage };
   }
 
-  return { code: "unknown_error", message: `Request failed (${status})`, status };
+  return {
+    code: typeof body.error.code === "string" ? body.error.code : "unknown_error",
+    message: typeof body.error.message === "string" ? body.error.message : fallbackMessage,
+  };
+}
+
+/** Normalizes arbitrary error payloads to a stable code, message, and HTTP status. */
+export function parseApiError(response: Response, body?: unknown): ApiError {
+  const status = response.status;
+  return { ...getApiErrorDetails(body, `Request failed (${status})`), status };
 }

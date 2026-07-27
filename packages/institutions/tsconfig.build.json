@@ -1,9 +1,10 @@
+// Emits the reusable institution-pack package with declarations and source maps.
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
