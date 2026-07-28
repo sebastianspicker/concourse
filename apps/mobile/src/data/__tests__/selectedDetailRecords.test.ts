@@ -38,6 +38,12 @@ describe("selected detail record handoff", () => {
     expect(selectedEventDetails.remember({ id: "crafted", title: "Untrusted route payload" })).toBe(false);
   });
 
+  it("rejects a selected event with a non-web source URL before route handoff", () => {
+    expect(selectedEventDetails.remember({ ...event, sourceUrl: "javascript:alert(1)" })).toBe(false);
+    expect(selectedEventDetails.remember({ ...event, sourceUrl: "data:text/html,unsafe" })).toBe(false);
+    expect(selectedEventDetails.get(event.id)).toBeNull();
+  });
+
   it("supports offline navigation from Today and filtered list caches", () => {
     selectedEventDetails.remember(event);
     selectedRoomDetails.remember(room);

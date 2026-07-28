@@ -113,6 +113,16 @@ test("rejects build metadata that cannot be used as a Docker tag", async (contex
   assert.match(result.stderr, /without build metadata/);
 });
 
+test("rejects malformed SemVer numeric identifiers", async (context) => {
+  const root = await releaseFixture();
+  context.after(() => rm(root, { recursive: true, force: true }));
+
+  const result = run(root, "02.0.0-alpha.1");
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /release version must be SemVer/);
+});
+
 test("does not borrow release notes from a later unbracketed section", async (context) => {
   const root = await releaseFixture();
   context.after(() => rm(root, { recursive: true, force: true }));

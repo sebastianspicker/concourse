@@ -29,13 +29,55 @@ const expectedExpoAssets = {
   webFavicon: "./assets/brand/concourse-favicon.png",
 };
 
-const numericIdentifier = "(?:0|[1-9]\\d*)";
-const alphanumericIdentifier = "(?:\\d*[A-Za-z-][0-9A-Za-z-]*)";
-const prereleaseIdentifier = `(?:${numericIdentifier}|${alphanumericIdentifier})`;
-const semverPattern = new RegExp(
-  `^(${numericIdentifier})\\.(${numericIdentifier})\\.(${numericIdentifier})` +
-    `(?:-(${prereleaseIdentifier}(?:\\.${prereleaseIdentifier})*))?$`,
-);
+function isAsciiDigit(character) {
+  return character >= "0" && character <= "9";
+}
+
+function isAsciiLetter(character) {
+  return (character >= "A" && character <= "Z") || (character >= "a" && character <= "z");
+}
+
+function isNumericIdentifier(value) {
+  if (!value || ![...value].every(isAsciiDigit)) return false;
+  return value === "0" || value[0] !== "0";
+}
+
+function isAlphanumericIdentifier(value) {
+  let hasNonNumericCharacter = false;
+  for (const character of value) {
+    const isLetter = isAsciiLetter(character);
+    if (!isAsciiDigit(character) && !isLetter && character !== "-") return false;
+    if (isLetter || character === "-") hasNonNumericCharacter = true;
+  }
+  return value.length > 0 && hasNonNumericCharacter;
+}
+
+function parseCoreVersion(baseVersion) {
+  const [major, minor, patch, ...extraBaseSegments] = baseVersion.split(".");
+  if (extraBaseSegments.length > 0 || !isNumericIdentifier(major) || !isNumericIdentifier(minor) || !isNumericIdentifier(patch)) {
+    return null;
+  }
+  return { major, minor, patch };
+}
+
+function isPrerelease(value) {
+  return value.split(".").every((identifier) => isNumericIdentifier(identifier) || isAlphanumericIdentifier(identifier));
+}
+
+function parseSemVer(version) {
+  if (typeof version !== "string") return null;
+  const prereleaseStart = version.indexOf("-");
+  const baseVersion = prereleaseStart === -1 ? version : version.slice(0, prereleaseStart);
+  const prerelease = prereleaseStart === -1 ? undefined : version.slice(prereleaseStart + 1);
+  const coreVersion = parseCoreVersion(baseVersion);
+  if (!coreVersion || (prerelease !== undefined && !isPrerelease(prerelease))) return null;
+  return { ...coreVersion, prerelease };
+}
+
+function isIsoDate(value) {
+  return value.length === 10 && value[4] === "-" && value[7] === "-" &&
+    [0, 1, 2, 3, 5, 6, 8, 9].every((index) => isAsciiDigit(value[index]));
+}
 
 /** Reads repository JSON using the current working directory as the release root. */
 async function readJson(path) {
@@ -49,7 +91,7 @@ function changelogSection(lines, version) {
   if (start === -1) return undefined;
 
   const date = lines[start].slice(headingPrefix.length);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined;
+  if (!isIsoDate(date)) return undefined;
 
   const nextHeading = lines.findIndex((line, index) => index > start && line.startsWith("## "));
   return lines.slice(start + 1, nextHeading === -1 ? lines.length : nextHeading);
@@ -93,7 +135,7 @@ try {
 }
 
 const expectedVersion = parsedArguments.version ?? rootPackage.version;
-const semver = semverPattern.exec(expectedVersion);
+const semver = parseSemVer(expectedVersion);
 const errors = [];
 
 if (!semver) {
@@ -112,7 +154,7 @@ for (const path of packagePaths) {
 
 if (semver) {
   const mobileConfig = await readJson("apps/mobile/app.json");
-  const expectedMobileVersion = `${semver[1]}.${semver[2]}.${semver[3]}`;
+  const expectedMobileVersion = `${semver.major}.${semver.minor}.${semver.patch}`;
   if (mobileConfig.expo?.version !== expectedMobileVersion) {
     errors.push(
       `apps/mobile/app.json has Expo version ${mobileConfig.expo?.version ?? "<missing>"}; ` +
@@ -171,6 +213,6 @@ if (errors.length > 0) {
     const releaseNotes = `${section.join("\n").trim()}\n`;
     await writeFile(resolve(parsedArguments.notesOutput), releaseNotes, "utf8");
   }
-  const channel = semver?.[4] ? "prerelease" : "stable";
+  const channel = semver?.prerelease ? "prerelease" : "stable";
   process.stdout.write(`OK: release metadata is consistent for ${expectedVersion} (${channel})\n`);
 }

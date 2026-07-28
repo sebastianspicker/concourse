@@ -1,6 +1,9 @@
 /** Defines and validates the public campus-data contract shared by server and client. */
 import { z } from "zod";
 
+/** URL is available in every supported runtime; this package deliberately omits DOM typings. */
+declare const URL: new (input: string) => { protocol: string };
+
 /** Uses the platform timezone database so invalid institution configuration fails early. */
 function isValidTimeZone(timeZone: string): boolean {
   try {
@@ -55,12 +58,22 @@ function hasForegroundContrast(accent: string): boolean {
   return Math.max(blackContrast, whiteContrast) >= 4.5;
 }
 
+/** Allows only web URLs that are safe to render as public links. */
+export function isPublicHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 /** Public event record normalized by connectors before it reaches the client. */
 export const PublicEventSchema = z.object({
   id: z.string(),
   title: z.string(),
   date: z.string().datetime({ offset: true }),
-  sourceUrl: z.string().url()
+  sourceUrl: z.string().url().refine(isPublicHttpUrl, "Public event source URLs must use HTTP or HTTPS")
 });
 
 export type PublicEvent = z.infer<typeof PublicEventSchema>;

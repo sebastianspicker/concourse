@@ -45,11 +45,7 @@ function loadHtmlRoutes() {
     if (!Array.isArray(manifest.htmlRoutes)) return [];
     return manifest.htmlRoutes.flatMap((route) => {
       if (typeof route?.namedRegex !== "string" || typeof route?.page !== "string") return [];
-      try {
-        return [{ pattern: new RegExp(route.namedRegex), page: route.page }];
-      } catch {
-        return [];
-      }
+      return [{ page: route.page }];
     });
   } catch {
     return [];
@@ -58,9 +54,46 @@ function loadHtmlRoutes() {
 
 const htmlRoutes = loadHtmlRoutes();
 
+/** Removes Expo route groups and index markers that do not consume a URL segment. */
+function manifestRouteSegments(page) {
+  return page.split("/").flatMap((segment) => {
+    if (!segment || segment === "index" || (segment.startsWith("(") && segment.endsWith(")"))) return [];
+    return [segment];
+  });
+}
+
+function isCatchAllSegment(segment) {
+  return segment.startsWith("[...") && segment.endsWith("]");
+}
+
+function isOptionalCatchAllSegment(segment) {
+  return segment.startsWith("[[...") && segment.endsWith("]]");
+}
+
+function isParameterSegment(segment) {
+  return segment.startsWith("[") && segment.endsWith("]");
+}
+
+/** Matches Expo static, parameter, and catch-all route pages without evaluating manifest regex text. */
+function manifestPageMatchesPath(page, pathname) {
+  const routeSegments = manifestRouteSegments(page);
+  const pathSegments = pathname.split("/").filter(Boolean);
+  let pathIndex = 0;
+
+  for (const segment of routeSegments) {
+    if (isOptionalCatchAllSegment(segment)) return true;
+    if (isCatchAllSegment(segment)) return pathIndex < pathSegments.length;
+    if (pathIndex >= pathSegments.length) return false;
+    if (!isParameterSegment(segment) && segment !== pathSegments[pathIndex]) return false;
+    pathIndex += 1;
+  }
+
+  return pathIndex === pathSegments.length;
+}
+
 /** Matches a pathname against Expo's route manifest and resolves its generated HTML file. */
 function resolveManifestRoute(pathname) {
-  const route = htmlRoutes.find(({ pattern }) => pattern.test(pathname));
+  const route = htmlRoutes.find(({ page }) => manifestPageMatchesPath(page, pathname));
   if (!route) return null;
 
   const pageCandidates = [route.page, route.page.replace(/\/index$/, "")];
