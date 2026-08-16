@@ -1,9 +1,10 @@
 /** Serves an Expo server export from loopback without adding a production web-server dependency. */
-import { createReadStream, readFileSync, statSync } from "node:fs";
+import { createReadStream } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { extname, join, normalize, resolve } from "node:path";
+import { extname, join, resolve } from "node:path";
 import { parsePort } from "./serve-expo-export-port.mjs";
+import { createExpoExportFileResolver } from "./serve-expo-export-routes.mjs";
 
 const exportRoot = resolve(process.argv[2] ?? join(tmpdir(), "concourse-playwright-web"));
 const port = parsePort(process.env.PORT);
@@ -21,104 +22,7 @@ const contentTypes = {
   ".ttf": "font/ttf",
 };
 
-const clientPathPrefixes = ["/_expo/static/", "/assets/"];
-
-/** Resolves a request beneath one root and rejects path traversal outside it. */
-function safeJoin(root, requestedPath) {
-  const resolved = resolve(root, `.${normalize(requestedPath)}`);
-  return resolved === root || resolved.startsWith(`${root}/`) ? resolved : null;
-}
-
-/** Returns the candidate only when it exists as a regular file. */
-function existingFile(candidate) {
-  try {
-    return statSync(candidate).isFile() ? candidate : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Loads Expo's generated route manifest while treating absent or invalid metadata as no routes. */
-function loadHtmlRoutes() {
-  try {
-    const manifest = JSON.parse(readFileSync(join(serverRoot, "_expo", "routes.json"), "utf8"));
-    if (!Array.isArray(manifest.htmlRoutes)) return [];
-    return manifest.htmlRoutes.flatMap((route) => {
-      if (typeof route?.namedRegex !== "string" || typeof route?.page !== "string") return [];
-      return [{ page: route.page }];
-    });
-  } catch {
-    return [];
-  }
-}
-
-const htmlRoutes = loadHtmlRoutes();
-
-/** Removes Expo route groups and index markers that do not consume a URL segment. */
-function manifestRouteSegments(page) {
-  return page.split("/").flatMap((segment) => {
-    if (!segment || segment === "index" || (segment.startsWith("(") && segment.endsWith(")"))) return [];
-    return [segment];
-  });
-}
-
-function isCatchAllSegment(segment) {
-  return segment.startsWith("[...") && segment.endsWith("]");
-}
-
-function isOptionalCatchAllSegment(segment) {
-  return segment.startsWith("[[...") && segment.endsWith("]]");
-}
-
-function isParameterSegment(segment) {
-  return segment.startsWith("[") && segment.endsWith("]");
-}
-
-/** Matches Expo static, parameter, and catch-all route pages without evaluating manifest regex text. */
-function manifestPageMatchesPath(page, pathname) {
-  const routeSegments = manifestRouteSegments(page);
-  const pathSegments = pathname.split("/").filter(Boolean);
-  let pathIndex = 0;
-
-  for (const segment of routeSegments) {
-    if (isOptionalCatchAllSegment(segment)) return true;
-    if (isCatchAllSegment(segment)) return pathIndex < pathSegments.length;
-    if (pathIndex >= pathSegments.length) return false;
-    if (!isParameterSegment(segment) && segment !== pathSegments[pathIndex]) return false;
-    pathIndex += 1;
-  }
-
-  return pathIndex === pathSegments.length;
-}
-
-/** Matches a pathname against Expo's route manifest and resolves its generated HTML file. */
-function resolveManifestRoute(pathname) {
-  const route = htmlRoutes.find(({ page }) => manifestPageMatchesPath(page, pathname));
-  if (!route) return null;
-
-  const pageCandidates = [route.page, route.page.replace(/\/index$/, "")];
-  return pageCandidates
-    .map((page) => safeJoin(serverRoot, `${page}.html`))
-    .filter(Boolean)
-    .map(existingFile)
-    .find(Boolean) ?? null;
-}
-
-/** Resolves static assets and route HTML across Expo's client/server output layout. */
-function resolveFile(pathname) {
-  if (clientPathPrefixes.some((prefix) => pathname.startsWith(prefix))) {
-    const clientFile = safeJoin(clientRoot, pathname);
-    return clientFile ? existingFile(clientFile) : null;
-  }
-  if (pathname === "/") return existingFile(join(serverRoot, "(tabs)", "index.html"));
-
-  const direct = safeJoin(serverRoot, pathname);
-  if (!direct) return null;
-  const candidates = extname(direct)
-    ? [direct, join(direct, "index.html")]
-    : [direct, `${direct}.html`, join(direct, "index.html")];
-  return candidates.map(existingFile).find(Boolean) ?? resolveManifestRoute(pathname);
-}
+const resolveExpoExportFile = createExpoExportFileResolver({ serverRoot, clientRoot });
 
 /** Sends a small plain-text error response without exposing filesystem details. */
 function sendText(response, status, message) {
@@ -136,9 +40,9 @@ function parsePathname(requestUrl) {
 }
 
 /** Streams one resolved file and handles HEAD without reading its body. */
-function sendFile(request, response, file) {
+function sendFile(request, response, resolvedFile) {
   const headers = {
-    "content-type": contentTypes[extname(file)] ?? "application/octet-stream",
+    "content-type": contentTypes[extname(resolvedFile.selectedPath)] ?? "application/octet-stream",
     "cache-control": "no-store",
   };
   if (request.method === "HEAD") {
@@ -146,7 +50,7 @@ function sendFile(request, response, file) {
     response.end();
     return;
   }
-  const stream = createReadStream(file);
+  const stream = createReadStream(resolvedFile.streamPath);
   stream.once("error", () => {
     if (!response.headersSent) sendText(response, 404, "Not found");
     else response.destroy();
@@ -169,7 +73,7 @@ const server = createServer((request, response) => {
     sendText(response, 400, "Bad request");
     return;
   }
-  const file = resolveFile(pathname);
+  const file = resolveExpoExportFile(pathname);
   if (!file) {
     sendText(response, 404, "Not found");
     return;

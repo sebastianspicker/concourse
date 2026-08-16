@@ -4,6 +4,10 @@ Concourse Campus Kit is a TypeScript workspace for presenting public university
 information. It contains an Expo application, a Node.js backend-for-frontend
 (BFF), shared Zod schemas, and public institution configuration.
 
+[Open the static Concourse demo](https://sebastianspicker.github.io/concourse/).
+It uses fictional fixture data; actions marked “Simulated” do not call campus
+services, open external sources, share content, or delete browser data.
+
 The current version is `1.2.0-alpha.1`. This checkout is a source candidate. It
 does not include a hosted service, signed mobile application, EAS project,
 store listing, private connector implementation, or user authentication flow.
@@ -187,6 +191,31 @@ tests, screenshot checks, BFF HTTP tests, and a source marker scan.
 Browser and native end-to-end tests are grouped under
 [`apps/mobile/e2e/`](apps/mobile/e2e/). Detox tests are skipped by CI unless
 generated native projects are present.
+
+## Static demo and GitHub Pages
+
+The static demo uses only the fictional `example` institution pack. It does
+not contact the BFF, campus services, or external sources, and controls marked
+`Simulated` do not share content or delete browser data.
+
+After installing the declared dependencies, build and validate the exact Pages
+artifact with:
+
+```bash
+pnpm build:demo
+pnpm verify:demo:artifact
+PORT=8082 node scripts/serve-pages-output.mjs dist-pages
+```
+
+Open <http://127.0.0.1:8082/concourse/>. Run `pnpm verify:demo` for the unit,
+artifact, and Chromium interaction checks together. Rebuild `dist-pages/`
+before treating it as evidence for current source; a previously generated
+artifact can still pass structural validation after source changes.
+
+The Pages workflow publishes `dist-pages/` beneath `/concourse/`. It is a
+static product walkthrough, not a hosted BFF, authenticated campus service,
+or signed mobile application. A successful local build does not prove a
+remote Pages deployment.
 
 ## Deployment and operation
 

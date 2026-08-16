@@ -114,6 +114,42 @@ async function stopServer(child) {
   }
 }
 
+async function verifyPublicRoutes(port) {
+  const health = await requestJson(port, "/health");
+  assert(health.response.status === 200, "health should return 200");
+  assert(health.body.institution === "mockuni", "health should report the selected institution");
+
+  const events = await requestJson(port, "/events?limit=2");
+  assert(events.response.status === 200, "events should return 200");
+  assert(events.response.headers.get("x-data-mode") === "mock", "events should advertise mock data mode");
+  assert(events.body._total === 10, "events should report all fixture events before pagination");
+  assert(events.body.events.length === 2, "events should apply limit pagination");
+  assert(events.body.events[0].title.includes("Mathematik"), "events should serve fixture event data");
+
+  const rooms = await requestJson(port, "/rooms?campus=hauptcampus&search=H%C3%B6rsaal&limit=2");
+  assert(rooms.response.status === 200, "rooms should return 200");
+  assert(rooms.body._total === 3, "rooms should search within the selected campus before pagination");
+  assert(rooms.body.rooms.length === 2, "rooms should apply pagination");
+  assert(rooms.body.rooms.every((room) => room.campusId === "hauptcampus"), "rooms should honor campus filtering");
+}
+
+async function verifyScheduleAndTodayRoutes(port) {
+  const schedule = await requestJson(port, "/schedule?search=Mathematik&limit=1");
+  assert(schedule.response.status === 200, "schedule should return 200");
+  assert(schedule.response.headers.get("x-data-mode") === "mock", "schedule should advertise mock data mode");
+  assert(schedule.body.schedule.length === 1, "schedule should apply limit pagination");
+  assert(schedule.body.schedule[0].title === "Vorlesung Mathematik I", "schedule should parse fixture ICS data");
+
+  const today = await requestJson(port, "/today?date=2026-02-25");
+  assert(today.response.status === 200, "today should return 200");
+  assert(today.body.events.length === 2, "today should return events for the requested campus-local date");
+  assert(today.body.rooms.length >= 2, "today should include public rooms");
+
+  const badQuery = await requestJson(port, "/events?limit=abc");
+  assert(badQuery.response.status === 400, "invalid pagination should return 400");
+  assert(badQuery.body.error?.code === "bad_request", "invalid pagination should use bad_request");
+}
+
 /** Exercises the public routes that the mobile client depends on before release. */
 async function run() {
   assert(existsSync(serverEntry), "Missing apps/bff/dist/server.js. Run pnpm test:e2e from the repo root.");
@@ -144,38 +180,8 @@ async function run() {
 
   try {
     await waitForHealth(port, child, () => childOutput);
-
-    const health = await requestJson(port, "/health");
-    assert(health.response.status === 200, "health should return 200");
-    assert(health.body.institution === "mockuni", "health should report the selected institution");
-
-    const events = await requestJson(port, "/events?limit=2");
-    assert(events.response.status === 200, "events should return 200");
-    assert(events.response.headers.get("x-data-mode") === "mock", "events should advertise mock data mode");
-    assert(events.body._total === 10, "events should report all fixture events before pagination");
-    assert(events.body.events.length === 2, "events should apply limit pagination");
-    assert(events.body.events[0].title.includes("Mathematik"), "events should serve fixture event data");
-
-    const rooms = await requestJson(port, "/rooms?campus=hauptcampus&search=H%C3%B6rsaal&limit=2");
-    assert(rooms.response.status === 200, "rooms should return 200");
-    assert(rooms.body._total === 3, "rooms should search within the selected campus before pagination");
-    assert(rooms.body.rooms.length === 2, "rooms should apply pagination");
-    assert(rooms.body.rooms.every((room) => room.campusId === "hauptcampus"), "rooms should honor campus filtering");
-
-    const schedule = await requestJson(port, "/schedule?search=Mathematik&limit=1");
-    assert(schedule.response.status === 200, "schedule should return 200");
-    assert(schedule.response.headers.get("x-data-mode") === "mock", "schedule should advertise mock data mode");
-    assert(schedule.body.schedule.length === 1, "schedule should apply limit pagination");
-    assert(schedule.body.schedule[0].title === "Vorlesung Mathematik I", "schedule should parse fixture ICS data");
-
-    const today = await requestJson(port, "/today?date=2026-02-25");
-    assert(today.response.status === 200, "today should return 200");
-    assert(today.body.events.length === 2, "today should return events for the requested campus-local date");
-    assert(today.body.rooms.length >= 2, "today should include public rooms");
-
-    const badQuery = await requestJson(port, "/events?limit=abc");
-    assert(badQuery.response.status === 400, "invalid pagination should return 400");
-    assert(badQuery.body.error?.code === "bad_request", "invalid pagination should use bad_request");
+    await verifyPublicRoutes(port);
+    await verifyScheduleAndTodayRoutes(port);
 
     console.log(`E2E PASS: BFF user-facing flows passed on ${baseUrl}`);
   } finally {

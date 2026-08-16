@@ -5,6 +5,7 @@ node_modules/
 
 ### Build artifacts
 dist/
+dist-pages/
 build/
 .next/
 *.tsbuildinfo
@@ -39,9 +40,14 @@ yarn-error.log*
 .turbo/
 .cache/
 .codegraph/
+.mcp.json
+.repowise/
 .eslintcache
 .parcel-cache/
-.codacy/
+/.codacy/*
+!/.codacy/codacy.config.json
+!/.codacy/codacy.yaml
+!/.codacy/codacy.yml
 .impeccable/
 .serena/
 .expo/
@@ -122,3 +128,51 @@ OPEN_IMPROVEMENTS_AND_PLAN.md
 REMEDIATION.md
 REMEDIATION_PLAN.md
 REMEDIATION_LEDGER.md
+
+# Shared local indexes and operator records
+/.kilo/
+CLAUDE.md
+GEMINI.md
+AUDIT_LEDGER.md
+remediation-ledger.md
+
+# Public environment templates
+!.env.sample
+!.env.template
+
+# Local-only credentials
+secrets.local.*
+credentials.local.*
+*.local.pem
+*.local.key
+.npmrc.local
+
+# Python caches and test reports
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyright/
+.hypothesis/
+.tox/
+.nox/
+.coverage.*
+coverage.xml
+junit*.xml
+
+# Shared build output
+target/
+.build/
+DerivedData/
+xcuserdata/
+
+# Local database sidecars
+*.local.db
+*.local.sqlite
+*.local.sqlite3
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3-shm
+*.sqlite3-wal

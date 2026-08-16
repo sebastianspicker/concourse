@@ -26,7 +26,7 @@ remove content and may warn, temporarily restrict, or permanently ban
 participants whose behavior is inappropriate, threatening, or harmful.
 
 Report conduct concerns privately through a
-[GitHub Security Advisory](https://github.com/sebastianspicker/campus-app-kit/security/advisories/new)
+[GitHub Security Advisory](https://github.com/sebastianspicker/concourse/security/advisories/new)
 with “Code of Conduct” in the title. Reports will be reviewed privately and as
 promptly as practical. Do not include unrelated secrets or personal data.
 

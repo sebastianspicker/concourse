@@ -8,6 +8,7 @@ import { formatCampusId, formatEventDate, formatScheduleTime } from "@/utils/dat
 import { useLocale } from "@/i18n/LocaleContext";
 import { getInstitutionTimeZone } from "@/config/institution";
 import { reconcileSelectedDetailRecord, selectDetailRecord, selectedScheduleDetails } from "@/data/selectedDetailRecords";
+import { STATIC_DEMO_SCHEDULE_IDS } from "@/data/staticDemoData";
 
 /** Resolves a selected schedule entry into a campus-time-aware detail surface. */
 export default function ScheduleDetailScreen(): JSX.Element {
@@ -68,4 +69,9 @@ export default function ScheduleDetailScreen(): JSX.Element {
       onRefresh={state.refresh}
     />
   );
+}
+
+/** Pre-renders the sanitized fixture detail routes for static hosting. */
+export function generateStaticParams(): Array<{ id: string }> {
+  return STATIC_DEMO_SCHEDULE_IDS.map((id) => ({ id }));
 }

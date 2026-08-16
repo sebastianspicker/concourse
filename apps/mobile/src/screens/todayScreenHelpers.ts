@@ -81,26 +81,38 @@ export function getScheduleCard(item: ScheduleItem, locale: string, timeZone: st
   };
 }
 
+type TimestampedScheduleItem = ScheduleItem & { startsAtMs: number; endsAtMs: number };
+
+function getScheduleItemTimestamps(item: ScheduleItem): TimestampedScheduleItem {
+  return {
+    ...item,
+    startsAtMs: Date.parse(item.startsAt),
+    endsAtMs: item.endsAt ? Date.parse(item.endsAt) : Number.NaN,
+  };
+}
+
+function isCurrentScheduleItem(item: TimestampedScheduleItem, nowMs: number): boolean {
+  return Number.isFinite(item.startsAtMs)
+    && Number.isFinite(item.endsAtMs)
+    && item.startsAtMs <= nowMs
+    && nowMs < item.endsAtMs;
+}
+
+function getNextScheduleItemId(items: TimestampedScheduleItem[], nowMs: number): string | undefined {
+  let next: TimestampedScheduleItem | undefined;
+  for (const item of items) {
+    if (item.startsAtMs > nowMs && (!next || item.startsAtMs < next.startsAtMs)) next = item;
+  }
+  return next?.id;
+}
+
 /** Prefers the ongoing schedule item, otherwise returns the nearest future item. */
 export function getCurrentOrNextScheduleId(items: ScheduleItem[], now = new Date()): string | undefined {
   const nowMs = now.getTime();
-  const current = items.find((item) => {
-    const startsAt = Date.parse(item.startsAt);
-    const endsAt = item.endsAt ? Date.parse(item.endsAt) : Number.NaN;
-    return Number.isFinite(startsAt) && Number.isFinite(endsAt) && startsAt <= nowMs && nowMs < endsAt;
-  });
+  const timestampedItems = items.map(getScheduleItemTimestamps);
+  const current = timestampedItems.find((item) => isCurrentScheduleItem(item, nowMs));
   if (current) return current.id;
-
-  let next: ScheduleItem | undefined;
-  let nextStart = Number.POSITIVE_INFINITY;
-  for (const item of items) {
-    const startsAt = Date.parse(item.startsAt);
-    if (Number.isFinite(startsAt) && startsAt > nowMs && startsAt < nextStart) {
-      next = item;
-      nextStart = startsAt;
-    }
-  }
-  return next?.id;
+  return getNextScheduleItemId(timestampedItems, nowMs);
 }
 
 /** Builds spoken schedule context from the course, room, and localized time. */

@@ -193,8 +193,16 @@ function handleListenerError(res: ServerResponse, requestId: string, handlerErr:
 
 const ALLOWED_METHODS = ["GET", "OPTIONS"];
 
+type RequestGuardContext = {
+  req: IncomingMessage;
+  res: ServerResponse;
+  requestId: string;
+  path: string;
+};
+
 /** Limits rejected authentication attempts separately from ordinary route traffic. */
-const guardAuthAttemptRate = (req: IncomingMessage, res: ServerResponse, requestId: string, path: string, clientKey: string): boolean => {
+const guardAuthAttemptRate = (context: RequestGuardContext, clientKey: string): boolean => {
+  const { req, res, requestId, path } = context;
   if (!isInvalidAuthAttempt(req)) return true;
 
   const authRate = checkRateLimit(`auth:${clientKey}`);
@@ -209,7 +217,7 @@ const guardRequestAccess = (req: IncomingMessage, res: ServerResponse, requestId
     trustProxy: BFF_ENV.trustProxy,
     trustedProxyMatcher: BFF_ENV.trustedProxyMatcher
   });
-  if (!guardAuthAttemptRate(req, res, requestId, path, clientKey)) return false;
+  if (!guardAuthAttemptRate({ req, res, requestId, path }, clientKey)) return false;
 
   if (!guardAuth(req, res, requestId)) {
     log("info", "auth_required", { requestId, method: req.method, path });
@@ -273,28 +281,36 @@ export function createRequestListener(): (req: IncomingMessage, res: ServerRespo
   };
 }
 
-/** Starts the configured HTTP listener and logs the resolved runtime settings. */
-export async function startServer(): Promise<void> {
-  log("info", "server_starting", {
-    port: BFF_ENV.port,
-    institutionId: BFF_ENV.institutionId
-  });
-
+/** Validates startup-only configuration or terminates before opening a listener. */
+function validateStartupConfiguration(): void {
   try {
     validateAuthConfiguration();
     loadInstitutionPack(BFF_ENV.institutionId);
     log("info", "startup_validation_ok");
   } catch (err: unknown) {
     log("error", "startup_validation_failed", {
-      message: err instanceof Error ? err.message : String(err)
+      message: normalizeError(err).message
     });
     process.exit(1);
   }
+}
 
+/** Opens the configured listener after startup validation succeeds. */
+function listenForRequests(): void {
   const server = http.createServer(createRequestListener());
   server.listen(BFF_ENV.port, () => {
     log("info", "server_listening", { port: BFF_ENV.port });
   });
+}
+
+/** Starts the configured HTTP listener and logs the resolved runtime settings. */
+export async function startServer(): Promise<void> {
+  log("info", "server_starting", {
+    port: BFF_ENV.port,
+    institutionId: BFF_ENV.institutionId
+  });
+  validateStartupConfiguration();
+  listenForRequests();
 }
 
 /** Detects direct source or compiled execution without starting during imports and tests. */

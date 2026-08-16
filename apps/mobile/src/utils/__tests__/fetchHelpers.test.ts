@@ -1,6 +1,10 @@
 /** Verifies request deadlines, cancellation, malformed bodies, and BFF error fallback parsing. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchJsonWithTimeout, RequestTimeoutError } from "../fetchHelpers";
+import {
+  fetchJsonResponseWithTimeout,
+  fetchJsonWithTimeout,
+  RequestTimeoutError
+} from "../fetchHelpers";
 import { toUiError } from "../../api/uiError";
 
 type FetchArgs = Parameters<typeof fetch>;
@@ -98,5 +102,35 @@ describe("fetchJsonWithTimeout", () => {
       "BFF URL must not include credentials"
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects redirects instead of following a cross-origin response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchJsonWithTimeout("https://example.com", { redirect: "follow" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.com",
+      expect.objectContaining({ redirect: "error" }),
+    );
+  });
+
+  it("preserves response headers and Retry-After on malformed error bodies", async () => {
+    const headers = new Headers({ "retry-after": "15" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      headers,
+      json: async () => { throw new SyntaxError("Unexpected token"); }
+    }));
+
+    const promise = fetchJsonResponseWithTimeout("https://example.com");
+    await expect(promise).rejects.toMatchObject({
+      code: "unknown_error",
+      message: "Request failed (503)",
+      retryAfterInSeconds: 15,
+      status: 503
+    });
   });
 });

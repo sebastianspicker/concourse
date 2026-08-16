@@ -24,6 +24,23 @@ type Lookup = (hostname: string, options: { all: true; verbatim: true }) => Prom
 type Request = (url: URL, options: RequestOptions, callback: (response: IncomingMessage) => void) => ClientRequest;
 type ResolvedPublicUrl = { parsed: URL; hostname: string; addresses: LookupResult[] };
 type ParsedPublicUrl = Omit<ResolvedPublicUrl, "addresses">;
+type AddressRequestContext = ParsedPublicUrl & {
+  request: Request;
+  signal: AbortSignal;
+};
+type AddressRequestOptions = AddressRequestContext & { address: LookupResult };
+type RequestAttempt = {
+  clientRequest?: ClientRequest;
+  onAbort?: () => void;
+  response?: IncomingMessage;
+  settled: boolean;
+  signal: AbortSignal;
+  resolve: (value: { request: ClientRequest; response: IncomingMessage }) => void;
+  reject: (error: Error) => void;
+};
+type AddressRequestResult =
+  | { connection: { request: ClientRequest; response: IncomingMessage } }
+  | { error: unknown };
 
 export interface FetchTextDependencies {
   lookup?: Lookup;
@@ -172,35 +189,44 @@ function readResponse(response: IncomingMessage, request: ClientRequest, signal:
   });
 }
 
+/** Settles connection setup exactly once after a response, error, or abort. */
+function settleRequestAttempt(attempt: RequestAttempt, error?: Error, response?: IncomingMessage): void {
+  if (attempt.settled) return;
+  attempt.settled = true;
+  if (attempt.onAbort) attempt.signal.removeEventListener("abort", attempt.onAbort);
+  if (error) {
+    attempt.reject(error);
+    return;
+  }
+  attempt.resolve({ request: attempt.clientRequest!, response: response! });
+}
+
+/** Destroys partially opened connection resources on caller cancellation. */
+function abortRequestAttempt(this: RequestAttempt): void {
+  const error = abortError();
+  this.clientRequest?.destroy(error);
+  this.response?.destroy(error);
+  settleRequestAttempt(this, error);
+}
+
+/** Accepts response headers only while the corresponding request is still pending. */
+function acceptRequestResponse(attempt: RequestAttempt, incoming: IncomingMessage): void {
+  attempt.response = incoming;
+  if (attempt.settled) {
+    incoming.destroy(abortError());
+    return;
+  }
+  settleRequestAttempt(attempt, undefined, incoming);
+}
+
 /** Opens one non-pooled request pinned to a previously validated public address. */
-function requestText(
-  parsed: URL,
-  hostname: string,
-  address: LookupResult,
-  request: Request,
-  signal: AbortSignal
-): Promise<{ request: ClientRequest; response: IncomingMessage }> {
+function requestText(options: AddressRequestOptions): Promise<{ request: ClientRequest; response: IncomingMessage }> {
+  const { parsed, hostname, address, request, signal } = options;
   return new Promise<{ request: ClientRequest; response: IncomingMessage }>((resolve, reject) => {
-    let clientRequest: ClientRequest | undefined;
-    let response: IncomingMessage | undefined;
-    let settled = false;
-    /** Settles connection setup exactly once after a response, error, or abort. */
-    const finish = (error?: Error, value?: IncomingMessage) => {
-      if (settled) return;
-      settled = true;
-      signal.removeEventListener("abort", onAbort);
-      if (error) reject(error);
-      else resolve({ request: clientRequest!, response: value! });
-    };
-    /** Destroys partially opened connection resources on caller cancellation. */
-    const onAbort = () => {
-      const error = abortError();
-      clientRequest?.destroy(error);
-      response?.destroy(error);
-      finish(error);
-    };
+    const attempt: RequestAttempt = { settled: false, signal, resolve, reject };
+    attempt.onAbort = abortRequestAttempt.bind(attempt);
     try {
-      clientRequest = request(parsed, {
+      attempt.clientRequest = request(parsed, {
         agent: false,
         family: address.family,
         headers: { Accept: "text/plain, text/html, */*", "Accept-Encoding": "identity", Host: parsed.host },
@@ -211,41 +237,37 @@ function requestText(
         port: parsed.port || undefined,
         rejectUnauthorized: true,
         servername: isIP(hostname) === 0 ? hostname : undefined
-      }, (incoming) => {
-        response = incoming;
-        if (settled) {
-          incoming.destroy(abortError());
-          return;
-        }
-        finish(undefined, incoming);
-      });
-      clientRequest.once("error", (error: Error) => finish(error));
-      signal.addEventListener("abort", onAbort, { once: true });
-      if (signal.aborted) onAbort();
-      else clientRequest.end();
+      }, (incoming) => acceptRequestResponse(attempt, incoming));
+      attempt.clientRequest.once("error", (error: Error) => settleRequestAttempt(attempt, error));
+      signal.addEventListener("abort", attempt.onAbort, { once: true });
+      if (signal.aborted) attempt.onAbort();
+      else attempt.clientRequest.end();
     } catch (error) {
-      finish(error instanceof Error ? error : new Error("HTTP request failed"));
+      settleRequestAttempt(attempt, error instanceof Error ? error : new Error("HTTP request failed"));
     }
   });
 }
 
+/** Attempts one validated address while preserving aborts as terminal failures. */
+async function requestAddress(options: AddressRequestContext, address: LookupResult): Promise<AddressRequestResult> {
+  throwIfAborted(options.signal);
+  try {
+    return { connection: await requestText({ ...options, address }) };
+  } catch (error: unknown) {
+    if (options.signal.aborted) throw error;
+    return { error };
+  }
+}
+
 /** Tries validated DNS results in order so one unreachable address does not fail the source. */
 async function requestFirstReachableAddress(
-  parsed: URL,
-  hostname: string,
-  addresses: LookupResult[],
-  request: Request,
-  signal: AbortSignal
+  options: AddressRequestContext & { addresses: LookupResult[] }
 ): Promise<{ request: ClientRequest; response: IncomingMessage }> {
   let lastError: unknown;
-  for (const address of addresses) {
-    throwIfAborted(signal);
-    try {
-      return await requestText(parsed, hostname, address, request, signal);
-    } catch (error: unknown) {
-      if (signal.aborted) throw error;
-      lastError = error;
-    }
+  for (const address of options.addresses) {
+    const result = await requestAddress(options, address);
+    if ("connection" in result) return result.connection;
+    lastError = result.error;
   }
   throw lastError instanceof Error ? lastError : new Error("HTTP request failed for every resolved address");
 }
@@ -295,13 +317,14 @@ export function createFetchTextWithTimeout(dependencies: FetchTextDependencies =
       for (let redirects = 0; ; redirects += 1) {
         throwIfAborted(signal);
         const { parsed, hostname, addresses } = await resolvePublicUrl(target, lookup, signal);
-        const { request, response } = await requestFirstReachableAddress(
+        const connection = await requestFirstReachableAddress({
           parsed,
           hostname,
           addresses,
-          parsed.protocol === "https:" ? https : http,
+          request: parsed.protocol === "https:" ? https : http,
           signal
-        );
+        });
+        const { request, response } = connection;
         const nextTarget = redirectTarget(response, parsed, redirects);
         if (nextTarget) {
           target = nextTarget;

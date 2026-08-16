@@ -10,6 +10,7 @@ const environmentKeys = [
   "INSTITUTION_ID",
   "MOBILE_ANDROID_PACKAGE",
   "MOBILE_BUNDLE_IDENTIFIER",
+  "CONCOURSE_STATIC_DEMO",
 ] as const;
 
 const originalEnvironment = new Map(
@@ -58,7 +59,29 @@ describe("mobile release configuration", () => {
 
     process.env.EXPO_PUBLIC_BFF_BASE_URL = "file:///tmp/campus";
     expect(resolveConfig).toThrow(
-      "EXPO_PUBLIC_BFF_BASE_URL must be a valid HTTP(S) URL for preview builds",
+      "EXPO_PUBLIC_BFF_BASE_URL must be a credential-free HTTPS origin for preview builds",
+    );
+  });
+
+  it.each([
+    "http://campus.example.test",
+    "https://user:pass@campus.example.test",
+    "https://localhost",
+    "https://localhost.",
+    "https://2130706433",
+    "https://10.0.0.1",
+    "https://100.64.0.1",
+    "https://169.254.1.1",
+    "https://[fc00::1]",
+  ])("rejects release BFF origins that are unsafe: %s", (baseUrl) => {
+    setProductionEnvironment({
+      EXPO_PUBLIC_BFF_BASE_URL: baseUrl,
+      MOBILE_BUNDLE_IDENTIFIER: "edu.example.campus",
+      MOBILE_ANDROID_PACKAGE: "edu.example.campus",
+    });
+
+    expect(resolveConfig).toThrow(
+      "EXPO_PUBLIC_BFF_BASE_URL must be a credential-free HTTPS origin for production builds",
     );
   });
 
@@ -141,6 +164,17 @@ describe("mobile release configuration", () => {
           backgroundColor: "#FFFFFF",
         },
       },
+    });
+  });
+
+  it("uses static output and the repository base path only for the Pages demo", () => {
+    resetBuildEnvironment();
+    process.env.CONCOURSE_STATIC_DEMO = "1";
+
+    expect(resolveConfig()).toMatchObject({
+      web: { output: "static" },
+      experiments: { baseUrl: "/concourse" },
+      extra: { staticDemo: true },
     });
   });
 });

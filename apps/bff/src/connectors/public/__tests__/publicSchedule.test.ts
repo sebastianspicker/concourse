@@ -56,4 +56,32 @@ describe("fetchPublicSchedule", () => {
 
     await expect(fetchPublicSchedule(institution)).rejects.toThrow("All public schedule sources failed");
   });
+
+  it("returns partial data as degraded and retries it instead of caching it", async () => {
+    const ics = readFileSync(new URL("../../../__fixtures__/schedule.ics", import.meta.url), "utf8");
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(ics))
+      .mockRejectedValueOnce(new Error("timeout"))
+      .mockResolvedValueOnce(new Response(ics))
+      .mockResolvedValueOnce(new Response(ics));
+    vi.stubGlobal("fetch", fetchMock);
+    const multiSourceInstitution = {
+      ...institution,
+      publicSources: {
+        schedules: [
+          { label: "Primary Calendar", url: "https://example.org/primary.ics" },
+          { label: "Backup Calendar", url: "https://example.org/backup.ics" }
+        ]
+      }
+    };
+
+    const degraded = await fetchPublicSchedule(multiSourceInstitution);
+    const recovered = await fetchPublicSchedule(multiSourceInstitution);
+
+    expect(degraded).toMatchObject({ degraded: true, schedule: expect.any(Array) });
+    expect(degraded.schedule).toHaveLength(2);
+    expect(recovered).toMatchObject({ degraded: false, schedule: expect.any(Array) });
+    expect(recovered.schedule).toHaveLength(4);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
 });

@@ -7,6 +7,7 @@ import { ResourceDetailScreen } from "@/ui/ResourceDetailScreen";
 import { useLocale } from "@/i18n/LocaleContext";
 import { reconcileSelectedDetailRecord, selectDetailRecord, selectedRoomDetails } from "@/data/selectedDetailRecords";
 import { formatCampusId } from "@/utils/dateFormat";
+import { STATIC_DEMO_ROOM_IDS } from "@/data/staticDemoData";
 
 /** Resolves a selected room into a refreshable, reconciled detail surface. */
 export default function RoomDetailScreen(): JSX.Element {
@@ -48,4 +49,9 @@ export default function RoomDetailScreen(): JSX.Element {
       onRefresh={state.refresh}
     />
   );
+}
+
+/** Pre-renders the sanitized fixture detail routes for static hosting. */
+export function generateStaticParams(): Array<{ id: string }> {
+  return STATIC_DEMO_ROOM_IDS.map((id) => ({ id }));
 }

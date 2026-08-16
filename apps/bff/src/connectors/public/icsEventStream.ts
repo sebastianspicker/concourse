@@ -1,11 +1,12 @@
 /** Streams bounded, validated VEVENT property maps from untrusted ICS text. */
 
 import { type IcsDateProperty } from "./recurrence";
-import { MAX_ICS_LOGICAL_LINE_LENGTH, scanUnfoldedLines } from "./icsLineScanner";
+import { MAX_ICS_LOGICAL_LINE_LENGTH, scanUnfoldedLines, type ScannedIcsLine } from "./icsLineScanner";
 import { parseIcsParams } from "./icsParams";
 
 export type IcsPropertyMap = Record<string, IcsDateProperty>;
 export type EventAccumulator = { current: IcsPropertyMap; exdates: IcsDateProperty[]; propertyCount: number; propertyBytes: number; exdateBytes: number; invalid: boolean };
+type IcsEventStreamState = { activeEvent: EventAccumulator | undefined; onEvent: (event: EventAccumulator) => void };
 
 const BEGIN_EVENT_LINE = "BEGIN:VEVENT";
 const END_EVENT_LINE = "END:VEVENT";
@@ -20,24 +21,46 @@ const KNOWN_PROPERTIES = ["UID", "SUMMARY", "DTSTART", "DTEND", "LOCATION", "X-C
 
 /** Visits only bounded, structurally valid VEVENTs from an untrusted ICS document. */
 export function forEachValidIcsEvent(ics: string, onEvent: (event: EventAccumulator) => void): void {
-  let event = createEventAccumulator();
-  let inEvent = false;
-  for (const scannedLine of scanUnfoldedLines(ics)) {
-    if (scannedLine.oversized) {
-      if (inEvent) event.invalid = true;
-      continue;
-    }
-    const line = scannedLine.value;
-    if (isEventStart(line)) {
-      inEvent = true;
-      event = createEventAccumulator();
-    } else if (isEventEnd(line)) {
-      if (inEvent && !event.invalid) onEvent(event);
-      inEvent = false;
-      event = createEventAccumulator();
-    } else if (inEvent) {
-      collectProperty(line, event);
-    }
+  const stream = new IcsEventStream(onEvent);
+  for (const scannedLine of scanUnfoldedLines(ics)) stream.accept(scannedLine);
+}
+
+/** Owns VEVENT lifecycle state so scanner transitions cannot leak across components. */
+class IcsEventStream {
+  private readonly state: IcsEventStreamState;
+
+  constructor(onEvent: (event: EventAccumulator) => void) {
+    this.state = { activeEvent: undefined, onEvent };
+  }
+
+  /** Accepts one scanner result and applies exactly one VEVENT lifecycle transition. */
+  accept(scannedLine: ScannedIcsLine): void {
+    if (scannedLine.oversized) return this.invalidateForOversizedLine();
+    if (isEventStart(scannedLine.value)) return this.startEvent();
+    if (isEventEnd(scannedLine.value)) return this.finishEvent();
+    if (this.state.activeEvent) this.collectActiveEventProperty(scannedLine.value);
+  }
+
+  /** Starts a fresh VEVENT, replacing any unterminated active event. */
+  private startEvent(): void {
+    this.state.activeEvent = createEventAccumulator();
+  }
+
+  /** Emits an active valid VEVENT before clearing all state for the next component. */
+  private finishEvent(): void {
+    const event = this.state.activeEvent;
+    if (event && !event.invalid) this.state.onEvent(event);
+    this.state.activeEvent = undefined;
+  }
+
+  /** Marks only the active VEVENT invalid when its unfolded line exceeds the scanner budget. */
+  private invalidateForOversizedLine(): void {
+    if (this.state.activeEvent) this.state.activeEvent.invalid = true;
+  }
+
+  /** Records an ordinary line after accept has established that a VEVENT is active. */
+  private collectActiveEventProperty(line: string): void {
+    collectProperty(line, this.state.activeEvent!);
   }
 }
 

@@ -10,11 +10,13 @@ import { SignalHeader } from "../src/components/SignalHeader";
 import { ThemeProvider } from "../src/ui/ThemeContext";
 import { LocaleProvider, useLocale } from "../src/i18n/LocaleContext";
 import { getInstitutionDisplayName } from "../src/config/institution";
+import { isStaticDemo } from "../src/config/staticDemo";
 import { webMotionCss } from "../src/ui/webMotion";
 
 /** Installs root providers and navigation for every mobile route. */
 export default function RootLayout(): JSX.Element {
   useFonts(MaterialIcons.font);
+  const staticDemo = isStaticDemo();
 
   return (
     <>
@@ -27,7 +29,7 @@ export default function RootLayout(): JSX.Element {
         <ThemeProvider>
           <LocaleProvider>
             <ErrorBoundary>
-              <OfflineIndicator />
+              {!staticDemo && <OfflineIndicator />}
               <AppNavigator />
             </ErrorBoundary>
           </LocaleProvider>

@@ -5,6 +5,8 @@ import { ApiErrorException } from "../api/errors";
 import { getCached } from "./cache";
 import { getPublicCacheKey } from "./publicCacheKey";
 import { fetchNetworkFirstWithFallback } from "./persistedCache";
+import { isStaticDemo } from "../config/staticDemo";
+import { getStaticDemoResponse } from "./staticDemoData";
 
 const DEFAULT_TTL_MS = 60_000;
 
@@ -57,6 +59,15 @@ export async function getCachedJson<T>(
 ): Promise<ResourceLoadResult<T>> {
   const cacheKey = getPublicCacheKey(keySuffix, options?.queryParams);
   const queryString = getQueryString(options?.queryParams);
+
+  if (isStaticDemo()) {
+    return {
+      data: safeParse(getStaticDemoResponse(path, options?.queryParams), schema),
+      source: "memory-cache",
+      updatedAt: Date.now(),
+      cacheAge: 0,
+    };
+  }
 
   if (options?.offlineMode) {
     const result = await fetchNetworkFirstWithFallback<T>(

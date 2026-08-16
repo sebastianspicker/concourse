@@ -30,7 +30,12 @@ export const OFFLINE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /** Uses AsyncStorage when available and an in-memory adapter for unsupported test or web runtimes. */
 async function getStorage(): Promise<StorageLike> {
-  const fallbackStorage: StorageLike = {
+  return (await getNativeStorage()) ?? createMemoryStorage();
+}
+
+/** Creates the unsupported-runtime storage adapter without sharing state with unrelated keys. */
+function createMemoryStorage(): StorageLike {
+  return {
     getItem: async (key) => memory.get(key) ?? null,
     setItem: async (key, value) => {
       memory.set(key, value);
@@ -43,23 +48,25 @@ async function getStorage(): Promise<StorageLike> {
       for (const key of keys) memory.delete(key);
     }
   };
+}
 
+/** Uses the native adapter only after confirming its backing implementation responds. */
+async function getNativeStorage(): Promise<StorageLike | null> {
   // Try to use AsyncStorage directly (native), but fall back if the JS object
   // exists without a working native backing implementation.
-  if (
-    AsyncStorage &&
-    typeof AsyncStorage === "object" &&
-    typeof AsyncStorage.getItem === "function"
-  ) {
-    try {
-      await AsyncStorage.getItem(`${CACHE_STORAGE_NAMESPACE}__probe__`);
-      return AsyncStorage as StorageLike;
-    } catch {
-      return fallbackStorage;
-    }
-  }
+  if (!isStorageAdapter(AsyncStorage)) return null;
 
-  return fallbackStorage;
+  try {
+    await AsyncStorage.getItem(`${CACHE_STORAGE_NAMESPACE}__probe__`);
+    return AsyncStorage as StorageLike;
+  } catch {
+    return null;
+  }
+}
+
+function isStorageAdapter(value: unknown): value is StorageLike {
+  return typeof value === "object" && value !== null && "getItem" in value &&
+    typeof value.getItem === "function";
 }
 
 /** Reads a validated cache envelope and exposes only its payload to legacy callers. */
@@ -216,24 +223,30 @@ export async function fetchNetworkFirstWithFallback<T>(
       cacheAge: null
     };
   } catch (error: unknown) {
-    if (cachedEntry && isTransientFailure(error)) {
-      const cacheAge = Math.max(0, Date.now() - cachedEntry.timestamp);
-      if (cacheAge > OFFLINE_CACHE_MAX_AGE_MS) {
-        throw error;
-      }
-
-      await markCacheAsOffline<T>(key).catch(() => undefined);
-
-      return {
-        data: cachedEntry.data,
-        fromCache: true,
-        isOffline: true,
-        cacheAge
-      };
-    }
-
+    const fallback = await getTransientCacheFallback(key, cachedEntry, error);
+    if (fallback) return fallback;
     throw error;
   }
+}
+
+/** Returns a fresh-enough cached result only for failures safe to treat as transient. */
+async function getTransientCacheFallback<T>(
+  key: string,
+  cachedEntry: CachedEntry<T> | null,
+  error: unknown
+): Promise<OfflineFetchResult<T> | null> {
+  if (!cachedEntry || !isTransientFailure(error)) return null;
+
+  const cacheAge = Math.max(0, Date.now() - cachedEntry.timestamp);
+  if (cacheAge > OFFLINE_CACHE_MAX_AGE_MS) return null;
+
+  await markCacheAsOffline<T>(key).catch(() => undefined);
+  return {
+    data: cachedEntry.data,
+    fromCache: true,
+    isOffline: true,
+    cacheAge
+  };
 }
 
 /** Allows fallback only for rate-limit and server failures that are not known validation mismatches. */
@@ -264,31 +277,47 @@ export async function getCacheStats(): Promise<{
   const storage = await getStorage();
   const allKeys = await storage.getAllKeys?.() ?? [];
   const ourKeys = allKeys.filter(k => k.startsWith(CACHE_STORAGE_NAMESPACE));
-  
-  let oldest: number | null = null;
-  let newest: number | null = null;
-  const offlineKeys: string[] = [];
-  
+  const stats = createCacheStats(ourKeys.length);
+
   for (const key of ourKeys) {
-    const raw = await storage.getItem(key);
-    if (raw) {
-      try {
-        const entry = JSON.parse(raw) as CachedEntry<unknown>;
-        if (oldest === null || entry.timestamp < oldest) oldest = entry.timestamp;
-        if (newest === null || entry.timestamp > newest) newest = entry.timestamp;
-        if (entry.isOffline) {
-          offlineKeys.push(key.replace(CACHE_STORAGE_NAMESPACE, ""));
-        }
-      } catch {
-        // Skip invalid entries
-      }
-    }
+    updateCacheStats(stats, key, await storage.getItem(key));
   }
-  
-  return {
-    keyCount: ourKeys.length,
-    oldestEntry: oldest,
-    newestEntry: newest,
-    offlineKeys
-  };
+
+  return stats;
+}
+
+type CacheStats = {
+  keyCount: number;
+  oldestEntry: number | null;
+  newestEntry: number | null;
+  offlineKeys: string[];
+};
+
+function createCacheStats(keyCount: number): CacheStats {
+  return { keyCount, oldestEntry: null, newestEntry: null, offlineKeys: [] };
+}
+
+/** Incorporates a readable cache envelope into diagnostics and ignores malformed values. */
+function updateCacheStats(stats: CacheStats, key: string, raw: string | null): void {
+  const entry = parseCacheStatsEntry(raw);
+  if (!entry) return;
+
+  if (stats.oldestEntry === null || entry.timestamp < stats.oldestEntry) {
+    stats.oldestEntry = entry.timestamp;
+  }
+  if (stats.newestEntry === null || entry.timestamp > stats.newestEntry) {
+    stats.newestEntry = entry.timestamp;
+  }
+  if (entry.isOffline) stats.offlineKeys.push(key.replace(CACHE_STORAGE_NAMESPACE, ""));
+}
+
+function parseCacheStatsEntry(raw: string | null): CachedEntry<unknown> | null {
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as CachedEntry<unknown>;
+  } catch {
+    // Diagnostics must tolerate malformed values without failing the cache view.
+    return null;
+  }
 }

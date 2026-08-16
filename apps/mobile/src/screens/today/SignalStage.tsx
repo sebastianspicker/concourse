@@ -1,18 +1,14 @@
 /** Composes the Quiet Chronograph clock, Now/Next board, and current-moment rule. */
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import type { ScheduleItem } from "@concourse/shared";
 import { useLocale } from "@/i18n/LocaleContext";
-import { spacing } from "@/ui/theme";
 import { useTheme } from "@/ui/ThemeContext";
-import { formatScheduleTime } from "@/utils/dateFormat";
 import { ClockBlock } from "./ClockBlock";
 import { CurrentMomentLine } from "./CurrentMomentLine";
 import { SignalBoard } from "./SignalBoard";
-import { tr } from "./todayClockFormat";
-import {
-  getTodayChromeStatus,
-  type TodaySourceStatus,
-} from "./todaySourceStatus";
+import { styles } from "./SignalStage.styles";
+import { signalStagePresentation } from "./signalStagePresentation";
+import type { TodaySourceStatus } from "./todaySourceStatus";
 
 /** Renders the approved Quiet Chronograph clock and live campus signal composition. */
 export function SignalStage({
@@ -37,12 +33,15 @@ export function SignalStage({
 }): JSX.Element {
   const theme = useTheme();
   const { t } = useLocale();
-  const chromeStatus = getTodayChromeStatus(sourceStatus, locale, theme.colors, !isWide);
-  const nextMeta = nextItem
-    ? `${formatScheduleTime(nextItem.startsAt, locale, timeZone)}${
-        nextItem.location ? ` · ${nextItem.location}` : ""
-      }`
-    : null;
+  const presentation = signalStagePresentation({
+    nextItem,
+    sourceStatus,
+    locale,
+    timeZone,
+    isWide,
+    colors: theme.colors,
+    translate: t,
+  });
 
   return (
     <>
@@ -58,30 +57,21 @@ export function SignalStage({
           localTime={localTime}
           isWide={isWide}
           timeZone={timeZone}
-          campusLocalLabel={tr(locale, "campusLocalTime", "Campus local time")}
+          campusLocalLabel={presentation.campusLocalLabel}
           showFreshnessChip={showFreshnessChip}
-          chromeLabel={chromeStatus.label}
-          chromeColor={chromeStatus.color}
-          chromeTone={chromeStatus.tone}
+          chromeLabel={presentation.chromeStatus.label}
+          chromeColor={presentation.chromeStatus.color}
+          chromeTone={presentation.chromeStatus.tone}
         />
         <SignalBoard
           isWide={isWide}
-          nowTitle={tr(locale, "campusIsOpen", t("campusInformation"))}
+          nowTitle={presentation.nowTitle}
           sourceLabel={sourceStatus.label}
-          nextTitle={nextItem?.title ?? t("noSchedule")}
-          nextMeta={nextMeta}
+          nextTitle={presentation.nextTitle}
+          nextMeta={presentation.nextMeta}
         />
       </View>
-      <CurrentMomentLine caption={tr(locale, "currentMoment", t("now"))} />
+      <CurrentMomentLine caption={presentation.currentMomentCaption} />
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  signalStage: { gap: spacing.lg },
-  signalStageWide: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: spacing.xl,
-  },
-});

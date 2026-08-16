@@ -6,11 +6,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sebastianspicker/campus-app-kit.git"
+    "url": "https://github.com/sebastianspicker/concourse.git"
   },
-  "homepage": "https://github.com/sebastianspicker/campus-app-kit#readme",
+  "homepage": "https://github.com/sebastianspicker/concourse#readme",
   "bugs": {
-    "url": "https://github.com/sebastianspicker/campus-app-kit/issues"
+    "url": "https://github.com/sebastianspicker/concourse/issues"
   },
   "keywords": [
     "accessibility",
@@ -20,18 +20,23 @@
     "typescript",
     "university"
   ],
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@9.15.0",
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
     "build": "turbo run build",
+    "build:demo": "pnpm --filter @concourse/shared build && pnpm --filter @concourse/institutions build && CONCOURSE_STATIC_DEMO=1 INSTITUTION_ID=example pnpm --filter @concourse/mobile exec expo export --platform web --output-dir ../../dist-pages --clear && node scripts/prepare-pages-output.mjs",
     "dev": "turbo run dev --parallel",
     "lint": "eslint playwright.config.ts vitest.config.ts apps/bff/vitest.config.ts apps/mobile/app.config.ts apps/mobile/vitest.config.ts && turbo run lint",
     "typecheck": "tsc -p tsconfig.tools.json && turbo run typecheck",
-    "test": "turbo run test && node --test scripts/serve-expo-export-port.test.mjs scripts/verify-release-metadata.test.mjs",
+    "test": "turbo run test && node --test scripts/serve-expo-export-port.test.mjs scripts/serve-expo-export-routes.test.mjs scripts/serve-expo-export.test.mjs scripts/verify-release-metadata.test.mjs",
+    "test:demo:unit": "pnpm --filter @concourse/mobile exec vitest run src/data/__tests__/publicApiRequest.test.ts",
+    "test:demo:web": "playwright test --config playwright.pages.config.ts",
     "test:e2e": "pnpm --filter @concourse/shared build && pnpm --filter @concourse/institutions build && pnpm --filter @concourse/bff build && node scripts/e2e-bff.mjs",
     "test:web": "playwright test",
+    "verify:demo": "pnpm test:demo:unit && pnpm build:demo && pnpm verify:demo:artifact && pnpm test:demo:web",
+    "verify:demo:artifact": "node scripts/verify-pages-output.mjs",
     "release:check": "node scripts/verify-release-metadata.mjs",
     "verify": "./scripts/verify-production-ready.sh",
     "setup:dev": "./scripts/setup-dev.sh"
@@ -46,54 +51,9 @@
     "eslint": "8.57.1",
     "eslint-plugin-react-hooks": "7.0.1",
     "tsx": "4.21.0",
-    "turbo": "2.8.1",
+    "turbo": "2.9.14",
     "typescript": "npm:@typescript/typescript6@6.0.2",
-    "vite": "6.4.2",
+    "vite": "6.4.3",
     "vitest": "4.1.5"
-  },
-  "pnpm": {
-    "overrides": {
-      "lightningcss": "1.30.1",
-      "@babel/core@>=7 <7.29.6": "7.29.6",
-      "@isaacs/brace-expansion@<=5.0.0": "5.0.1",
-      "@babel/plugin-transform-modules-systemjs@<7.29.4": "7.29.4",
-      "@remix-run/server-runtime@<2.17.5": "2.17.5",
-      "@xmldom/xmldom@<0.8.13": "0.8.13",
-      "ajv@>=7.0.0-alpha.0 <8.18.0": "8.18.0",
-      "brace-expansion@<1.1.13": "1.1.13",
-      "brace-expansion@>=2.0.0 <2.0.3": "2.0.3",
-      "brace-expansion@>=5.0.0 <5.0.8": "5.0.8",
-      "fast-uri@<3.1.2": "3.1.2",
-      "fast-xml-builder@<1.1.7": "1.1.7",
-      "fast-xml-parser@<5.7.0": "5.7.0",
-      "flatted@<=3.4.1": "3.4.2",
-      "form-data@>=3 <3.0.5": "3.0.5",
-      "handlebars@>=4.0.0 <=4.7.8": "4.7.9",
-      "joi@>=17 <17.13.4": "17.13.4",
-      "js-yaml@>=3 <3.15.0": "3.15.0",
-      "js-yaml@>=4 <4.3.0": "4.3.0",
-      "minimatch@<3.1.4": "3.1.4",
-      "minimatch@>=9.0.0 <9.0.7": "9.0.7",
-      "minimatch@>=10.0.0 <10.2.3": "10.2.3",
-      "node-forge@<1.4.0": "1.4.0",
-      "picomatch@<2.3.2": "2.3.2",
-      "picomatch@>=3.0.0 <3.0.2": "3.0.2",
-      "picomatch@>=4.0.0 <4.0.4": "4.0.4",
-      "postcss": "8.5.18",
-      "rollup@>=4.0.0 <4.59.0": "4.60.3",
-      "send@<0.19.0": "0.19.0",
-      "shell-quote@>=1 <1.9.0": "1.9.0",
-      "tar@<7.5.16": "7.5.16",
-      "@expo/cli@0.18.31>tar": "7.5.16",
-      "cacache@18.0.4>tar": "7.5.16",
-      "turbo-stream@<3.0.0": "3.0.0",
-      "undici@<6.27.0": "6.27.0",
-      "uuid@<14.0.0": "14.0.0",
-      "vite@<=6.4.1": "6.4.2",
-      "ws@>=6 <6.2.4": "6.2.4",
-      "ws@>=7 <7.5.11": "7.5.11",
-      "ws@>=8 <8.21.0": "8.21.0",
-      "yaml@>=2.0.0 <2.8.3": "2.8.3"
-    }
   }
 }

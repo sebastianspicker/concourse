@@ -51,6 +51,22 @@ describe("withRetry", () => {
     expect(fn).toHaveBeenCalledTimes(2); // 1 initial + 1 retry
   });
 
+  it("preserves the terminal error identity", async () => {
+    const error = new Error("not found");
+    (error as { status?: number }).status = 404;
+
+    await expect(withRetry(vi.fn().mockRejectedValue(error))).rejects.toBe(error);
+  });
+
+  it("aborts before invoking the operation", async () => {
+    const controller = new AbortController();
+    const fn = vi.fn().mockResolvedValue("ok");
+    controller.abort();
+
+    await expect(withRetry(fn, { signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" });
+    expect(fn).not.toHaveBeenCalled();
+  });
+
   it("does not retry AbortError", async () => {
     const err = new Error("aborted");
     (err as { name: string }).name = "AbortError";

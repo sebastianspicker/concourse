@@ -113,6 +113,24 @@ describe("cache: TTL and eviction", () => {
     expect(loader).toHaveBeenCalledTimes(2);
   });
 
+  it("force-invalidates retained data while joining matching in-flight work", async () => {
+    await getCached("force", async () => "stale", 5000);
+    let resolve!: (value: string) => void;
+    const loader = vi.fn(() => new Promise<string>((done) => {
+      resolve = done;
+    }));
+
+    const refreshed = getCached("force", loader, 5000, { force: true });
+    const joined = getCached("force", async () => "must-not-run", 5000, { force: true });
+    resolve("fresh");
+
+    await expect(refreshed).resolves.toBe("fresh");
+    await expect(joined).resolves.toBe("fresh");
+    await expect(getCached("force", async () => "must-not-run", 5000)).resolves.toBe("fresh");
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(cacheStats()).toMatchObject({ hits: 1, misses: 3 });
+  });
+
   it("keeps a timed-out loader accounted for until its underlying work settles", async () => {
     let settle!: () => void;
     const loader = vi.fn((signal: AbortSignal) => new Promise<string>((resolve) => {

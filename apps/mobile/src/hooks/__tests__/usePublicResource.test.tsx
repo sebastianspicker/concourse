@@ -1,129 +1,234 @@
 /** Verifies refreshes and unmounts ignore stale request completions. */
 import TestRenderer, { act } from "react-test-renderer";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { usePublicResource, type PublicResource } from "../usePublicResource";
 import type { ResourceLoadResult } from "../../data/publicApiRequest";
 
-type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void };
+type LoadControls = { force?: boolean; signal?: AbortSignal };
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+};
 
 /** Creates a controllable promise so tests decide when a resource request resolves. */
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((next) => { resolve = next; });
-  return { promise, resolve };
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((next, fail) => { resolve = next; reject = fail; });
+  return { promise, resolve, reject };
 }
 
 /** Builds a complete network result so hook tests focus on state transitions rather than response shape. */
-const result = (value: number): ResourceLoadResult<number> => ({
-  data: value, source: "network", updatedAt: 1, cacheAge: null
-});
+const result = (
+  value: number,
+  source: ResourceLoadResult<number>["source"] = "network",
+  updatedAt = value,
+  cacheAge: number | null = null
+): ResourceLoadResult<number> => ({ data: value, source, updatedAt, cacheAge });
+
+/** Queues exact request completions and records controls passed by the hook. */
+function queuedLoader(...requests: Deferred<ResourceLoadResult<number>>[]) {
+  const calls: LoadControls[] = [];
+  return {
+    calls,
+    loader: vi.fn((controls: LoadControls) => {
+      calls.push(controls);
+      const request = requests.shift();
+      if (!request) throw new Error("Unexpected resource request");
+      return request.promise;
+    }),
+  };
+}
+
+/** Mounts one hook instance and exposes its latest observable state and renderer operations. */
+function resourceFixture(loader: (controls: LoadControls) => Promise<ResourceLoadResult<number>>) {
+  let current!: PublicResource<number>;
+  let renderer!: TestRenderer.ReactTestRenderer;
+  let renderCount = 0;
+  const observe = (next: PublicResource<number>) => { current = next; renderCount += 1; };
+  const render = (resourceKey?: string) => <Harness loader={loader} resourceKey={resourceKey} onState={observe} />;
+
+  return {
+    get state() { return current; },
+    get renderCount() { return renderCount; },
+    mount: async (resourceKey?: string) => {
+      await act(async () => { renderer = TestRenderer.create(render(resourceKey)); });
+    },
+    update: async (resourceKey?: string) => {
+      await act(async () => { renderer.update(render(resourceKey)); });
+    },
+    unmount: async () => {
+      await act(async () => { renderer.unmount(); });
+    },
+  };
+}
+
+/** Prepares a hook instance with a fixed count of loader requests. */
+function resourceScenario(requestCount: number) {
+  const requests = Array.from({ length: requestCount }, () => deferred<ResourceLoadResult<number>>());
+  const queue = queuedLoader(...requests);
+  return { fixture: resourceFixture(queue.loader), requests, calls: queue.calls };
+}
+
+/** Settles a deferred request inside React's update boundary. */
+async function resolve(request: Deferred<ResourceLoadResult<number>>, value: ResourceLoadResult<number>): Promise<void> {
+  await act(async () => { request.resolve(value); });
+}
+
+/** Rejects a deferred request inside React's update boundary. */
+async function reject(request: Deferred<ResourceLoadResult<number>>, reason: unknown): Promise<void> {
+  await act(async () => { request.reject(reason); });
+}
+
+/** Starts the current resource's force refresh and returns its completion promise. */
+async function startRefresh(fixture: ReturnType<typeof resourceFixture>): Promise<{ refresh: Promise<void> }> {
+  let refresh!: Promise<void>;
+  await act(async () => { refresh = fixture.state.refresh(); });
+  return { refresh };
+}
 
 describe("usePublicResource request ownership", () => {
-  it("preserves fulfilled data and exposes refreshing while a key change loads", async () => {
-    const initial = deferred<ResourceLoadResult<number>>();
-    const filtered = deferred<ResourceLoadResult<number>>();
-    const requests = [initial, filtered];
-    let state!: PublicResource<number>;
-    let renderer!: TestRenderer.ReactTestRenderer;
-    const loader = () => requests.shift()!.promise;
-
-    await act(async () => {
-      renderer = TestRenderer.create(<Harness loader={loader} resourceKey="all" onState={(next) => { state = next; }} />);
+  it("maps an owning synchronous TypeError into an offline error and settles initial state", async () => {
+    const loader = vi.fn((_controls: LoadControls): Promise<ResourceLoadResult<number>> => {
+      throw new TypeError("offline");
     });
-    await act(async () => { initial.resolve(result(1)); });
-    expect(state.data).toBe(1);
-    expect(state.loading).toBe(false);
+    const fixture = resourceFixture(loader);
 
-    await act(async () => {
-      renderer.update(<Harness loader={loader} resourceKey="filtered" onState={(next) => { state = next; }} />);
-    });
-    expect(state.data).toBe(1);
-    expect(state.loading).toBe(false);
-    expect(state.refreshing).toBe(true);
-
-    await act(async () => { filtered.resolve(result(2)); });
-    expect(state.data).toBe(2);
-    expect(state.refreshing).toBe(false);
+    await fixture.mount();
+    expect(fixture.state).toMatchObject({ error: { kind: "offline" }, loading: false, refreshing: false });
   });
 
-  it("does not leave initial loading true when refresh supersedes it", async () => {
-    const initial = deferred<ResourceLoadResult<number>>();
-    const refreshed = deferred<ResourceLoadResult<number>>();
-    const requests = [initial, refreshed];
-    let state!: PublicResource<number>;
-/** Records loader calls and returns a fresh deferred result for the test scenario. */
-    const loader = () => requests.shift()!.promise;
+  it("maps an owning rejected TypeError into an offline error and settles initial state", async () => {
+    const loader = vi.fn((_controls: LoadControls) => Promise.reject(new TypeError("offline")));
+    const fixture = resourceFixture(loader);
 
-    await act(async () => {
-      TestRenderer.create(<Harness loader={loader} onState={(next) => { state = next; }} />);
-    });
-    let refresh!: Promise<void>;
-    await act(async () => { refresh = state.refresh(); });
-    expect(state.loading).toBe(false);
-    expect(state.refreshing).toBe(true);
+    await fixture.mount();
+    expect(fixture.state).toMatchObject({ error: { kind: "offline" }, loading: false, refreshing: false });
+  });
+
+  it("clears an accepted error while a key change begins its replacement load", async () => {
+    const { fixture, requests: [failed, replacement] } = resourceScenario(2);
+
+    await fixture.mount("one");
+    await reject(failed, new TypeError("offline"));
+    expect(fixture.state.error).toMatchObject({ kind: "offline" });
+
+    await fixture.update("two");
+    expect(fixture.state).toMatchObject({ error: null, loading: true, refreshing: false });
+    await resolve(replacement, result(2));
+  });
+
+  it("preserves fulfilled data and exposes refreshing while a key change loads", async () => {
+    const { fixture, requests: [initial, filtered], calls } = resourceScenario(2);
+
+    await fixture.mount("all");
+    await resolve(initial, result(1, "persisted-cache", 8, 3_000));
+    await fixture.update("filtered");
+    expect(fixture.state).toMatchObject({ data: 1, loading: false, refreshing: true, error: null });
+    expect(calls.map(({ force }) => force)).toEqual([false, false]);
+
+    await resolve(filtered, result(2, "memory-cache", 9, 0));
+    expect(fixture.state).toMatchObject({ data: 2, source: "memory-cache", updatedAt: 9, cacheAge: 0, refreshing: false });
+  });
+
+  it.each([
+    ["resolves", (request: Deferred<ResourceLoadResult<number>>) => request.resolve(result(1))],
+    ["rejects", (request: Deferred<ResourceLoadResult<number>>) => request.reject(new TypeError("offline"))],
+  ])("ignores a stale key request that %s and lets only the latest cleanup settle loading", async (_outcome, settleStale) => {
+    const { fixture, requests: [first, second] } = resourceScenario(2);
+
+    await fixture.mount("one");
+    await fixture.update("two");
+    await act(async () => { settleStale(first); });
+    expect(fixture.state).toMatchObject({ data: null, error: null, loading: true, refreshing: false });
+
+    await resolve(second, result(2));
+    expect(fixture.state).toMatchObject({ data: 2, error: null, loading: false, refreshing: false });
+  });
+
+  it("aborts on unmount and suppresses a late cancellation completion", async () => {
+    const { fixture, requests: [pending], calls } = resourceScenario(1);
+
+    await fixture.mount();
+    await fixture.unmount();
+    const renderCount = fixture.renderCount;
+    expect(calls[0]?.signal?.aborted).toBe(true);
+
+    await reject(pending, Object.assign(new Error("cancelled"), { name: "AbortError" }));
+    expect(fixture.renderCount).toBe(renderCount);
+  });
+
+  it("does not read result fields from a late success after unmount", async () => {
+    const { fixture, requests: [pending] } = resourceScenario(1);
+    const data = vi.fn(() => 1);
+    const source = vi.fn(() => "network" as const);
+    const updatedAt = vi.fn(() => 1);
+    const cacheAge = vi.fn(() => null);
+    const lateResult = Object.defineProperties({}, {
+      data: { get: data },
+      source: { get: source },
+      updatedAt: { get: updatedAt },
+      cacheAge: { get: cacheAge },
+    }) as ResourceLoadResult<number>;
+
+    await fixture.mount();
+    await fixture.unmount();
+    await resolve(pending, lateResult);
+    for (const getter of [data, source, updatedAt, cacheAge]) {
+      expect(getter).not.toHaveBeenCalled();
+    }
+  });
+
+  it("suppresses a current cancellation without exposing a UI error", async () => {
+    const { fixture, requests: [pending] } = resourceScenario(1);
+
+    await fixture.mount();
+    await reject(pending, Object.assign(new Error("cancelled"), { name: "AbortError" }));
+    expect(fixture.state).toMatchObject({ error: null, loading: false, refreshing: false });
+  });
+
+  it("aborts before replacing a request with a force refresh", async () => {
+    const { fixture, requests: [_initial, refreshed], calls } = resourceScenario(2);
+
+    await fixture.mount();
+    const { refresh } = await startRefresh(fixture);
+    expect(calls[0]?.signal?.aborted).toBe(true);
+    expect(calls[1]).toMatchObject({ force: true });
+    expect(fixture.state).toMatchObject({ loading: false, refreshing: true });
 
     await act(async () => { refreshed.resolve(result(2)); await refresh; });
-    expect(state.refreshing).toBe(false);
-    expect(state.data).toBe(2);
+    expect(fixture.state).toMatchObject({ data: 2, refreshing: false });
   });
 
   it("keeps refreshing true until the latest overlapping refresh completes", async () => {
-    const initial = deferred<ResourceLoadResult<number>>();
-    const firstRefresh = deferred<ResourceLoadResult<number>>();
-    const secondRefresh = deferred<ResourceLoadResult<number>>();
-    const requests = [initial, firstRefresh, secondRefresh];
-    let state!: PublicResource<number>;
-/** Simulates a loader that remains pending until the test resolves its captured promise. */
-    const loader = () => requests.shift()!.promise;
+    const { fixture, requests: [_initial, firstRefresh, secondRefresh] } = resourceScenario(3);
 
-    await act(async () => {
-      TestRenderer.create(<Harness loader={loader} onState={(next) => { state = next; }} />);
-    });
-    let one!: Promise<void>;
-    let two!: Promise<void>;
-    await act(async () => { one = state.refresh(); two = state.refresh(); });
-    await act(async () => { firstRefresh.resolve(result(1)); await one; });
-    expect(state.refreshing).toBe(true);
-    await act(async () => { secondRefresh.resolve(result(2)); await two; });
-    expect(state.refreshing).toBe(false);
-    expect(state.data).toBe(2);
+    await fixture.mount();
+    const { refresh: first } = await startRefresh(fixture);
+    const { refresh: second } = await startRefresh(fixture);
+    await act(async () => { firstRefresh.resolve(result(1)); await first; });
+    expect(fixture.state.refreshing).toBe(true);
+    await act(async () => { secondRefresh.resolve(result(2)); await second; });
+    expect(fixture.state).toMatchObject({ data: 2, refreshing: false });
   });
 
-  it("clears refreshing when a key change supersedes the refresh", async () => {
-    const initial = deferred<ResourceLoadResult<number>>();
-    const refreshed = deferred<ResourceLoadResult<number>>();
-    const nextKey = deferred<ResourceLoadResult<number>>();
-    const requests = [initial, refreshed, nextKey];
-    let state!: PublicResource<number>;
-/** Produces a loader whose successive completions expose stale-request handling. */
-    const loader = () => requests.shift()!.promise;
-    let renderer!: TestRenderer.ReactTestRenderer;
+  it("clears refresh state when a key change supersedes the refresh", async () => {
+    const { fixture, requests: [_initial, refreshed, nextKey] } = resourceScenario(3);
 
-    await act(async () => {
-      renderer = TestRenderer.create(<Harness loader={loader} resourceKey="one" onState={(next) => { state = next; }} />);
-    });
-    let refresh!: Promise<void>;
-    await act(async () => { refresh = state.refresh(); });
-    expect(state.refreshing).toBe(true);
+    await fixture.mount("one");
+    const { refresh } = await startRefresh(fixture);
+    await fixture.update("two");
+    expect(fixture.state).toMatchObject({ loading: true, refreshing: false });
 
-    await act(async () => {
-      renderer.update(<Harness loader={loader} resourceKey="two" onState={(next) => { state = next; }} />);
-    });
-    expect(state.refreshing).toBe(false);
-    expect(state.loading).toBe(true);
-
-    await act(async () => {
-      refreshed.resolve(result(1));
-      nextKey.resolve(result(2));
-      await refresh;
-    });
-    expect(state.data).toBe(2);
+    await act(async () => { refreshed.resolve(result(1)); nextKey.resolve(result(2)); await refresh; });
+    expect(fixture.state).toMatchObject({ data: 2, loading: false, refreshing: false });
   });
 });
 
 /** Mounts the resource hook and exposes its state through the test renderer. */
 function Harness({ loader, resourceKey, onState }: {
-  loader: () => Promise<ResourceLoadResult<number>>;
+  loader: (controls: LoadControls) => Promise<ResourceLoadResult<number>>;
   resourceKey?: string;
   onState: (state: PublicResource<number>) => void;
 }): null {

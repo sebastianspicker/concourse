@@ -1,35 +1,74 @@
 /** Composes the Quiet Chronograph Today view from public-data resources. */
-import { useCallback, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { useSetChromeStatus } from "@/components/ChromeStatusContext";
 import { getInstitutionTimeZone } from "@/config/institution";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useToday } from "@/hooks/useToday";
 import { useLocale } from "@/i18n/LocaleContext";
-import { TodayEventsSection } from "@/screens/todayEventsSection";
-import { ScheduleSection } from "@/screens/todayScheduleSection";
 import {
   formatCampusTime,
   formatTodayDate,
   getTodayChromeStatus,
   getTodaySourceStatus,
   getTodaySchedule,
-  ScheduleLimitNotice,
   SignalStage,
   TodayStateNotices,
 } from "@/screens/today";
+import { TodayAgenda } from "@/screens/today/TodayAgenda";
+import type { TodayChromeStatus } from "@/screens/today/todaySourceStatus";
 import {
   getLocalDayRange,
   isScheduleUnavailable,
   type SortDirection,
 } from "@/screens/todayScreenHelpers";
 import { Screen } from "@/ui/Screen";
-import { spacing } from "@/ui/theme";
 import { useTheme } from "@/ui/ThemeContext";
 import { useHydratedWindowWidth } from "@/ui/useHydratedWindowWidth";
+import { isStaticDemo } from "@/config/staticDemo";
 
 const WIDE_BREAKPOINT = 900;
+
+/** Prevents static clock markup from becoming stale before the demo hydrates. */
+function useDemoSafeCampusClock(locale: string, timeZone: string, loadingLabel: string) {
+  const staticDemo = isStaticDemo();
+  const [demoHydrated, setDemoHydrated] = useState(!staticDemo);
+
+  useEffect(() => {
+    if (staticDemo) setDemoHydrated(true);
+  }, [staticDemo]);
+
+  if (!demoHydrated) return { date: loadingLabel, localTime: "--:--" };
+  return {
+    date: formatTodayDate(locale, timeZone),
+    localTime: formatCampusTime(locale, timeZone),
+  };
+}
+
+function usePublishChromeStatus(
+  chromeStatus: TodayChromeStatus,
+  setChromeStatus: ReturnType<typeof useSetChromeStatus>,
+): void {
+  // Stack keeps sibling tabs mounted; clear the header chip whenever Today blurs.
+  useFocusEffect(
+    useCallback(() => {
+      setChromeStatus({ label: chromeStatus.label, tone: chromeStatus.tone });
+      return () => setChromeStatus(null);
+    }, [chromeStatus.label, chromeStatus.tone, setChromeStatus]),
+  );
+}
+
+function useRefreshAll(
+  todayState: ReturnType<typeof useToday>,
+  scheduleState: ReturnType<typeof useSchedule>,
+  scheduleUnavailable: boolean,
+): () => Promise<void> {
+  return useCallback(async () => {
+    const requests = [todayState.refresh()];
+    if (!scheduleUnavailable) requests.push(scheduleState.refresh());
+    await Promise.all(requests);
+  }, [scheduleState, scheduleUnavailable, todayState]);
+}
 
 /** Composes Today while preserving refresh, sorting, and error behavior. */
 export default function TodayScreen(): JSX.Element {
@@ -38,6 +77,7 @@ export default function TodayScreen(): JSX.Element {
   const width = useHydratedWindowWidth();
   const isWide = width >= WIDE_BREAKPOINT;
   const timeZone = getInstitutionTimeZone();
+  const clock = useDemoSafeCampusClock(locale, timeZone, t("loading"));
   const todayState = useToday();
   const scheduleState = useSchedule(getLocalDayRange(new Date(), timeZone));
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -54,20 +94,8 @@ export default function TodayScreen(): JSX.Element {
     locale,
   });
   const chromeStatus = getTodayChromeStatus(sourceStatus, locale, theme.colors, !isWide);
-
-  // Stack keeps sibling tabs mounted; clear the header chip whenever Today blurs.
-  useFocusEffect(
-    useCallback(() => {
-      setChromeStatus({ label: chromeStatus.label, tone: chromeStatus.tone });
-      return () => setChromeStatus(null);
-    }, [chromeStatus.label, chromeStatus.tone, setChromeStatus]),
-  );
-
-  const refreshAll = useCallback(async () => {
-    const requests = [todayState.refresh()];
-    if (!scheduleUnavailable) requests.push(scheduleState.refresh());
-    await Promise.all(requests);
-  }, [scheduleState, scheduleUnavailable, todayState]);
+  usePublishChromeStatus(chromeStatus, setChromeStatus);
+  const refreshAll = useRefreshAll(todayState, scheduleState, scheduleUnavailable);
 
   return (
     <Screen
@@ -77,8 +105,8 @@ export default function TodayScreen(): JSX.Element {
       testID="today-screen"
     >
       <SignalStage
-        date={formatTodayDate(locale, timeZone)}
-        localTime={formatCampusTime(locale, timeZone)}
+        date={clock.date}
+        localTime={clock.localTime}
         nextItem={schedule.items[0]}
         sourceStatus={sourceStatus}
         locale={locale}
@@ -87,49 +115,16 @@ export default function TodayScreen(): JSX.Element {
         showFreshnessChip={false}
       />
       <TodayStateNotices todayState={todayState} scheduleState={scheduleState} />
-      <View style={[styles.agenda, isWide && styles.agendaWide]}>
-        {!scheduleUnavailable ? (
-          <View
-            style={[
-              styles.agendaColumn,
-              isWide && styles.scheduleColumn,
-              isWide && { borderRightColor: theme.colors.border },
-            ]}
-          >
-            <ScheduleSection
-              sortDirection={sortDirection}
-              onToggleSort={() =>
-                setSortDirection((value) => (value === "asc" ? "desc" : "asc"))
-              }
-              loading={scheduleState.loading}
-              error={scheduleState.error}
-              items={schedule.items}
-              source={scheduleState.source}
-              isWide={isWide}
-              onRetry={() => void scheduleState.refresh()}
-            />
-            <ScheduleLimitNotice count={schedule.items.length} total={schedule.total} />
-          </View>
-        ) : null}
-        <View style={[styles.agendaColumn, isWide && styles.eventsColumn]}>
-          <TodayEventsSection
-            loading={todayState.loading}
-            error={todayState.error}
-            events={todayState.data?.events ?? []}
-            source={todayState.source}
-            isWide={isWide}
-            onRetry={() => void todayState.refresh()}
-          />
-        </View>
-      </View>
+      <TodayAgenda
+        isWide={isWide}
+        borderColor={theme.colors.border}
+        scheduleUnavailable={scheduleUnavailable}
+        schedule={schedule}
+        scheduleState={scheduleState}
+        todayState={todayState}
+        sortDirection={sortDirection}
+        onToggleSort={() => setSortDirection((value) => (value === "asc" ? "desc" : "asc"))}
+      />
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  agenda: { gap: spacing.xxl },
-  agendaWide: { flexDirection: "row", gap: 0 },
-  agendaColumn: { flex: 1, minWidth: 0 },
-  scheduleColumn: { paddingRight: spacing.xxl, borderRightWidth: StyleSheet.hairlineWidth },
-  eventsColumn: { paddingLeft: spacing.xxl },
-});

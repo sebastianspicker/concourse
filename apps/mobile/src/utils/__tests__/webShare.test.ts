@@ -10,11 +10,15 @@ function setNavigator(navigator: object): void {
   Object.defineProperty(globalThis, "navigator", { configurable: true, value: navigator });
 }
 
+function clearNavigator(): void {
+  delete (globalThis as { navigator?: Navigator }).navigator;
+}
+
 afterEach(() => {
   if (originalNavigator) {
     Object.defineProperty(globalThis, "navigator", originalNavigator);
   } else {
-    delete (globalThis as { navigator?: Navigator }).navigator;
+    clearNavigator();
   }
 });
 
@@ -35,17 +39,53 @@ describe("shareEventOnWeb", () => {
     expect(writeText).toHaveBeenCalledWith("https://example.org/event");
   });
 
+  it("fails when navigator or clipboard support is unavailable", async () => {
+    clearNavigator();
+    await expect(shareEventOnWeb("Welcome concert", "https://example.org/event")).resolves.toBe("failed");
+
+    setNavigator({});
+    await expect(shareEventOnWeb("Welcome concert", "https://example.org/event")).resolves.toBe("failed");
+  });
+
   it("treats an aborted share as cancellation rather than an unhandled failure", async () => {
     setNavigator({ share: vi.fn().mockRejectedValue(Object.assign(new Error("cancelled"), { name: "AbortError" })) });
 
     await expect(shareEventOnWeb("Welcome concert", "https://example.org/event")).resolves.toBe("cancelled");
   });
 
-  it("returns a failure result when sharing or copying is rejected", async () => {
-    setNavigator({ share: vi.fn().mockRejectedValue(new Error("denied")) });
-    await expect(shareEventOnWeb("Welcome concert", "https://example.org/event")).resolves.toBe("failed");
+  it("does not fall back to the clipboard when browser sharing is rejected", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    setNavigator({ share: vi.fn().mockRejectedValue(new Error("denied")), clipboard: { writeText } });
 
-    setNavigator({ clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) } });
     await expect(shareEventOnWeb("Welcome concert", "https://example.org/event")).resolves.toBe("failed");
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("absorbs synchronous share errors without falling back to the clipboard", async () => {
+    const share = vi.fn(() => {
+      throw new Error("denied");
+    });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    setNavigator({ share, clipboard: { writeText } });
+
+    await expect(shareEventOnWeb("Welcome concert", "https://example.org/event")).resolves.toBe("failed");
+    expect(share).toHaveBeenCalledWith({ title: "Welcome concert", text: "Welcome concert", url: "https://example.org/event" });
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("returns a failure result when copying is rejected", async () => {
+    setNavigator({ clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) } });
+
+    await expect(shareEventOnWeb("Welcome concert", "https://example.org/event")).resolves.toBe("failed");
+  });
+
+  it("absorbs synchronous clipboard errors", async () => {
+    const writeText = vi.fn(() => {
+      throw new Error("denied");
+    });
+    setNavigator({ clipboard: { writeText } });
+
+    await expect(shareEventOnWeb("Welcome concert", "https://example.org/event")).resolves.toBe("failed");
+    expect(writeText).toHaveBeenCalledWith("https://example.org/event");
   });
 });

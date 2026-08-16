@@ -13,6 +13,8 @@ import { formatEventDate } from "@/utils/dateFormat";
 import { getInstitutionTimeZone } from "@/config/institution";
 import { reconcileSelectedDetailRecord, selectDetailRecord, selectedEventDetails } from "@/data/selectedDetailRecords";
 import { shareEventOnWeb } from "@/utils/webShare";
+import { isStaticDemo } from "@/config/staticDemo";
+import { STATIC_DEMO_EVENT_IDS } from "@/data/staticDemoData";
 
 type ShareStatus = { message: string; kind: "success" | "error" };
 
@@ -78,6 +80,7 @@ export default function EventDetailScreen(): JSX.Element {
   const theme = useTheme();
   const [shareStatus, setShareStatus] = useState<ShareStatus | null>(null);
   const timeZone = getInstitutionTimeZone();
+  const staticDemo = isStaticDemo();
 
   useEffect(() => {
     reconcileSelectedDetailRecord(selectedEventDetails, id, collection, state.source, state.data?._degraded === true);
@@ -86,6 +89,10 @@ export default function EventDetailScreen(): JSX.Element {
   const share = useCallback(async () => {
     if (!event) return;
     setShareStatus(null);
+    if (staticDemo) {
+      setShareStatus({ message: t("simulatedShare"), kind: "success" });
+      return;
+    }
     if (Platform.OS === "web") {
       const result = await shareEventOnWeb(event.title, event.sourceUrl);
       if (result === "shared") setShareStatus({ message: t("shareComplete"), kind: "success" });
@@ -98,7 +105,11 @@ export default function EventDetailScreen(): JSX.Element {
     } catch {
       setShareStatus({ message: t("shareFailed"), kind: "error" });
     }
-  }, [event, locale, t, timeZone]);
+  }, [event, locale, staticDemo, t, timeZone]);
+
+  const simulateOfficialSource = useCallback(() => {
+    setShareStatus({ message: t("simulatedOpenSource"), kind: "success" });
+  }, [t]);
 
   return (
     <ResourceDetailScreen
@@ -113,8 +124,12 @@ export default function EventDetailScreen(): JSX.Element {
           <MetaRow label={t("date")} value={formatEventDate(event.date, locale, timeZone)} />
           <MetaRow label={t("source")} value={event.sourceUrl} />
           <View style={styles.actions}>
-            <EventAction icon="open-in-new" label={t("officialSource")} href={event.sourceUrl} role="link" />
-            <EventAction icon="share" label={t("share")} onPress={() => void share()} role="button" />
+            {staticDemo ? (
+              <EventAction icon="open-in-new" label={`${t("officialSource")} · ${t("simulated")}`} onPress={simulateOfficialSource} role="button" />
+            ) : (
+              <EventAction icon="open-in-new" label={t("officialSource")} href={event.sourceUrl} role="link" />
+            )}
+            <EventAction icon="share" label={staticDemo ? `${t("share")} · ${t("simulated")}` : t("share")} onPress={() => void share()} role="button" />
           </View>
           {shareStatus ? <Text accessibilityLiveRegion={shareStatus.kind === "error" ? "assertive" : "polite"} style={[styles.shareStatus, { color: shareStatus.kind === "error" ? theme.colors.error : theme.colors.success }]}>{shareStatus.message}</Text> : null}
         </>
@@ -126,6 +141,11 @@ export default function EventDetailScreen(): JSX.Element {
       onRefresh={state.refresh}
     />
   );
+}
+
+/** Pre-renders the sanitized fixture detail routes for static hosting. */
+export function generateStaticParams(): Array<{ id: string }> {
+  return STATIC_DEMO_EVENT_IDS.map((id) => ({ id }));
 }
 
 const styles = StyleSheet.create({

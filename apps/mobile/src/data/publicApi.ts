@@ -27,9 +27,10 @@ export type EventsQuery = {
 };
 
 type PublicRequestOptions<Q> = Q & RequestControls;
+type PublicQuery = Record<string, string | number | undefined>;
 
 /** Drops empty query values and stringifies the remaining parameters for the BFF request. */
-function serializeQuery(query: Record<string, string | number | undefined>): Record<string, string> {
+function serializeQuery(query: PublicQuery): Record<string, string> {
   return Object.fromEntries(
     Object.entries(query).flatMap(([key, value]) => value === undefined || value === "" ? [] : [[key, String(value)]])
   );
@@ -40,17 +41,27 @@ function fetchPublicResource<T>(
   path: string,
   schema: ZodType<T>,
   keySuffix: string,
-  query: Record<string, string | number | undefined>,
+  query: PublicQuery,
   controls: RequestControls
 ): Promise<ResourceLoadResult<T>> {
   return getCachedJson(path, schema, keySuffix, { ...controls, queryParams: serializeQuery(query) });
 }
 
-/** Requests the `/events` collection after separating transport controls from endpoint filters. */
-export function fetchEvents(options: PublicRequestOptions<EventsQuery> = {}): Promise<ResourceLoadResult<EventsResponse>> {
+/** Splits endpoint filters from transport controls before using the shared public-request pipeline. */
+function dispatchPublicEndpoint<T, Q extends PublicQuery>(
+  options: PublicRequestOptions<Q>,
+  path: string,
+  schema: ZodType<T>,
+  keySuffix: string
+): Promise<ResourceLoadResult<T>> {
   const { force, signal, offlineMode, ...query } = options;
 
-  return fetchPublicResource("/events", EventsResponseSchema, "events", query, { force, signal, offlineMode });
+  return fetchPublicResource(path, schema, keySuffix, query, { force, signal, offlineMode });
+}
+
+/** Requests the `/events` collection after separating transport controls from endpoint filters. */
+export function fetchEvents(options: PublicRequestOptions<EventsQuery> = {}): Promise<ResourceLoadResult<EventsResponse>> {
+  return dispatchPublicEndpoint(options, "/events", EventsResponseSchema, "events");
 }
 
 export type RoomsQuery = {
@@ -62,9 +73,7 @@ export type RoomsQuery = {
 
 /** Requests the `/rooms` collection while forwarding only room query filters. */
 export function fetchRooms(options: PublicRequestOptions<RoomsQuery> = {}): Promise<ResourceLoadResult<RoomsResponse>> {
-  const { force, signal, offlineMode, ...query } = options;
-
-  return fetchPublicResource("/rooms", RoomsResponseSchema, "rooms", query, { force, signal, offlineMode });
+  return dispatchPublicEndpoint(options, "/rooms", RoomsResponseSchema, "rooms");
 }
 
 export type TodayQuery = {
@@ -73,9 +82,7 @@ export type TodayQuery = {
 
 /** Requests the `/today` summary using the shared validation and cache pipeline. */
 export function fetchToday(options: PublicRequestOptions<TodayQuery> = {}): Promise<ResourceLoadResult<TodayResponse>> {
-  const { force, signal, offlineMode, ...query } = options;
-
-  return fetchPublicResource("/today", TodayResponseSchema, "today", query, { force, signal, offlineMode });
+  return dispatchPublicEndpoint(options, "/today", TodayResponseSchema, "today");
 }
 
 export type ScheduleQuery = {
@@ -89,7 +96,5 @@ export type ScheduleQuery = {
 
 /** Requests the `/schedule` timeline after normalizing its optional filters. */
 export function fetchSchedule(options: PublicRequestOptions<ScheduleQuery> = {}): Promise<ResourceLoadResult<ScheduleResponse>> {
-  const { force, signal, offlineMode, ...query } = options;
-
-  return fetchPublicResource("/schedule", ScheduleResponseSchema, "schedule", query, { force, signal, offlineMode });
+  return dispatchPublicEndpoint(options, "/schedule", ScheduleResponseSchema, "schedule");
 }

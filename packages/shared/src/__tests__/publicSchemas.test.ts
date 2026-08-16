@@ -7,9 +7,44 @@ import {
   InstitutionPackSchema,
   isPublicHttpUrl,
   PublicEventSchema,
+  RoomsResponseSchema,
   ScheduleResponseSchema,
   TodayResponseSchema
 } from "../domain/public";
+
+const RESPONSE_SCHEMA_CASES = [
+  {
+    name: "events",
+    schema: EventsResponseSchema,
+    payload: { events: [] },
+    expectedMetadata: { _total: 2, _degraded: true, _sourcesConfigured: false },
+  },
+  {
+    name: "rooms",
+    schema: RoomsResponseSchema,
+    payload: { rooms: [] },
+    expectedMetadata: { _total: 2, _sourcesConfigured: false },
+  },
+  {
+    name: "today",
+    schema: TodayResponseSchema,
+    payload: { events: [], rooms: [] },
+    expectedMetadata: { _degraded: true, _sourcesConfigured: false },
+  },
+  {
+    name: "schedule",
+    schema: ScheduleResponseSchema,
+    payload: { schedule: [] },
+    expectedMetadata: { _total: 2, _degraded: true, _sourcesConfigured: false },
+  },
+] as const;
+
+const METADATA_INPUT = {
+  _total: 2,
+  _degraded: true,
+  _sourcesConfigured: false,
+  ignored: "value",
+} as const;
 
 describe("@concourse/shared schemas", () => {
   it("parses minimal institution pack", () => {
@@ -58,13 +93,31 @@ describe("@concourse/shared schemas", () => {
     expect(() => InstitutionDesignPresetSchema.parse("unknown")).toThrow();
   });
 
-  it("parses empty responses", () => {
-    expect(() => EventsResponseSchema.parse({ events: [] })).not.toThrow();
-    expect(() => ScheduleResponseSchema.parse({ schedule: [] })).not.toThrow();
-    expect(() =>
-      TodayResponseSchema.parse({ events: [], rooms: [] })
-    ).not.toThrow();
+  it.each(RESPONSE_SCHEMA_CASES)("accepts $name responses without optional metadata", ({ schema, payload }) => {
+    expect(schema.parse(payload)).toEqual(payload);
   });
+
+  it.each(RESPONSE_SCHEMA_CASES)("keeps the exact public metadata boundary for $name", ({ expectedMetadata, payload, schema }) => {
+    expect(schema.parse({ ...payload, ...METADATA_INPUT })).toEqual({ ...payload, ...expectedMetadata });
+  });
+
+  it.each(RESPONSE_SCHEMA_CASES)("rejects an invalid configured-source status for $name", ({ payload, schema }) => {
+    expect(() => schema.parse({ ...payload, _sourcesConfigured: "true" })).toThrow();
+  });
+
+  it.each(RESPONSE_SCHEMA_CASES.filter(({ expectedMetadata }) => "_degraded" in expectedMetadata))(
+    "rejects an invalid degraded status for $name",
+    ({ payload, schema }) => {
+      expect(() => schema.parse({ ...payload, _degraded: "true" })).toThrow();
+    },
+  );
+
+  it.each(RESPONSE_SCHEMA_CASES.filter(({ expectedMetadata }) => "_total" in expectedMetadata))(
+    "rejects a non-integer total for $name",
+    ({ payload, schema }) => {
+      expect(() => schema.parse({ ...payload, _total: 1.5 })).toThrow();
+    },
+  );
 
   it("accepts HTTP(S) public event source URLs", () => {
     for (const sourceUrl of ["http://example.org/events/1", "https://example.org/events/1"]) {

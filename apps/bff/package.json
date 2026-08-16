@@ -22,7 +22,7 @@
     "@types/node": "22.19.7",
     "@types/supertest": "6.0.3",
     "supertest": "7.0.0",
-    "vite": "6.4.2",
+    "vite": "6.4.3",
     "vitest": "4.1.5"
   }
 }

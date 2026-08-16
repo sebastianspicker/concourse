@@ -2,11 +2,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: Alpha and support guide
-    url: https://github.com/sebastianspicker/campus-app-kit/blob/main/SUPPORT.md
+    url: https://github.com/sebastianspicker/concourse/blob/main/SUPPORT.md
     about: Check supported scope and safe reporting guidance before filing.
   - name: Security vulnerability
-    url: https://github.com/sebastianspicker/campus-app-kit/security/advisories/new
+    url: https://github.com/sebastianspicker/concourse/security/advisories/new
     about: Report vulnerabilities privately. Do not open public security issues.
   - name: Documentation
-    url: https://github.com/sebastianspicker/campus-app-kit/tree/main/docs
+    url: https://github.com/sebastianspicker/concourse/tree/main/docs
     about: Check the public docs before opening a support-style issue.

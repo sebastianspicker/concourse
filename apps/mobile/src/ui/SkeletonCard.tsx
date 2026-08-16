@@ -5,6 +5,7 @@ import { getDesignPreset } from "./designPresets";
 import { useTheme } from "./ThemeContext";
 import { useLocale } from "../i18n/LocaleContext";
 import { Skeleton } from "./SkeletonPrimitive";
+import { SkeletonLoadingRegion } from "./SkeletonLoadingRegion";
 
 const styles = StyleSheet.create({
   card: { flexDirection: "row", alignItems: "center", gap: spacing.md },
@@ -20,18 +21,9 @@ export function SkeletonCard({ announceLoading = true }: { announceLoading?: boo
   const metrics = getDesignPreset(theme.designPreset).metrics;
 
   return (
-    <View
-      {...(announceLoading
-        ? {
-            accessibilityLabel: t("loading"),
-            accessibilityRole: "progressbar" as const,
-            accessibilityState: { busy: true },
-          }
-        : {
-            accessible: false,
-            accessibilityElementsHidden: true,
-            importantForAccessibility: "no-hide-descendants" as const,
-          })}
+    <SkeletonLoadingRegion
+      accessibilityLabel={t("loading")}
+      announceLoading={announceLoading}
       style={[
         styles.card,
         {
@@ -49,7 +41,7 @@ export function SkeletonCard({ announceLoading = true }: { announceLoading?: boo
         <Skeleton width="45%" height={14} borderRadius={0} />
       </View>
       <Skeleton width={20} height={20} borderRadius={0} />
-    </View>
+    </SkeletonLoadingRegion>
   );
 }
 
@@ -58,10 +50,8 @@ export function SkeletonList({ count = 3 }: { count?: number }): JSX.Element {
   const theme = useTheme();
   const { t } = useLocale();
   return (
-    <View
+    <SkeletonLoadingRegion
       accessibilityLabel={t("loading")}
-      accessibilityRole="progressbar"
-      accessibilityState={{ busy: true }}
       style={[
         styles.listContainer,
         {
@@ -72,10 +62,8 @@ export function SkeletonList({ count = 3 }: { count?: number }): JSX.Element {
       ]}
     >
       {Array.from({ length: count }).map((_, index) => (
-        <View key={index} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <SkeletonCard announceLoading={false} />
-        </View>
+        <SkeletonCard key={index} announceLoading={false} />
       ))}
-    </View>
+    </SkeletonLoadingRegion>
   );
 }

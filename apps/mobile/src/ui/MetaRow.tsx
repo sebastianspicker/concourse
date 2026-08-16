@@ -35,12 +35,11 @@ export function MetaRow({
   value: string;
 }): JSX.Element {
   const theme = useTheme();
-  const ui = theme.ui;
 
-  const captionSize = scaledFont(typography.caption.fontSize, ui);
-  const captionLineHeight = scaledFont(typography.caption.lineHeight, ui);
-  const bodySize = scaledFont(typography.body.fontSize, ui);
-  const bodyLineHeight = scaledFont(typography.body.lineHeight, ui);
+  const captionSize = scaledFont(typography.caption.fontSize, theme.ui);
+  const captionLineHeight = scaledFont(typography.caption.lineHeight, theme.ui);
+  const bodySize = scaledFont(typography.body.fontSize, theme.ui);
+  const bodyLineHeight = scaledFont(typography.body.lineHeight, theme.ui);
 
   return (
     <View
@@ -48,8 +47,8 @@ export function MetaRow({
         styles.row,
         {
           borderBottomColor: theme.colors.border,
-          borderBottomWidth: ui.borderWidth,
-          paddingVertical: scaled(spacing.md, ui),
+          borderBottomWidth: theme.ui.borderWidth,
+          paddingVertical: scaled(spacing.md, theme.ui),
         },
       ]}
     >

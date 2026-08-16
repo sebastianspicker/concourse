@@ -87,26 +87,43 @@ export const RoomSchema = z.object({
 
 export type Room = z.infer<typeof RoomSchema>;
 
-const PAGINATED_SOURCE_METADATA = {
-  _total: z.number().int().optional(),
+const SOURCE_STATUS_METADATA = {
   _degraded: z.boolean().optional(),
   _sourcesConfigured: z.boolean().optional(),
 };
 
+const PAGINATED_SOURCE_METADATA = {
+  _total: z.number().int().optional(),
+  ...SOURCE_STATUS_METADATA,
+};
+
+const ROOMS_SOURCE_METADATA = {
+  _total: PAGINATED_SOURCE_METADATA._total,
+  _sourcesConfigured: SOURCE_STATUS_METADATA._sourcesConfigured,
+};
+
+type SingleCollectionResponseShape<CollectionName extends string, ItemSchema extends z.ZodTypeAny, Metadata extends z.ZodRawShape> = {
+  [Key in CollectionName]: z.ZodArray<ItemSchema>;
+} & Metadata;
+
+function createSingleCollectionResponseSchema<
+  CollectionName extends string,
+  ItemSchema extends z.ZodTypeAny,
+  Metadata extends z.ZodRawShape,
+>(collectionName: CollectionName, itemSchema: ItemSchema, metadata: Metadata): z.ZodObject<SingleCollectionResponseShape<CollectionName, ItemSchema, Metadata>> {
+  return z.object({
+    [collectionName]: z.array(itemSchema),
+    ...metadata,
+  } as SingleCollectionResponseShape<CollectionName, ItemSchema, Metadata>);
+}
+
 /** Paginated event response, including optional degraded-source metadata. */
-export const EventsResponseSchema = z.object({
-  events: z.array(PublicEventSchema),
-  ...PAGINATED_SOURCE_METADATA,
-});
+export const EventsResponseSchema = createSingleCollectionResponseSchema("events", PublicEventSchema, PAGINATED_SOURCE_METADATA);
 
 export type EventsResponse = z.infer<typeof EventsResponseSchema>;
 
 /** Paginated room response backed by the selected institution pack. */
-export const RoomsResponseSchema = z.object({
-  rooms: z.array(RoomSchema),
-  _total: z.number().int().optional(),
-  _sourcesConfigured: z.boolean().optional()
-});
+export const RoomsResponseSchema = createSingleCollectionResponseSchema("rooms", RoomSchema, ROOMS_SOURCE_METADATA);
 
 export type RoomsResponse = z.infer<typeof RoomsResponseSchema>;
 
@@ -114,8 +131,7 @@ export type RoomsResponse = z.infer<typeof RoomsResponseSchema>;
 export const TodayResponseSchema = z.object({
   events: z.array(PublicEventSchema),
   rooms: z.array(RoomSchema),
-  _degraded: z.boolean().optional(),
-  _sourcesConfigured: z.boolean().optional()
+  ...SOURCE_STATUS_METADATA,
 });
 
 export type TodayResponse = z.infer<typeof TodayResponseSchema>;
@@ -134,10 +150,7 @@ export const ScheduleItemSchema = z.object({
 export type ScheduleItem = z.infer<typeof ScheduleItemSchema>;
 
 /** Paginated schedule response, including partial-source state when applicable. */
-export const ScheduleResponseSchema = z.object({
-  schedule: z.array(ScheduleItemSchema),
-  ...PAGINATED_SOURCE_METADATA,
-});
+export const ScheduleResponseSchema = createSingleCollectionResponseSchema("schedule", ScheduleItemSchema, PAGINATED_SOURCE_METADATA);
 
 export type ScheduleResponse = z.infer<typeof ScheduleResponseSchema>;
 

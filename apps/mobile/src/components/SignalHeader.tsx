@@ -8,6 +8,7 @@ import { useHydratedWindowWidth } from "@/ui/useHydratedWindowWidth";
 import { ChromeFreshnessChip } from "./ChromeFreshnessChip";
 import { SignalIdentity } from "./SignalIdentity";
 import { SignalNav } from "./SignalNav";
+import { StaticDemoNotice } from "./StaticDemoNotice";
 
 /** Renders the same product chrome for tab and detail routes. */
 export function SignalHeader({ backFallback }: { backFallback?: Href }): JSX.Element {
@@ -53,6 +54,7 @@ export function SignalHeader({ backFallback }: { backFallback?: Href }): JSX.Ele
           </>
         )}
       </View>
+      <StaticDemoNotice />
     </View>
   );
 }

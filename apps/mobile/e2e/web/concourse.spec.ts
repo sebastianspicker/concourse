@@ -82,6 +82,14 @@ async function settleReleaseScreenshot(page: Page): Promise<void> {
   });
 }
 
+async function expectDetailActionsAreTappable(page: Page): Promise<void> {
+  const sourceAction = await page.getByRole("link", { name: "Open official source" }).boundingBox();
+  const shareAction = await page.getByRole("button", { name: "Share" }).boundingBox();
+  if (!sourceAction || !shareAction) throw new Error("Detail action geometry is unavailable");
+  expect(sourceAction.height).toBeGreaterThanOrEqual(44);
+  expect(shareAction.height).toBeGreaterThanOrEqual(44);
+}
+
 test.beforeAll(async () => {
   await mkdir(screenshots, { recursive: true });
 });
@@ -124,11 +132,7 @@ test("primary navigation, search, settings, keyboard, and accessibility", async 
     "href",
     "https://example.org/events/welcome-concert"
   );
-  const sourceAction = await page.getByRole("link", { name: "Open official source" }).boundingBox();
-  const shareAction = await page.getByRole("button", { name: "Share" }).boundingBox();
-  if (!sourceAction || !shareAction) throw new Error("Detail action geometry is unavailable");
-  expect(sourceAction.height).toBeGreaterThanOrEqual(44);
-  expect(shareAction.height).toBeGreaterThanOrEqual(44);
+  await expectDetailActionsAreTappable(page);
   await page.getByRole("button", { name: "Share" }).click();
   await expect(page.getByText("Event link copied.")).toBeVisible();
   await expectNoHorizontalClipping(page);

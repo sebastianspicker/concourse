@@ -5,7 +5,7 @@ import type { ClientRequest, IncomingMessage } from "node:http";
 import type { RequestOptions } from "node:https";
 import { describe, expect, it, vi } from "vitest";
 
-import { createFetchTextWithTimeout, TimeoutError } from "../fetch";
+import { createFetchTextWithTimeout, TimeoutError } from "./fetch";
 
 type LookupResult = { address: string; family: number };
 type RequestCall = { url: URL; options: RequestOptions };

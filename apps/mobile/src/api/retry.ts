@@ -1,6 +1,12 @@
 /** Retries transient requests with abort-aware exponential backoff. */
 import { createAbortError, getRetryDelayMs, shouldRetry, sleep } from "./retryHelpers";
 
+type AttemptResult<T> = { ok: true; value: T } | { ok: false; error: unknown };
+
+function canRetry(error: unknown, attempt: number, retries: number): boolean {
+  return attempt <= retries && shouldRetry(error);
+}
+
 /** Retries transient request failures with abort-aware backoff and server retry-after guidance. */
 export async function withRetry<T>(
   fn: () => Promise<T>,
@@ -19,16 +25,22 @@ export async function withRetry<T>(
       throw createAbortError();
     }
 
+    let result: AttemptResult<T>;
     try {
-      return await fn();
-    } catch (err: unknown) {
-      attempt += 1;
-      if (attempt > retries || !shouldRetry(err)) {
-        throw err;
-      }
-
-      const delay = getRetryDelayMs(err, baseDelayMs, attempt, multiplier, maxDelayMs);
-      await sleep(delay, signal);
+      result = { ok: true, value: await fn() };
+    } catch (error: unknown) {
+      result = { ok: false, error };
     }
+    if (result.ok) {
+      return result.value;
+    }
+
+    attempt += 1;
+    if (!canRetry(result.error, attempt, retries)) {
+      throw result.error;
+    }
+
+    const delay = getRetryDelayMs(result.error, baseDelayMs, attempt, multiplier, maxDelayMs);
+    await sleep(delay, signal);
   }
 }

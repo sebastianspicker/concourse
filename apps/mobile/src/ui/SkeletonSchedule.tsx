@@ -5,6 +5,7 @@ import { getDesignPreset } from "./designPresets";
 import { useTheme } from "./ThemeContext";
 import { useLocale } from "../i18n/LocaleContext";
 import { Skeleton } from "./SkeletonPrimitive";
+import { SkeletonLoadingRegion } from "./SkeletonLoadingRegion";
 
 const styles = StyleSheet.create({
   listContainer: {},
@@ -30,18 +31,9 @@ export function SkeletonScheduleItem({ announceLoading = true }: { announceLoadi
   const metrics = getDesignPreset(theme.designPreset).metrics;
 
   return (
-    <View
-      {...(announceLoading
-        ? {
-            accessibilityLabel: t("loading"),
-            accessibilityRole: "progressbar" as const,
-            accessibilityState: { busy: true },
-          }
-        : {
-            accessible: false,
-            accessibilityElementsHidden: true,
-            importantForAccessibility: "no-hide-descendants" as const,
-          })}
+    <SkeletonLoadingRegion
+      accessibilityLabel={t("loading")}
+      announceLoading={announceLoading}
       style={[
         styles.scheduleItem,
         {
@@ -63,7 +55,7 @@ export function SkeletonScheduleItem({ announceLoading = true }: { announceLoadi
         <Skeleton width="70%" height={16} borderRadius={4} />
         <Skeleton width="50%" height={12} borderRadius={4} style={styles.scheduleLocation} />
       </View>
-    </View>
+    </SkeletonLoadingRegion>
   );
 }
 
@@ -72,10 +64,8 @@ export function SkeletonSchedule({ count = 4 }: { count?: number }): JSX.Element
   const theme = useTheme();
   const { t } = useLocale();
   return (
-    <View
+    <SkeletonLoadingRegion
       accessibilityLabel={t("loading")}
-      accessibilityRole="progressbar"
-      accessibilityState={{ busy: true }}
       style={[
         styles.listContainer,
         {
@@ -86,10 +76,8 @@ export function SkeletonSchedule({ count = 4 }: { count?: number }): JSX.Element
       ]}
     >
       {Array.from({ length: count }).map((_, index) => (
-        <View key={index} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <SkeletonScheduleItem announceLoading={false} />
-        </View>
+        <SkeletonScheduleItem key={index} announceLoading={false} />
       ))}
-    </View>
+    </SkeletonLoadingRegion>
   );
 }

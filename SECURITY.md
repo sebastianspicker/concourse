@@ -10,7 +10,7 @@ supported release lines.
 ## Reporting a Vulnerability
 
 Use the repository's private
-[Security Advisory form](https://github.com/sebastianspicker/campus-app-kit/security/advisories/new).
+[Security Advisory form](https://github.com/sebastianspicker/concourse/security/advisories/new).
 Do not open a public issue for a vulnerability and do not attach exploit details,
 credentials, private URLs, or personal data to a public discussion.
 
@@ -32,7 +32,7 @@ documents the integration boundary.
 Do not commit API keys, tokens, passwords, certificates, or private endpoints.
 Use environment variables and secret stores in private infrastructure instead.
 
-## BFF Auth Notes
+## Backend for Frontend (BFF) Auth Notes
 
 This public template serves public data without auth by default. Private forks
 that enable BFF bearer auth must set both values below, unless they replace this
@@ -48,7 +48,8 @@ Unset, `0`, `false`, `no`, and `off` disable the guard. Any other non-empty
 
 `BFF_TRUST_PROXY` defaults to `never`, so rate limiting uses the direct peer
 address and ignores `X-Forwarded-For`/`Forwarded`. To accept forwarded client
-identities, prefer `BFF_TRUSTED_PROXIES` with exact proxy IPs or CIDR ranges.
+identities, prefer `BFF_TRUSTED_PROXIES` with exact proxy IPs or Classless
+Inter-Domain Routing (CIDR) ranges.
 The BFF then walks the forwarding chain only through allowlisted hops. `auto`
 is rejected. `always` is a legacy, unsafe override and is appropriate only when
 the BFF is network-isolated behind an edge that replaces forwarded headers.

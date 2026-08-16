@@ -12,6 +12,7 @@ import { useTheme, useThemePreference, type ThemePreference } from "@/ui/ThemeCo
 import { spacing, typography } from "@/ui/theme";
 import { getDesignPreset } from "@/ui/designPresets";
 import { useHydratedWindowWidth } from "@/ui/useHydratedWindowWidth";
+import { isStaticDemo } from "@/config/staticDemo";
 
 type ChoiceValue = ThemePreference | LanguagePreference;
 type Translation = ReturnType<typeof useLocale>["t"];
@@ -84,14 +85,16 @@ const ClearSavedDataGroup = ({
   theme,
   minHeight,
   onPress,
+  staticDemo,
 }: {
   t: Translation;
   theme: ReturnType<typeof useTheme>;
   minHeight: number;
   onPress: () => void;
+  staticDemo: boolean;
 }): JSX.Element => {
   return (
-    <SettingsGroup title={t("clearSavedData")}>
+    <SettingsGroup title={staticDemo ? `${t("clearSavedData")} · ${t("simulated")}` : t("clearSavedData")}>
       <Pressable
         accessibilityRole="button"
         accessibilityHint={t("clearSavedDataHint")}
@@ -99,8 +102,8 @@ const ClearSavedDataGroup = ({
         testID="clear-saved-data"
         style={({ pressed }) => [styles.action, { backgroundColor: pressed ? theme.colors.errorSurface : theme.colors.surface, minHeight }]}
       >
-        <Text style={[styles.actionTitle, { color: theme.colors.error }]}>{t("clearSavedData")}</Text>
-        <Text style={[styles.help, { color: theme.colors.muted }]}>{t("clearSavedDataHint")}</Text>
+        <Text style={[styles.actionTitle, { color: theme.colors.error }]}>{staticDemo ? `${t("clearSavedData")} · ${t("simulated")}` : t("clearSavedData")}</Text>
+        <Text style={[styles.help, { color: theme.colors.muted }]}>{staticDemo ? t("simulatedClearHint") : t("clearSavedDataHint")}</Text>
       </Pressable>
     </SettingsGroup>
   );
@@ -129,6 +132,7 @@ export default function SettingsScreen(): JSX.Element {
   const [webConfirmationVisible, setWebConfirmationVisible] = useState(false);
   const isWide = width >= 900;
   const minHeight = Math.max(52, metrics.rowMinHeight - 12);
+  const staticDemo = isStaticDemo();
   const themeChoices: Array<{ value: ThemePreference; label: string }> = [
     { value: "system", label: t("systemTheme") },
     { value: "light", label: t("lightTheme") },
@@ -141,12 +145,20 @@ export default function SettingsScreen(): JSX.Element {
     { value: "de", label: "Deutsch" },
   ];
   const clearSavedData = () => {
+    if (staticDemo) {
+      setStatus({ message: t("simulatedClearData"), kind: "success" });
+      return;
+    }
     clearCache();
     void clearPersistedCache()
       .then(() => setStatus({ message: t("cleared"), kind: "success" }))
       .catch(() => setStatus({ message: t("errorUnknown"), kind: "error" }));
   };
   const confirmClear = () => {
+    if (staticDemo) {
+      clearSavedData();
+      return;
+    }
     if (Platform.OS === "web") {
       setWebConfirmationVisible(true);
       return;
@@ -170,7 +182,7 @@ export default function SettingsScreen(): JSX.Element {
       </View>
       <View style={[styles.settingsGrid, isWide && styles.settingsGridWide]}>
         <View style={styles.settingsColumn}>
-          <ClearSavedDataGroup t={t} theme={theme} minHeight={minHeight} onPress={confirmClear} />
+          <ClearSavedDataGroup t={t} theme={theme} minHeight={minHeight} onPress={confirmClear} staticDemo={staticDemo} />
           {webConfirmationVisible ? <WebClearConfirmation t={t} theme={theme} onCancel={() => setWebConfirmationVisible(false)} onConfirm={() => { setWebConfirmationVisible(false); clearSavedData(); }} /> : null}
         </View>
         <View style={styles.settingsColumn}>

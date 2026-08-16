@@ -12,9 +12,9 @@ reproducible behavior in this repository.
 4. Remove credentials, private URLs, student data, internal institution names,
    signing material, and proprietary connector details from all logs and images.
 
-Use the [bug form](https://github.com/sebastianspicker/campus-app-kit/issues/new?template=bug_report.yml)
-for a reproducible defect, the [feature form](https://github.com/sebastianspicker/campus-app-kit/issues/new?template=feature_request.yml)
-for a public template proposal, and the [alpha feedback form](https://github.com/sebastianspicker/campus-app-kit/issues/new?template=alpha_feedback.yml)
+Use the [bug form](https://github.com/sebastianspicker/concourse/issues/new?template=bug_report.yml)
+for a reproducible defect, the [feature form](https://github.com/sebastianspicker/concourse/issues/new?template=feature_request.yml)
+for a public template proposal, and the [alpha feedback form](https://github.com/sebastianspicker/concourse/issues/new?template=alpha_feedback.yml)
 for adoption feedback. Include the exact version, platform,
 institution pack (or a sanitized minimal pack), expected behavior, observed
 behavior, and checks run.
@@ -29,6 +29,6 @@ organization's private repository and support channels.
 ## Security and conduct
 
 Report vulnerabilities through
-[GitHub Security Advisories](https://github.com/sebastianspicker/campus-app-kit/security/advisories/new),
+[GitHub Security Advisories](https://github.com/sebastianspicker/concourse/security/advisories/new),
 not a public issue. Participation is governed by the
 [Code of Conduct](CODE_OF_CONDUCT.md).

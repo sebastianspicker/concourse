@@ -38,6 +38,12 @@ export type JsonResponse<T> = {
   headers: Headers;
 };
 
+type TimedRequest = {
+  signal: AbortSignal;
+  didTimeout: () => boolean;
+  cleanup: () => void;
+};
+
 /** Rejects malformed, non-HTTP, or credential-bearing BFF URLs before a client request starts. */
 function assertClientHttpUrl(url: string): void {
   let parsed: URL;
@@ -73,61 +79,78 @@ export async function fetchJsonResponseWithTimeout<T>(
   timeoutMs = 10_000
 ): Promise<JsonResponse<T>> {
   assertClientHttpUrl(url);
+  const request = createTimedRequest(init?.signal, timeoutMs);
 
+  try {
+    const response = await fetch(url, { ...init, signal: request.signal, redirect: "error" });
+    return await parseJsonResponse<T>(response, request.signal);
+  } catch (error: unknown) {
+    // Keep the timeout semantic through response-body reads as well as the
+    // initial header fetch. Caller cancellations remain AbortError.
+    if (request.didTimeout()) throw new RequestTimeoutError();
+    throw error;
+  } finally {
+    request.cleanup();
+  }
+}
+
+/** Creates the independently abortable deadline signal used for one client request. */
+function createTimedRequest(externalSignal: AbortSignal | null | undefined, timeoutMs: number): TimedRequest {
   const controller = new AbortController();
   let timedOut = false;
   const timeoutId = setTimeout(() => {
     timedOut = true;
     controller.abort();
   }, timeoutMs);
-  const cleanup = linkAbortSignals(controller, init?.signal);
+  const unlinkAbortSignals = linkAbortSignals(controller, externalSignal);
 
-  try {
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        ...init,
-        signal: controller.signal
-      });
-    } catch (error) {
-      if (timedOut) throw new RequestTimeoutError();
-      throw error;
+  return {
+    signal: controller.signal,
+    didTimeout: () => timedOut,
+    cleanup: () => {
+      unlinkAbortSignals();
+      clearTimeout(timeoutId);
     }
+  };
+}
 
-    if (!response.ok) {
-      const bffError = await parseBffError(response, controller.signal);
-      const message =
-        bffError.code === "unknown_error"
-          ? `Request failed (${response.status})`
-          : bffError.message;
-      throw new HttpError({
-        message,
-        status: response.status,
-        code: bffError.code,
-        retryAfterInSeconds: parseRetryAfterSeconds(response.headers.get("retry-after"))
-      });
-    }
-
-    // Some BFF responses intentionally have no body; callers still expect an
-    // object-shaped value so schema parsing can decide what to do next.
-    if (response.status === 204) {
-      return { data: {} as T, headers: response.headers };
-    }
-
-    const text = await abortableResponseRead(response.text(), controller.signal);
-    if (!text) {
-      return { data: {} as T, headers: response.headers };
-    }
-    return { data: JSON.parse(text) as T, headers: response.headers };
-  } catch (error: unknown) {
-    // Keep the timeout semantic through response-body reads as well as the
-    // initial header fetch. Caller cancellations remain AbortError.
-    if (timedOut) throw new RequestTimeoutError();
-    throw error;
-  } finally {
-    cleanup();
-    clearTimeout(timeoutId);
+/** Validates a response and returns its parsed JSON while preserving its headers. */
+async function parseJsonResponse<T>(response: Response, signal: AbortSignal): Promise<JsonResponse<T>> {
+  if (!response.ok) {
+    throw await createHttpError(response, signal);
   }
+
+  return {
+    data: await parseJsonBody<T>(response, signal),
+    headers: response.headers
+  };
+}
+
+/** Builds the normalized HTTP failure consumed by retry and UI error handling. */
+async function createHttpError(response: Response, signal: AbortSignal): Promise<HttpError> {
+  const bffError = await parseBffError(response, signal);
+  const message = bffError.code === "unknown_error"
+    ? `Request failed (${response.status})`
+    : bffError.message;
+
+  return new HttpError({
+    message,
+    status: response.status,
+    code: bffError.code,
+    retryAfterInSeconds: parseRetryAfterSeconds(response.headers.get("retry-after"))
+  });
+}
+
+/** Reads successful response bodies while preserving empty and no-content response semantics. */
+async function parseJsonBody<T>(response: Response, signal: AbortSignal): Promise<T> {
+  // Some BFF responses intentionally have no body; callers still expect an
+  // object-shaped value so schema parsing can decide what to do next.
+  if (response.status === 204) {
+    return {} as T;
+  }
+
+  const text = await abortableResponseRead(response.text(), signal);
+  return text ? JSON.parse(text) as T : {} as T;
 }
 
 /** Races a response-body read against caller cancellation and cleans up its listener. */

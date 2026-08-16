@@ -49,6 +49,7 @@ async function flushResource<T>(mounted: RenderedHook<ObservableResource<T>>): P
 function defineResourceLifecycle(responseBody?: unknown): void {
   beforeEach(async () => {
     process.env.EXPO_PUBLIC_BFF_BASE_URL = "http://localhost:4000";
+    vi.stubGlobal("__DEV__", true);
     _resetBffBaseUrlMemoForTests();
     if (responseBody !== undefined) {
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(responseBody)));
