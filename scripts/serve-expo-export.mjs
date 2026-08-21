@@ -6,7 +6,7 @@ import { extname, join, resolve } from "node:path";
 import { parsePort } from "./serve-expo-export-port.mjs";
 import { createExpoExportFileResolver } from "./serve-expo-export-routes.mjs";
 
-const exportRoot = resolve(process.argv[2] ?? join(tmpdir(), "concourse-playwright-web"));
+const exportRoot = resolve(process.argv[2] ?? join(tmpdir(), "concourse-web-export"));
 const port = parsePort(process.env.PORT);
 const serverRoot = join(exportRoot, "server");
 const clientRoot = join(exportRoot, "client");

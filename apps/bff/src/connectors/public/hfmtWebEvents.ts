@@ -9,7 +9,6 @@ import { parseDateTimeInTimeZone } from "../../utils/timeZone";
 import { buildEventId } from "./eventId";
 import { getPublicSourceBreaker } from "./publicSourceBreaker";
 import { BFF_ENV } from "../../config/env";
-import mockuniEventsFixture from "../../__fixtures__/mockuni-events.json";
 
 const DEFAULT_TIME_ZONE = "Europe/Berlin";
 const MAX_EVENTS_PER_SOURCE = 8;
@@ -46,13 +45,7 @@ export async function fetchPublicEvents(
     cacheKey,
     async (signal): Promise<FetchPublicEventsResult> => {
       if (mode === "mock") {
-        // Mock mode is deterministic for tests and demos; real deployments
-        // should keep PUBLIC_EVENTS_MODE unset so public sources are fetched.
-        if (institution.id === "mockuni") {
-          const fixtureEvents = mockuniEventsFixture.events as PublicEvent[];
-          return { events: fixtureEvents, degraded: false };
-        }
-        // Keep non-fixture mock institutions usable without fetching external sources.
+        // Mock mode is deterministic without embedding an alternate data corpus.
         const mockEvents = sourceLabelEvents(sources, now);
         return { events: mockEvents, degraded: false };
       }

@@ -1,4 +1,4 @@
-// Emits only deployable BFF source while excluding tests and fixtures.
+// Emits only deployable BFF source while excluding tests.
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
@@ -11,5 +11,5 @@
     "outDir": "dist"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts", "src/**/__tests__/**", "src/**/__fixtures__/**"]
+  "exclude": ["src/**/*.test.ts", "src/**/__tests__/**"]
 }

@@ -5,8 +5,6 @@ import { getCached } from "../../utils/cache";
 import { fetchTextWithTimeout } from "../../utils/fetch";
 import { log } from "../../utils/logger";
 import type { ScheduleItem } from "@concourse/shared";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 
 import { parseIcs, type ParsedIcsEvent } from "./icsParser";
 import { getPublicSourceBreaker } from "./publicSourceBreaker";
@@ -16,25 +14,6 @@ import { BFF_ENV } from "../../config/env";
 export type FetchPublicScheduleResult = { schedule: ScheduleItem[]; degraded: boolean };
 type ScheduleSource = { url: string };
 type SettledScheduleSource = PromiseSettledResult<ParsedIcsEvent[]>;
-
-/** Finds a fixture from either supported test working directory before reading it. */
-async function resolveFixturePath(filename: string): Promise<string> {
-  // Tests may run from apps/bff or from the monorepo root.
-  const candidates = [
-    resolve(process.cwd(), "src/__fixtures__", filename),
-    resolve(process.cwd(), "apps/bff/src/__fixtures__", filename),
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      await readFile(candidate);
-      return candidate;
-    } catch {
-      // Continue with the next known test runner working directory.
-    }
-  }
-  return candidates[0];
-}
 
 function toScheduleItem(p: ParsedIcsEvent): ScheduleItem {
   return {
@@ -46,21 +25,6 @@ function toScheduleItem(p: ParsedIcsEvent): ScheduleItem {
     campusId: p.campusId,
     description: p.description,
   };
-}
-
-/** Loads the mock fixture without allowing fixture failures to break demonstration mode. */
-async function loadMockSchedule(): Promise<FetchPublicScheduleResult> {
-  try {
-    const fixturePath = await resolveFixturePath("mockuni-schedule.ics");
-    const icsContent = await readFile(fixturePath, "utf-8");
-    const parsed = parseIcs(icsContent, { rruleHorizonDays: BFF_ENV.rruleExpansionHorizonDays });
-    return { schedule: parsed.map(toScheduleItem), degraded: false };
-  } catch (err: unknown) {
-    log("warn", "mock_schedule_load_failed", {
-      reason: err instanceof Error ? err.message : String(err)
-    });
-    return { schedule: [], degraded: true };
-  }
 }
 
 /** Fetches and parses one source through its source-scoped circuit breaker. */
@@ -117,10 +81,7 @@ export async function fetchPublicSchedule(
   const sources = institution.publicSources?.schedules ?? [];
   const cacheKey = `public-schedule:${institution.id}`;
   const ttlMs = BFF_ENV.defaultCacheTtl * 1000;
-  const mode = process.env.PUBLIC_EVENTS_MODE ?? "auto";
-  const loader = mode === "mock" && institution.id === "mockuni"
-    ? loadMockSchedule
-    : (signal: AbortSignal) => loadScheduleSources(sources, signal);
+  const loader = (signal: AbortSignal) => loadScheduleSources(sources, signal);
 
   return getCached(
     cacheKey,

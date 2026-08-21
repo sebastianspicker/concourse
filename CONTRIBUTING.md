@@ -25,7 +25,6 @@ compatibility diagnostics.
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm exec playwright install chromium
 pnpm verify
 ```
 

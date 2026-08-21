@@ -41,7 +41,7 @@ at 4.5:1. Shared-schema validation rejects invalid values.
 - At 900 pixels and above, identity and navigation share a row and Today uses
   two content columns.
 - Tab routes use up to 1400 pixels. Detail content uses up to 1280 pixels.
-- Browser tests exercise widths from 320 to 1600 pixels, depending on the workflow.
+- Layouts must be reviewed across relevant viewport widths before release.
 - Layouts must remain operable at 200 percent browser zoom.
 
 ## Components
@@ -73,14 +73,12 @@ semantics for appearance and language.
 - Press feedback is brief and respects reduced-motion preferences.
 - State is never encoded by color alone.
 
-Automated Chromium tests cover the primary keyboard workflow, zoom, responsive
-layouts, reduced motion, serious or critical axe findings, localization, and
-high contrast. Before native distribution, test VoiceOver, TalkBack, text
-scaling, bold text, orientation, and offline recovery on the signed artifact.
+Before native distribution, test VoiceOver, TalkBack, text scaling, bold text,
+orientation, and offline recovery on the signed artifact.
 
 ## Screenshot set
 
-`pnpm test:web` writes exactly these files:
+The reviewed release evidence consists of exactly these files:
 
 - `docs/screenshots/concourse-today-1600-light.png`
 - `docs/screenshots/concourse-today-390-light.png`
@@ -92,5 +90,4 @@ scaling, bold text, orientation, and offline recovery on the signed artifact.
 - `docs/screenshots/concourse-settings-1440-light.png`
 - `docs/screenshots/concourse-settings-768-high-contrast-de.png`
 
-Review the images after regeneration. Rendering can differ by operating system,
-and the tests do not perform pixel-diff approval.
+Review the images after regeneration. Rendering can differ by operating system.

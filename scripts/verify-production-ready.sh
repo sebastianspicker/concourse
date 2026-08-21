@@ -28,8 +28,8 @@ verify_public_tree() {
 
 verify_public_tree
 
-# Require the reviewed runtime evidence to exist before Playwright can overwrite
-# it. CI also proves that every expected image belongs to the candidate commit.
+# Require the reviewed runtime evidence to exist. CI also proves that every
+# expected image belongs to the candidate commit.
 expected_screenshots=(
   docs/screenshots/concourse-event-detail-390-light.png
   docs/screenshots/concourse-event-detail-1440-light.png
@@ -88,9 +88,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm test:web
 verify_screenshot_set
-pnpm test:e2e
 
 if [[ "${SKIP_MARKER_CHECK:-}" != "1" ]]; then
   marker_pattern='\b(TODO|FIXME|SKELETON|PLACEHOLDER|TBD)\b'

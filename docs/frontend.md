@@ -62,39 +62,6 @@ WCAG 2.2 AA is a target, not a conformance claim.
 - Loading placeholders do not animate.
 - Interaction does not depend on hover.
 
-The Chromium suite covers keyboard use, 200 percent zoom, serious or critical
-axe findings, reduced motion, localization, high contrast, and the responsive
-workflows represented by the screenshot set. It does not establish support for
-Firefox, Safari, Edge, VoiceOver, TalkBack, native text scaling, or device
-orientation.
-
-## Browser tests
-
-Run:
-
-```bash
-pnpm test:web
-```
-
-Playwright starts the fixture BFF, exports and serves the Expo web application,
-uses a fixed clock and locale where required, and writes the nine screenshots
-listed in [`DESIGN.md`](../DESIGN.md#screenshot-set).
-
-The suite covers:
-
-- Today, Events, Rooms, Settings, and event detail workflows
-- keyboard navigation
-- search and sort behavior
-- appearance and language settings
-- 200 percent browser zoom
-- widths from 320 to 1600 pixels
-- serious or critical axe findings
-- the Material Icons font
-
-The full `pnpm verify` gate requires the exact screenshot filename set before
-and after Playwright. Review regenerated images manually because operating
-systems can render fonts and pixels differently.
-
 ## Native checks
 
 Before distributing a signed native artifact, verify on target devices:
@@ -106,6 +73,4 @@ Before distributing a signed native artifact, verify on target devices:
 - offline and recovery announcements
 - navigation and back behavior
 
-Native Detox definitions are under `apps/mobile/e2e/native/`, but CI runs them
-only when generated native projects are checked in. Playwright tests are under
-`apps/mobile/e2e/web/`.
+Browser and native accessibility remain owner-managed release checks.

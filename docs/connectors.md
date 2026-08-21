@@ -30,13 +30,14 @@ responses are normalized into the schemas in
 1. Add the public URL to an institution pack.
 2. Extend the connector only if the existing HTML or ICS parser cannot
    normalize the source.
-3. Add synthetic fixtures and deterministic tests.
-4. Test upstream failure, partial success, malformed data, cancellation, and
-   cache behavior.
+3. Add a direct inline-data contract test when changing parsing or a public
+   response boundary.
+4. Exercise upstream failure, partial success, malformed data, cancellation,
+   and cache behavior as appropriate.
 5. Run `pnpm verify`.
 
 Do not commit authenticated URLs, private hostnames, access tokens, captured
-user data, or fixtures copied from protected systems.
+user data or captured protected-system content.
 
 ## Private extension stubs
 

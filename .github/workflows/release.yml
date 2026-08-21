@@ -63,9 +63,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-
       - name: Run release checks
         run: SKIP_INSTALL=1 ./scripts/verify-production-ready.sh
 

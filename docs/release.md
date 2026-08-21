@@ -74,9 +74,8 @@ Move candidate notes from `[Unreleased]` into:
 
 ```bash
 corepack enable
-corepack prepare pnpm@9.0.0 --activate
+corepack prepare pnpm@9.15.0 --activate
 pnpm install --frozen-lockfile
-pnpm exec playwright install chromium
 pnpm release:check -- X.Y.Z-alpha.N
 pnpm verify
 ```
@@ -103,7 +102,7 @@ git push origin vX.Y.Z-alpha.N
 The tag workflow runs in this order:
 
 1. validates tag, package, Expo, and changelog identity;
-2. installs Chromium and runs the full release gate;
+2. runs the full release gate;
 3. builds the BFF on Node 22.13 with the version embedded in `/health`;
 4. smoke-tests the image with `BFF_PORT=4100`;
 5. pushes the verified version tag, plus `latest` only for stable versions; and

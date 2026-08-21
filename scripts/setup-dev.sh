@@ -22,13 +22,21 @@ fi
 echo "Node.js: $(node -v)"
 
 if ! command -v corepack &>/dev/null; then
-  echo "ERROR: Corepack is required to run pnpm 9.0.0."
+  echo "ERROR: Corepack is required to run pnpm 9.15.0."
   exit 1
 fi
-pnpm_command=(corepack pnpm@9.0.0)
+
+# Give Turbo a Corepack pnpm shim as well as this script. Otherwise package
+# scripts can resolve an unrelated globally installed pnpm.
+corepack_bin_dir="$(mktemp -d "${TMPDIR:-/tmp}/concourse-corepack.XXXXXX")"
+trap 'rm -rf "$corepack_bin_dir"' EXIT
+corepack enable --install-directory "$corepack_bin_dir"
+export PATH="$corepack_bin_dir:$PATH"
+
+pnpm_command=(pnpm)
 echo "pnpm: $("${pnpm_command[@]}" --version)"
 
-# Use Corepack directly so setup does not mutate a global pnpm installation.
+# Use the temporary Corepack shim so setup does not mutate a global pnpm installation.
 echo ""
 echo "Installing dependencies..."
 "${pnpm_command[@]}" install --frozen-lockfile
@@ -74,7 +82,7 @@ echo ""
 echo "Next steps:"
 echo "   1. Edit apps/bff/.env and confirm INSTITUTION_ID"
 echo "   2. Edit apps/mobile/.env and set EXPO_PUBLIC_BFF_BASE_URL"
-echo "   3. Run 'corepack pnpm@9.0.0 dev' for an installed development client"
+echo "   3. Run 'corepack pnpm@9.15.0 dev' for an installed development client"
 echo "   4. For Expo Go, run the BFF and mobile start command in separate terminals"
 echo ""
 echo "Documentation:"

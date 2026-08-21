@@ -5,7 +5,7 @@
 Install from the repository root:
 
 ```bash
-corepack pnpm@9.0.0 install --frozen-lockfile
+corepack pnpm@9.15.0 install --frozen-lockfile
 ```
 
 Create local configuration:
@@ -92,8 +92,6 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm test:web
-pnpm test:e2e
 ```
 
 Run the complete local gate with:
@@ -119,7 +117,7 @@ reachable.
 
 ### The BFF does not start
 
-- Confirm Node is at least 22.13 and the install used pnpm 9.0.0.
+- Confirm Node is at least 22.13 and the install used pnpm 9.15.0.
 - Confirm `INSTITUTION_ID` is `example`, `hfmt`, `mockuni`, or a newly registered pack.
 - Check numeric ranges for `BFF_PORT`, `BFF_DEFAULT_CACHE_TTL`, and
   `RRULE_EXPANSION_HORIZON_DAYS`.
@@ -152,13 +150,6 @@ require `publicRooms`. Today requires at least an event source or a room list.
 Keep socket-address behavior with `BFF_TRUST_PROXY=never`, or add the exact
 proxy IP addresses and CIDR ranges to `BFF_TRUSTED_PROXIES`. Do not enable
 `always` on an exposed BFF.
-
-### Browser tests fail to launch
-
-```bash
-pnpm exec playwright install chromium
-pnpm test:web
-```
 
 ### Lockfile validation fails
 

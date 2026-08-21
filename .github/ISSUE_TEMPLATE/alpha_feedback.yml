@@ -48,7 +48,7 @@ body:
     attributes:
       label: Environment and checks
       description: OS, Node, pnpm, target platform, institution pack, and commands run
-      placeholder: macOS 15; Node 22.13.0; pnpm 9.0.0; web; example pack; pnpm test:web
+      placeholder: macOS 15; Node 22.13.0; pnpm 9.0.0; web; example pack; pnpm verify
     validations:
       required: true
   - type: checkboxes

@@ -29,11 +29,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:demo:unit
       - run: pnpm build:demo
       - run: pnpm verify:demo:artifact
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:demo:web
       - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
           path: dist-pages

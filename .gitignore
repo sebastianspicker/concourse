@@ -16,17 +16,12 @@ coverage/
 .coverage
 htmlcov/
 .nyc_output/
-test-results/
 junit.xml
 junit-*.xml
 *.lcov
 *.xcresult
 *.sarif
 *.sarif.json
-playwright-report/
-blob-report/
-apps/mobile/artifacts/
-apps/mobile/detox-artifacts/
 .vitest/
 
 ### Runtime logs
@@ -176,3 +171,16 @@ xcuserdata/
 *.sqlite-wal
 *.sqlite3-shm
 *.sqlite3-wal
+
+# Generated test and coverage output (local only)
+/coverage/
+/htmlcov/
+/.coverage
+/.coverage.*
+/.pytest_cache/
+/test-results/
+/playwright-report/
+/blob-report/
+/coverage.xml
+/junit.xml
+/junit-*.xml

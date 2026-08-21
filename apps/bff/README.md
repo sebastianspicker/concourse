@@ -33,12 +33,10 @@ behavior, proxy configuration, and troubleshooting.
 
 ```bash
 pnpm --filter @concourse/bff test
-pnpm test:e2e
+pnpm test
 ```
 
-Package tests cover routes, middleware, parsers, caching, proxy handling, rate
-limits, and server lifecycle. The root E2E command builds the BFF and verifies
-public HTTP flows on a temporary port.
+Package tests cover the auth guard, security headers, and ICS parser contracts.
 
 ## Connector boundary
 

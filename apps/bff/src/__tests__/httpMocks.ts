@@ -1,8 +1,7 @@
 /** Shared in-memory HTTP request and response doubles for route-level tests. */
 
-import { readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { expect, vi } from "vitest";
+import { expect } from "vitest";
 
 export type MockHttpResponse = {
   response: ServerResponse;
@@ -79,30 +78,6 @@ export function createMockReqRes(options: {
   };
 }
 
-/** Stubs the shared schedule ICS fixture and clears the connector cache. */
-export function stubScheduleFixtureFetch(clearCache: () => void) {
-  clearCache();
-  const ics = readFileSync(new URL("../__fixtures__/schedule.ics", import.meta.url), "utf8");
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-    ok: true,
-    headers: { get: () => null },
-    body: null,
-    text: async () => ics
-  }));
-}
-
-/** Sets and restores the public-event mock environment shared by route tests. */
-export function usePublicEventsMockEnvironment(clearCache: () => void) {
-  process.env.PUBLIC_EVENTS_DATE = "2020-01-01T00:00:00.000Z";
-  process.env.PUBLIC_EVENTS_MODE = "mock";
-  clearCache();
-}
-
-export function clearPublicEventsMockEnvironment() {
-  vi.unstubAllGlobals();
-  delete process.env.PUBLIC_EVENTS_DATE;
-  delete process.env.PUBLIC_EVENTS_MODE;
-}
 
 export function expectNotFound(body: { error: { code: string } }) {
   expect(body.error.code).toBe("not_found");

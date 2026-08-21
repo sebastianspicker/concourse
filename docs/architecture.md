@@ -51,13 +51,13 @@ offline or degraded operation and is labeled by the UI.
 
 ## Public and private boundaries
 
-This repository contains public source URLs, public campus metadata, synthetic
-fixtures, and interfaces for private extensions. Files under
+This repository contains public source URLs, public campus metadata, sanitized
+static-demo records, and interfaces for private extensions. Files under
 `apps/bff/src/connectors/private-stubs/` are not wired into the public runtime.
 
 Protected systems, credentials, session handling, SSO, private schedules, and
 student data belong in a separately reviewed private implementation. Do not add
-them to an institution pack or public fixture.
+them to an institution pack or static-demo record.
 
 ## Expo server route
 

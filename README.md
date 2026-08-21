@@ -5,7 +5,7 @@ information. It contains an Expo application, a Node.js backend-for-frontend
 (BFF), shared Zod schemas, and public institution configuration.
 
 [Open the static Concourse demo](https://sebastianspicker.github.io/concourse/).
-It uses fictional fixture data; actions marked “Simulated” do not call campus
+It uses fictional sample data; actions marked “Simulated” do not call campus
 services, open external sources, share content, or delete browser data.
 
 The current version is `1.2.0-alpha.1`. This checkout is a source candidate. It
@@ -25,7 +25,8 @@ store listing, private connector implementation, or user authentication flow.
 - English and German text plus system, light, dark, and high-contrast appearance
 - BFF caching, request timeouts, bounded recurrence expansion, circuit breaking,
   rate limiting, CORS, request IDs, security headers, and optional bearer auth
-- Vitest tests, process-level BFF tests, and Chromium Playwright tests with axe
+- Direct Vitest contracts for public schemas, institution packs, BFF auth,
+  response headers, and ICS parsing
 
 ## Limitations
 
@@ -37,16 +38,15 @@ store listing, private connector implementation, or user authentication flow.
   network-restricted BFF. It is not a user authentication system.
 - `ios/` and `android/` projects, signing configuration, EAS linkage, and native
   binaries are not checked in.
-- Automated browser testing covers Chromium. Native screen readers, native text
-  scaling, device orientation, and other browser engines require separate checks.
+- Native screen readers, native text scaling, device orientation, and browser
+  engines require separate owner-managed checks before distribution.
 - Workspace packages are private and are not published to a package registry.
 
 ## Requirements
 
 - Node.js 22.13 or newer. CI uses 22.13.0 and [`.nvmrc`](.nvmrc) records that version.
 - Corepack
-- pnpm 9.0.0, selected through Corepack
-- Playwright Chromium for browser tests
+- pnpm 9.15.0, selected through Corepack
 - Expo Go or an institution-owned development client for device testing
 - Docker only for the container workflows
 
@@ -55,7 +55,7 @@ store listing, private connector implementation, or user authentication flow.
 From the repository root:
 
 ```bash
-corepack pnpm@9.0.0 install --frozen-lockfile
+corepack pnpm@9.15.0 install --frozen-lockfile
 cp apps/bff/.env.example apps/bff/.env
 cp apps/mobile/.env.example apps/mobile/.env
 ```
@@ -65,7 +65,7 @@ files without overwriting existing files, builds the workspace, and runs the
 type checker:
 
 ```bash
-corepack pnpm@9.0.0 setup:dev
+corepack pnpm@9.15.0 setup:dev
 ```
 
 ## Configuration
@@ -80,7 +80,7 @@ Use the same institution ID in the BFF and mobile application.
 | EAS production | Preview values plus `MOBILE_BUNDLE_IDENTIFIER` and `MOBILE_ANDROID_PACKAGE` |
 
 The bundled institution IDs are `example`, `hfmt`, and `mockuni`.
-`mockuni` is deterministic test data. Institution packs live in
+`mockuni` is a deterministic static-preview pack. Institution packs live in
 [`packages/institutions/src/packs/`](packages/institutions/src/packs/).
 
 BFF options:
@@ -96,8 +96,8 @@ BFF options:
 | `BFF_TRUSTED_PROXIES` | none | Comma-separated proxy IP addresses or CIDR ranges |
 | `BFF_TRUST_PROXY` | `never` | `never`, `always`, or implicit `trusted` through `BFF_TRUSTED_PROXIES` |
 
-`PUBLIC_EVENTS_MODE` and `PUBLIC_EVENTS_DATE` are deterministic fixture controls
-used by tests. Do not set them in a normal deployment.
+`PUBLIC_EVENTS_MODE` and `PUBLIC_EVENTS_DATE` are static-preview controls. Do
+not set them in a normal deployment.
 
 See [Runbook](docs/runbook.md#configuration) for validation rules and proxy behavior.
 
@@ -110,10 +110,10 @@ Run the BFF and Expo Go in separate terminals:
 
 ```bash
 # Terminal 1
-INSTITUTION_ID=hfmt corepack pnpm@9.0.0 --filter @concourse/bff dev
+INSTITUTION_ID=hfmt corepack pnpm@9.15.0 --filter @concourse/bff dev
 
 # Terminal 2
-INSTITUTION_ID=hfmt corepack pnpm@9.0.0 --filter @concourse/mobile start
+INSTITUTION_ID=hfmt corepack pnpm@9.15.0 --filter @concourse/mobile start
 ```
 
 For an installed development client, replace `start` with `dev`.
@@ -136,7 +136,7 @@ Partial public-source results include `_degraded: true` and
 ```text
 apps/
   bff/            Node.js BFF, public connectors, and private extension stubs
-  mobile/         Expo Router application and native E2E definitions
+  mobile/         Expo Router application
 packages/
   institutions/  Public institution packs
   shared/        Shared schemas and domain types
@@ -160,21 +160,13 @@ Use root commands so Turbo runs packages in dependency order.
 |---|---|
 | `pnpm lint` | ESLint for root files and all packages |
 | `pnpm typecheck` | Root tool config and package TypeScript checks |
-| `pnpm test` | Package tests and root script tests |
+| `pnpm test` | Direct package contract tests |
 | `pnpm build` | Shared packages, institution packs, BFF, and mobile TypeScript build |
-| `pnpm test:e2e` | Compiled BFF process tests over local HTTP |
-| `pnpm test:web` | Expo web export and Chromium workflow, accessibility, responsive, and screenshot tests |
 | `pnpm release:check` | Version, Expo identity, and changelog checks |
 | `pnpm verify` | Complete source-candidate gate |
 
 No formatter is configured. ESLint checks code-quality rules for the configured
 source and configuration files; it does not lint Markdown.
-
-Install Chromium once before the browser gate:
-
-```bash
-pnpm exec playwright install chromium
-```
 
 ## Testing
 
@@ -185,12 +177,8 @@ pnpm verify
 ```
 
 It performs a frozen install unless `SKIP_INSTALL=1`, checks release metadata
-and the tracked public tree, runs lint, type checks, tests, builds, Chromium
-tests, screenshot checks, BFF HTTP tests, and a source marker scan.
-
-Browser and native end-to-end tests are grouped under
-[`apps/mobile/e2e/`](apps/mobile/e2e/). Detox tests are skipped by CI unless
-generated native projects are present.
+and the tracked public tree, runs lint, type checks, direct contract tests,
+builds, screenshot-set checks, and a source marker scan.
 
 ## Static demo and GitHub Pages
 
@@ -207,8 +195,7 @@ pnpm verify:demo:artifact
 PORT=8082 node scripts/serve-pages-output.mjs dist-pages
 ```
 
-Open <http://127.0.0.1:8082/concourse/>. Run `pnpm verify:demo` for the unit,
-artifact, and Chromium interaction checks together. Rebuild `dist-pages/`
+Open <http://127.0.0.1:8082/concourse/>. Rebuild `dist-pages/`
 before treating it as evidence for current source; a previously generated
 artifact can still pass structural validation after source changes.
 
@@ -241,14 +228,13 @@ validation. It does not build mobile binaries. Prereleases do not update the
 | Data route returns `404 not_found` | Confirm the selected pack configures that source or room list |
 | Response is degraded or unavailable | Check BFF logs and the configured public upstream |
 | All proxied clients share a rate-limit bucket | Configure exact values in `BFF_TRUSTED_PROXIES` |
-| Browser tests cannot launch | Install Chromium with `pnpm exec playwright install chromium` |
 | Lockfile validation fails | Run `pnpm install`, review `pnpm-lock.yaml`, then retry with `--frozen-lockfile` |
 
 More detail is available in [Runbook](docs/runbook.md#troubleshooting).
 
 ## Security considerations
 
-Only public source URLs and synthetic fixtures belong in this repository. Do
+Only public source URLs and sanitized static-preview data belong in this repository. Do
 not commit credentials, private endpoints, protected campus data, signing
 material, or logs containing personal data.
 

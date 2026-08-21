@@ -1,15 +1,14 @@
 # CI Overview
 
-This repository uses GitHub Actions for source checks, browser and service
-tests, dependency and secret scanning, CodeQL, and tag publication.
+This repository uses GitHub Actions for source checks, dependency and secret
+scanning, CodeQL, and tag publication.
 
 ## Workflows and triggers
 
 - `ci` (push to `main` or `dev`, all PRs)
   - Runs the source-candidate gate in `./scripts/verify-production-ready.sh`
-    (release identity, lint, typecheck, tests, build, Playwright/axe web E2E,
-    BFF E2E, marker check).
-  - Uploads test artifacts if present (e.g., `coverage/`, `test-results/`).
+    (release identity, lint, typecheck, direct contract tests, build,
+    screenshot-set and marker checks).
 - `dependency-review` (PRs only)
   - Runs the pinned OSV Scanner reusable workflow against `pnpm-lock.yaml` and fails on known vulnerabilities.
 - `gitleaks` (push to `main` or `dev`, all PRs)
@@ -17,9 +16,6 @@ tests, dependency and secret scanning, CodeQL, and tag publication.
     checksum manifest, and scans with `.gitleaks.toml`.
 - `codeql` (push to `main` or `dev`, all PRs, weekly schedule)
   - Static analysis for JavaScript/TypeScript.
-- `e2e` (push to `main` or `dev`, PRs against `main` or `dev` when app, BFF, shared package, or E2E workflow files change; also `workflow_dispatch`)
-  - Runs the default BFF process-level E2E suite.
-  - Runs Detox native mobile E2E only when generated native iOS or Android projects are checked in.
 - `release` (push tags matching `v*`)
   - Validates strict tag/package/Expo/changelog identity, runs the source-candidate
     gate, smoke-tests the Node 22 BFF image on a non-default port, pushes the
@@ -39,9 +35,8 @@ main CI workflow caches pnpm and Turbo build metadata.
 
 | Script | Purpose |
 |--------|---------|
-| `./scripts/verify-production-ready.sh` | Main CI source-candidate gate: public-tree and screenshot evidence checks, release identity, lint, typecheck, tests, build, Playwright/axe web E2E, BFF E2E, and marker check. |
+| `./scripts/verify-production-ready.sh` | Main CI source-candidate gate: public-tree and screenshot evidence checks, release identity, lint, typecheck, direct contract tests, build, and marker check. |
 | `pnpm release:check -- X.Y.Z[-prerelease]` | Verifies package, Expo, and changelog identity before tagging. |
-| `pnpm test:e2e` | Starts the compiled BFF on a temporary port and verifies critical public HTTP flows. |
 | `./scripts/ci-local.sh` | Local equivalent of the main CI job: frozen install plus the source-candidate gate. |
 | `./scripts/build.sh` | Convenience: runs `pnpm build` at repo root. |
 | `./scripts/generate-lockfile.sh` | Regenerates `pnpm-lock.yaml` (e.g. after adding deps). |
@@ -77,8 +72,7 @@ pnpm build
 ```
 
 `make ci` does not replace the separate Gitleaks, OSV dependency-review,
-CodeQL, Docker publication, cross-browser, or native/manual accessibility
-gates.
+CodeQL, Docker publication, or native/manual accessibility gates.
 
 `pnpm typecheck` uses the native TypeScript 7 compiler. The separately available
 `tsc6` executable comes from the TypeScript 6 compatibility package used by
@@ -96,9 +90,6 @@ Repository settings to keep aligned with this public template:
   request, not from workflow filenames. The main CI and Gitleaks workflows run
   for every pull request. CodeQL and dependency review do the same. Reconfirm
   emitted contexts after changing workflow names, job names, or path filters.
-- Do not require `E2E Tests / E2E Tests Summary` while its pull-request trigger
-  remains path-filtered: documentation-only changes do not emit that context.
-  The always-on `ci / Verify …` job already runs both browser and BFF E2E gates.
 - Do not add CI secrets for public PR workflows. If a future private-fork job
   needs secrets, run it only on trusted branch pushes or manual dispatch.
 - CODEOWNERS protects CI, security policy, Docker runtime, shared contracts, and
@@ -109,7 +100,7 @@ Repository settings to keep aligned with this public template:
 - Add new checks to `./scripts/verify-production-ready.sh` if they must run on every PR.
 - If a job needs secrets, run it only on trusted branch pushes such as `main` or `dev`, or via `workflow_dispatch`.
 - Keep workflows deterministic:
-  - Pin tool versions (e.g., `corepack prepare pnpm@9.0.0 --activate`).
+  - Pin tool versions (e.g., `corepack prepare pnpm@9.15.0 --activate`).
   - Use `--frozen-lockfile`/equivalent.
 - Prefer quick PR checks; schedule heavier checks (nightly/weekly) if needed.
 

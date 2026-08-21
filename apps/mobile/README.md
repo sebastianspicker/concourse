@@ -35,17 +35,10 @@ INSTITUTION_ID=hfmt pnpm --filter @concourse/mobile dev
 See [`../../docs/deploy/mobile.md`](../../docs/deploy/mobile.md) for the EAS
 profiles and owner-managed release inputs.
 
-## Tests
+## Verification
+
+Run the root contract suite after mobile behavior changes:
 
 ```bash
-pnpm --filter @concourse/mobile test
-pnpm test:web
+pnpm test
 ```
-
-The package tests cover data loading, caching, configuration, screens, shared
-components, themes, localization, and utilities. The root browser command
-exports the web application and runs Chromium workflows, axe checks, responsive
-checks, and screenshot capture.
-
-Browser and native end-to-end tests are documented in
-[`e2e/README.md`](e2e/README.md).

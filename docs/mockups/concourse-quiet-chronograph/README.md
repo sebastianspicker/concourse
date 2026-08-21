@@ -19,7 +19,7 @@ Open `index.html` in a browser. No build step.
 
 Product and design contracts are in [`PRODUCT.md`](../../../PRODUCT.md) and
 [`DESIGN.md`](../../../DESIGN.md). Use the captures under `docs/screenshots/`
-from `pnpm test:web` as runtime evidence.
+as runtime evidence.
 
 ## Reference elements
 

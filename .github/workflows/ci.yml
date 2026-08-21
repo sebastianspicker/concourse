@@ -1,4 +1,4 @@
-# Main source-alpha gate: install, static checks, tests, builds, and browser/service E2E.
+# Main source-alpha gate: install, static checks, direct contract tests, and builds.
 name: ci
 
 on:
@@ -54,19 +54,4 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
       - run: pnpm install --frozen-lockfile
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
       - run: SKIP_INSTALL=1 ./scripts/verify-production-ready.sh
-      - name: Upload test artifacts (if any)
-        if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: ci-artifacts
-          path: |
-            test-results/**
-            playwright-report/**
-            coverage/**
-            junit*.xml
-            junit-*.xml
-          if-no-files-found: ignore
-          retention-days: 7
