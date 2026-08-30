@@ -1,61 +1,29 @@
-# Security Policy
+# Security policy
 
-## Supported Versions
+## Supported versions
 
-Before the first alpha tag is published, security fixes target the current
-default branch. After publication, fixes target the current default branch and
-the latest published `1.2.0-alpha.x` release. Older prereleases are not
-supported release lines.
+Before the first alpha tag, security fixes target the default branch. After publication, fixes target the default branch and the latest 1.2.0-alpha.x release. Older prereleases are not supported.
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-Use the repository's private
-[Security Advisory form](https://github.com/sebastianspicker/concourse/security/advisories/new).
-Do not open a public issue for a vulnerability and do not attach exploit details,
-credentials, private URLs, or personal data to a public discussion.
+Use the repository's private [Security Advisory form](https://github.com/sebastianspicker/concourse/security/advisories/new). Do not open a public issue or attach exploit details, credentials, private URLs, or personal data to public discussions.
 
-GitHub Security Advisories is the only repository-managed private reporting
-channel for this alpha. If the form is unavailable, retain the report and retry
-later, or contact a listed maintainer through a private channel that you can
-independently verify. Do not move sensitive details to a public issue as a
-fallback.
+## Scope and data boundary
 
-## Scope
+This public repository handles public campus sources only: public HTTP(S) event pages, public iCalendar (ICS) feeds, public pack metadata, and sanitized static-demo data. It contains no private connector implementations or stubs.
 
-This public repo is a template. It intentionally contains only public data sources and stubs.
-Private integrations and operational systems are out of scope for this public
-repo and must live in a private repo unless an explicitly private fork owns and
-documents the integration boundary.
+Do not commit API keys, tokens, passwords, certificates, private endpoints, protected-system identifiers, captured user data, or signing material. Keep secrets in private deployment storage. Protected integrations, single sign-on (SSO), accounts, personalized schedules, and operational systems are outside this repository.
 
-## No Secrets in This Repo
+## API deployment notes
 
-Do not commit API keys, tokens, passwords, certificates, or private endpoints.
-Use environment variables and secret stores in private infrastructure instead.
+The optional bearer guard starts disabled. To enable it for a private deployment, set BFF_REQUIRE_AUTH=1 and provide a long random BFF_AUTH_TOKEN. Any other non-empty BFF_REQUIRE_AUTH value causes startup to fail.
 
-## Backend for Frontend (BFF) Auth Notes
+BFF_TRUST_PROXY uses never unless the deployment configures reviewed proxy trust. In the never mode, rate limiting uses the direct peer and ignores forwarding headers.
 
-This public template serves public data without auth by default. Private forks
-that enable BFF bearer auth must set both values below, unless they replace this
-template guard with a reviewed private authentication layer:
+When a reviewed proxy must forward identity, configure BFF_TRUSTED_PROXIES. Use exact Internet Protocol (IP) addresses or Classless Inter-Domain Routing (CIDR) ranges.
 
-- `BFF_REQUIRE_AUTH=1` (also accepts `true`, `yes`, or `on`)
-- `BFF_AUTH_TOKEN=<long random secret>`
+The always setting is unsafe except behind an isolated edge that replaces forwarding headers.
 
-Unset, `0`, `false`, `no`, and `off` disable the guard. Any other non-empty
-`BFF_REQUIRE_AUTH` value fails closed with `auth_misconfigured`.
+## Coordinated disclosure
 
-## BFF Proxy Trust Notes
-
-`BFF_TRUST_PROXY` defaults to `never`, so rate limiting uses the direct peer
-address and ignores `X-Forwarded-For`/`Forwarded`. To accept forwarded client
-identities, prefer `BFF_TRUSTED_PROXIES` with exact proxy IPs or Classless
-Inter-Domain Routing (CIDR) ranges.
-The BFF then walks the forwarding chain only through allowlisted hops. `auto`
-is rejected. `always` is a legacy, unsafe override and is appropriate only when
-the BFF is network-isolated behind an edge that replaces forwarded headers.
-
-## Coordinated Disclosure
-
-If classification is uncertain, use the same private advisory form and label
-the report as unconfirmed. The project does not publish a response-time or fix
-deadline for alpha reports.
+If impact is uncertain, use the same private advisory form and label the report unconfirmed. The project does not publish a response-time or fix deadline for alpha reports.

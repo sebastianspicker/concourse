@@ -1,63 +1,76 @@
-# Keeps generated, private, and internal work products out of the public source tree.
-### Dependencies
+# Dependencies
 node_modules/
 .pnpm-store/
 
-### Build artifacts
+# Build and generated output
 dist/
 dist-pages/
 build/
 .next/
+.turbo/
+.expo/
+.expo-shared/
+apps/client/.eas/
 *.tsbuildinfo
 release-notes.md
 
-### Test artifacts
+# Test and analysis output
 coverage/
 .coverage
-htmlcov/
+.coverage.*
 .nyc_output/
-junit.xml
-junit-*.xml
+.vitest/
+test-results/
+playwright-report/
+blob-report/
+/reports/
+/artifacts/
+/docs/screenshots/
+/docs/mockups/
+junit*.xml
 *.lcov
 *.xcresult
 *.sarif
 *.sarif.json
-.vitest/
 
-### Runtime logs
+# Tool caches and local indexes
+.cache/
+.history/
+.local/
+.eslintcache
+.parcel-cache/
+.codegraph/
+.repowise/
+.serena/
+.impeccable/
+.mcp.json
+/.codacy/*
+!/.codacy/codacy.yaml
+!/.codacy/codacy.yml
+
+# Logs
 *.log
+*.pid
+*.lock.tmp
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-### Tooling caches
-.turbo/
-.cache/
-.codegraph/
-.mcp.json
-.repowise/
-.eslintcache
-.parcel-cache/
-/.codacy/*
-!/.codacy/codacy.config.json
-!/.codacy/codacy.yaml
-!/.codacy/codacy.yml
-.impeccable/
-.serena/
-.expo/
-.expo-shared/
-apps/mobile/.eas/
-
-### Environment files
+# Local environment and package-manager configuration
 .env
 .env.*
 !.env.example
 !.env.*.example
+!.env.sample
+!.env.template
 .npmrc
+.npmrc.local
 .netrc
 
-### Local credentials and signing material
+# Credentials and signing material
+secrets.local.*
+credentials.local.*
 *.key
 *.pem
 *.p12
@@ -68,17 +81,15 @@ apps/mobile/.eas/
 google-services.json
 GoogleService-Info.plist
 
-### OS / IDE
+# Editor and operating-system state
 .DS_Store
 ._*
 Thumbs.db
 .fleet/
 .vscode/
 .idea/
-.cursor/
-.codex/
 
-### Temporary and patch files
+# Temporary and patch files
 *.bak
 *.orig
 *.rej
@@ -87,100 +98,67 @@ Thumbs.db
 *.tmp
 *~
 
-### Internal tooling artifacts
-.claude/
+# Local agent and maintainer workspaces
+.agent/
 .agents/
-archive/
-.github/codex/
-.github/workflows/codex.yml
-AGENTS.md
-AUDIT.md
-HARNESS_PRINCIPLES.md
-code_review.md
-deprecated/
-docs/agent/
-docs/archive/
-docs/deprecated/
-docs/source-audit/
-docs/function-audit.md
-docs/architecture-map.md
-docs/code-index.md
-docs/verification-baseline.md
-scripts/topology_inventory.sh
-plan.md
-plan-status.md
-plan-findings-ledger.md
-progress.md
-RELEASE_STATUS.md
-DECISIONS.md
-FINDINGS.md
-LOG.md
-REFACTOR_PLAN.md
-IMPLEMENTATION_BACKLOG.md
-BUGS_AND_FIXES.md
-BUGS_AND_FIXES_ARCHIVE.md
-OPEN_IMPROVEMENTS_AND_PLAN.md
-REMEDIATION.md
-REMEDIATION_PLAN.md
-REMEDIATION_LEDGER.md
-
-# Shared local indexes and operator records
+.ai/
+.claude/
+.codex/
+.cursor/
+.cursorrules
 /.kilo/
+AGENT.md
+AGENTS.md
+agent.md
+agents.md
 CLAUDE.md
+CODEX.md
 GEMINI.md
-AUDIT_LEDGER.md
-remediation-ledger.md
+.github/copilot-instructions.md
+/.github/codex/
+/.github/workflows/codex.yml
+/prompt/
+/prompts/
+/agent-prompts/
+/ai-prompts/
+/agent-notes*
+/agent-context*
+/agent-memory*
+/agent-output*
+/agent-report*
+/AI_NOTES*
+/AI_REPORT*
+/AI_AUDIT*
+/AI_SUMMARY*
 
-# Public environment templates
-!.env.sample
-!.env.template
-
-# Local-only credentials
-secrets.local.*
-credentials.local.*
-*.local.pem
-*.local.key
-.npmrc.local
-
-# Python caches and test reports
-__pycache__/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.pyright/
-.hypothesis/
-.tox/
-.nox/
-.coverage.*
-coverage.xml
-junit*.xml
-
-# Shared build output
-target/
-.build/
-DerivedData/
-xcuserdata/
-
-# Local database sidecars
-*.local.db
-*.local.sqlite
-*.local.sqlite3
-*.db-shm
-*.db-wal
-*.sqlite-shm
-*.sqlite-wal
-*.sqlite3-shm
-*.sqlite3-wal
-
-# Generated test and coverage output (local only)
-/coverage/
-/htmlcov/
-/.coverage
-/.coverage.*
-/.pytest_cache/
-/test-results/
-/playwright-report/
-/blob-report/
-/coverage.xml
-/junit.xml
-/junit-*.xml
+# Local planning and repository-analysis records
+/archive/
+/deprecated/
+/docs/agent/
+/docs/archive/
+/docs/deprecated/
+/docs/source-audit/
+/docs/function-audit.md
+/docs/architecture-map.md
+/docs/code-index.md
+/docs/verification-baseline.md
+/scripts/topology_inventory.sh
+/*-ledger.md
+/*_ledger.md
+/scratchpad*
+/worklog*
+/devlog*
+/plan.md
+/plan-status.md
+/progress.md
+/RELEASE_STATUS.md
+/DECISIONS.md
+/FINDINGS.md
+/LOG.md
+/REFACTOR_PLAN.md
+/IMPLEMENTATION_BACKLOG.md
+/BUGS_AND_FIXES.md
+/BUGS_AND_FIXES_ARCHIVE.md
+/OPEN_IMPROVEMENTS_AND_PLAN.md
+/REMEDIATION.md
+/REMEDIATION_PLAN.md

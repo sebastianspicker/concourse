@@ -35,7 +35,6 @@ implementation.
 4. Preserve normal platform navigation, focus, text scaling, and control semantics.
 5. Do not expose internal service errors or private integration details to users.
 
-WCAG 2.2 AA is a design target, not a conformance claim. Automated evidence
-covers Chromium keyboard navigation, 200 percent browser zoom, and serious or
-critical axe findings. Native screen readers, native text scaling, orientation,
-and signed artifacts require manual validation.
+WCAG 2.2 AA is a design target, not a conformance claim. Keyboard navigation,
+browser zoom, native screen readers, text scaling, orientation, and signed
+artifacts require validation on the relevant targets.

@@ -1,0 +1,118 @@
+import React, { Component, type ReactNode } from "react";
+import { View, Text, StyleSheet, Pressable } from "react-native";
+import { spacing, typography } from "@/design-system/theme";
+import { useTheme } from "@/design-system/ThemeContext";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useLocale } from "@/localization/LocaleContext";
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.xl,
+  },
+  errorIcon: { marginBottom: spacing.md },
+  title: {
+    ...typography.subheading,
+    fontWeight: "bold",
+    marginBottom: spacing.sm,
+    textAlign: "center",
+  },
+  message: {
+    ...typography.body,
+    textAlign: "center",
+    marginBottom: spacing.xl,
+    maxWidth: 300,
+  },
+  button: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    ...typography.body,
+    fontWeight: "600",
+  },
+});
+
+interface Props {
+  children: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error: Error | null;
+}
+
+function ErrorFallback({
+  onReset,
+}: {
+  onReset: () => void;
+}): JSX.Element {
+  const theme = useTheme();
+  const { t } = useLocale();
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.errorIcon}><MaterialIcons name="error-outline" size={48} color={theme.colors.error} /></View>
+      <Text style={[styles.title, { color: theme.colors.text }]}>
+        {t("errorTitleGeneric")}
+      </Text>
+      <Text style={[styles.message, { color: theme.colors.muted }]}>
+        {t("errorUnknown")}
+      </Text>
+      <Pressable
+        style={({ pressed }) => [
+          styles.button,
+          { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent, borderWidth: theme.ui.borderWidth },
+          pressed && styles.buttonPressed,
+        ]}
+        onPress={onReset}
+        accessibilityRole="button"
+        accessibilityLabel={t("tryAgain")}
+      >
+        <Text style={[styles.buttonText, { color: theme.colors.accentText }]}>
+          {t("tryAgain")}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+export class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
+    console.error("react_error_boundary_caught", {
+      message: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack
+    });
+  }
+
+  handleReset = (): void => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  render(): ReactNode {
+    if (this.state.hasError) {
+      return (
+        <ErrorFallback
+          onReset={this.handleReset}
+        />
+      );
+    }
+
+    return this.props.children;
+  }
+}

@@ -1,4 +1,3 @@
-/** Enforces the shared TypeScript, React Hooks, import, and complexity rules. */
 module.exports = {
   root: true,
   reportUnusedDisableDirectives: true,

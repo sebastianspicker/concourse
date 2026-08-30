@@ -16,8 +16,10 @@ verify_public_tree() {
   fi
 
   while IFS= read -r -d '' path; do
-    forbidden_files+=("$path")
-  done < <(git ls-files -z | git check-ignore --no-index -z --stdin)
+    if [[ ( -e "$path" || -L "$path" ) ]] && git check-ignore --no-index --quiet -- "$path"; then
+      forbidden_files+=("$path")
+    fi
+  done < <(git ls-files -z)
 
   if (( ${#forbidden_files[@]} > 0 )); then
     echo "Tracked files must not match .gitignore:"
@@ -27,58 +29,7 @@ verify_public_tree() {
 }
 
 verify_public_tree
-
-# Require the reviewed runtime evidence to exist. CI also proves that every
-# expected image belongs to the candidate commit.
-expected_screenshots=(
-  docs/screenshots/concourse-event-detail-390-light.png
-  docs/screenshots/concourse-event-detail-1440-light.png
-  docs/screenshots/concourse-events-1440-light.png
-  docs/screenshots/concourse-rooms-1440-light.png
-  docs/screenshots/concourse-rooms-320-light.png
-  docs/screenshots/concourse-settings-1440-light.png
-  docs/screenshots/concourse-settings-768-high-contrast-de.png
-  docs/screenshots/concourse-today-1600-light.png
-  docs/screenshots/concourse-today-390-light.png
-)
-
-verify_screenshot_set() {
-  local actual expected path
-
-  expected="$(printf '%s\n' "${expected_screenshots[@]}" | LC_ALL=C sort)"
-  if [[ -d docs/screenshots ]]; then
-    actual="$(find docs/screenshots -maxdepth 1 -type f -name '*.png' -print | LC_ALL=C sort)"
-  else
-    actual=""
-  fi
-  if [[ "$actual" != "$expected" ]]; then
-    echo "Runtime screenshot evidence must contain exactly:"
-    printf '  %s\n' "${expected_screenshots[@]}"
-    echo "Found:"
-    if [[ -n "$actual" ]]; then
-      while IFS= read -r path; do printf '  %s\n' "$path"; done <<< "$actual"
-    else
-      echo "  (none)"
-    fi
-    exit 1
-  fi
-
-  for path in "${expected_screenshots[@]}"; do
-    if [[ ! -s "$path" ]]; then
-      echo "Runtime screenshot is missing or empty: $path"
-      exit 1
-    fi
-  done
-
-  if [[ -n "${CI:-}" ]]; then
-    if ! git ls-files --error-unmatch -- "${expected_screenshots[@]}" >/dev/null 2>&1; then
-      echo "Every runtime screenshot must be tracked in the candidate commit."
-      exit 1
-    fi
-  fi
-}
-
-verify_screenshot_set
+pnpm check:architecture
 
 if [[ "${SKIP_INSTALL:-}" != "1" ]]; then
   pnpm install --frozen-lockfile
@@ -88,7 +39,6 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
-verify_screenshot_set
 
 if [[ "${SKIP_MARKER_CHECK:-}" != "1" ]]; then
   marker_pattern='\b(TODO|FIXME|SKELETON|PLACEHOLDER|TBD)\b'

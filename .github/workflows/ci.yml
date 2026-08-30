@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Verify (lint, typecheck, test, build)
+  ci:
+    name: ci
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -36,11 +36,11 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.13.0
-      - name: Enable corepack (pnpm@9.0.0)
+      - name: Enable corepack (pnpm@9.15.0)
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@9.0.0 --activate
+          corepack prepare pnpm@9.15.0 --activate
       - name: Get pnpm store path
         id: pnpm-store
         run: |

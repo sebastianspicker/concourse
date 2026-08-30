@@ -1,47 +1,29 @@
-# Connectors
+# Public sources
 
-The BFF loads one institution pack and uses its public source configuration for
-each data route.
+The API loads one public institution pack and reads only the sources configured by that pack.
 
-| Route | Source |
+| Route | Input |
 |---|---|
-| `/events` | Public HTML URLs in `publicSources.events` |
-| `/schedule` | Public ICS URLs in `publicSources.schedules` |
-| `/rooms` | `publicRooms` from the pack |
-| `/today` | Same-day public events plus `publicRooms` |
+| /events | Public HTTP(S) pages in publicSources.events |
+| /schedule | Public ICS feeds in publicSources.schedules |
+| /rooms | publicRooms in the pack |
+| /today | Same-day public events and pack-defined rooms |
 
-Public connector code lives in `apps/bff/src/connectors/public/`. HTML and ICS
-responses are normalized into the schemas in
-`packages/shared/src/domain/public.ts`.
+Source adapters live in apps/api/src/sources/web-events/ and apps/api/src/sources/ics/. They normalize upstream data into the public resource schemas in packages/contracts/src/resources/.
 
 ## Failure behavior
 
-- Fetches use bounded timeouts.
-- Source failures are logged with request context.
-- When at least one source succeeds, events and schedules can return partial
-  data with `_degraded: true`.
+- Fetches have bounded timeouts and failures are logged with request context.
+- If at least one event or schedule source succeeds, the API can return partial data with _degraded: true.
 - Degraded results are not cached.
-- When no configured source can return usable data, the route returns a
-  sanitized error.
-- ICS recurrence expansion is limited by `RRULE_EXPANSION_HORIZON_DAYS`.
+- No usable result from configured sources becomes a sanitized API error.
+- ICS recurrence expansion is bounded by RRULE_EXPANSION_HORIZON_DAYS.
 
 ## Adding a public source
 
-1. Add the public URL to an institution pack.
-2. Extend the connector only if the existing HTML or ICS parser cannot
-   normalize the source.
-3. Add a direct inline-data contract test when changing parsing or a public
-   response boundary.
-4. Exercise upstream failure, partial success, malformed data, cancellation,
-   and cache behavior as appropriate.
-5. Run `pnpm verify`.
+1. Add an unauthenticated public HTTP(S) URL to an institution pack.
+2. Reuse the existing parser where possible; otherwise extend the relevant API source adapter.
+3. Add deterministic parser and response tests, including malformed input and partial-source failure where applicable.
+4. Verify the pack and affected API package, then run pnpm verify.
 
-Do not commit authenticated URLs, private hostnames, access tokens, captured
-user data or captured protected-system content.
-
-## Private extension stubs
-
-`apps/bff/src/connectors/private-stubs/` contains interfaces and inactive stub
-implementations. The public server does not import them. A private implementation
-must define authentication, error, empty-state, logging, and data-retention
-behavior before wiring those interfaces into a runtime.
+Never add authenticated URLs, internal hostnames, tokens, captured user data, or protected-system content. This repository does not contain or define private connector stubs.

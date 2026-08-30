@@ -36,11 +36,11 @@ jobs:
         with:
           node-version: 22.13.0
 
-      - name: Enable corepack (pnpm@9.0.0)
+      - name: Enable corepack (pnpm@9.15.0)
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@9.0.0 --activate
+          corepack prepare pnpm@9.15.0 --activate
 
       - name: Validate tag, versions, and changelog
         id: metadata
@@ -143,7 +143,7 @@ jobs:
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: .
-          file: ./apps/bff/Dockerfile.prod
+          file: ./apps/api/Dockerfile.prod
           load: true
           push: false
           build-args: |

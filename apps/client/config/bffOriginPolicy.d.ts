@@ -1,0 +1,10 @@
+export function normalizeBffBaseUrl(input: string, isDevelopment: boolean): string;
+export function normalizeReleaseBffBaseUrl(input: string): string;
+export function assertCredentialFreeBffUrl(url: URL): void;
+export function assertOriginOnlyBffUrl(url: URL): void;
+export function isPermittedDevelopmentBffUrl(url: URL, isDevelopment: boolean): boolean;
+export function isLoopbackHost(hostname: string): boolean;
+export function isReleaseRestrictedHost(hostname: string): boolean;
+export function normalizeHostname(hostname: string): string;
+export function isSpecialUseIpv4Address(hostname: string): boolean;
+export function isSpecialUseIpv6Address(hostname: string): boolean;

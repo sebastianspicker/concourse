@@ -1,73 +1,41 @@
 # Contributing
 
-Do not add secrets, private endpoints, or protected campus data to this public
-repository.
-By participating, you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). For
-adoption questions and reporting boundaries, read [SUPPORT.md](SUPPORT.md).
+Do not add secrets, private endpoints, protected campus data, or private integration code to this public repository. Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md); see [SUPPORT.md](SUPPORT.md) for support and adoption boundaries.
 
-## Prerequisites
+## Setup
 
-- Node.js 22.13 or newer (see `.nvmrc`)
-- pnpm 9 (see `package.json#packageManager`)
+Use Node.js 22.13+ and the pnpm version declared in package.json.
 
-Tip: enable Corepack once:
-
-```bash
+~~~bash
 corepack enable
-```
-
-The repository uses TypeScript 7 for `tsc`. The `typescript` dependency
-intentionally resolves to the TypeScript 6 compatibility package because
-some tools still consume the compiler API; `tsc6` is available for
-compatibility diagnostics.
-
-## Local setup
-
-```bash
 pnpm install --frozen-lockfile
 pnpm verify
-```
+~~~
 
-### Run the BFF (optional)
+For local runtime work, copy apps/api/.env.example and apps/client/.env.example to their untracked .env files. Then start the API and client separately:
 
-```bash
-INSTITUTION_ID=hfmt pnpm --filter @concourse/bff dev
-```
+~~~bash
+INSTITUTION_ID=hfmt pnpm --filter @concourse/api dev
+INSTITUTION_ID=hfmt pnpm --filter @concourse/client start
+~~~
 
-### Run the mobile app
+EXPO_PUBLIC_BFF_BASE_URL in apps/client/.env must be reachable by the target client. Keep INSTITUTION_ID aligned with the API; mismatches are rejected rather than displaying another institution's data.
 
-```bash
-INSTITUTION_ID=hfmt pnpm --filter @concourse/mobile start
-```
+## Contributions we accept
 
-If you want the mobile app to call a running BFF, set `EXPO_PUBLIC_BFF_BASE_URL` in
-`apps/mobile/.env` (copy from `apps/mobile/.env.example`). This is required in both
-development and production; there is no automatic fallback. The mobile app and
-BFF must use the same `INSTITUTION_ID`; a mismatch is rejected rather than showing
-data from a different institution pack.
+- Fixes and tests for public events, rooms, schedules, Today, and client states.
+- Public institution packs and public web/ICS parser improvements.
+- Documentation, local tooling, accessibility, and deterministic CI improvements.
 
-## What we accept
+Do not contribute credentials, internal or authenticated URLs, protected-system connectors, captured personal data, or code that requires such access.
 
-- Bug fixes and tests for existing public features (rooms, schedules, events, Today).
-- Improvements to docs and local DX (scripts, CI, linting).
-- Improvements to the connector pattern (public connectors + private stubs), as long as public repo safety remains intact.
+## Change expectations
 
-## What we won’t accept
+- Update @concourse/contracts consumers together when changing a public DTO or error contract.
+- Keep pack data schema-valid and public. Add or adjust pack tests for pack changes.
+- Add focused offline-safe tests for behavior changes; use deterministic inputs or mocked HTTP instead of live campus requests.
+- Update public documentation for changed commands, environment variables, API routes, or user-visible state behavior.
+- Describe responsive and accessibility checks for visible client changes.
+- Run the narrowest relevant checks, then pnpm verify for a complete change.
 
-- Real institution credentials, tokens, or internal URLs.
-- Connectors that require access to protected systems in this public repo.
-
-## Documentation conventions
-
-- Start hand-maintained source, script, and comment-capable configuration files with a concise purpose statement.
-- Document exported and non-obvious functions, components, hooks, and class methods when their contract or design reason is not already clear from types and naming.
-- Explain responsibility, invariants, or fallback behavior instead of restating a filename or symbol name. Anonymous callbacks, generated output, lockfiles, strict JSON, and data fixtures do not need commentary.
-
-## Pull request checklist
-
-- `pnpm verify` passes locally.
-- No placeholder markers added (unfinished task markers, stub markers, etc.).
-- Tests are added for behavior changes (offline-capable; no real network required).
-- Docs are updated when you change workflows or env vars.
-- Visible UI changes include regenerated screenshots plus responsive and accessibility evidence.
-- Release/version changes pass `pnpm release:check`.
+No formatter is configured. ESLint does not lint Markdown. Document exported or non-obvious behavior by explaining its invariant, responsibility, or fallback, not by repeating its identifier.

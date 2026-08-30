@@ -1,0 +1,8 @@
+// Applies shared strict checking to public wire contracts and their tests.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"]
+}

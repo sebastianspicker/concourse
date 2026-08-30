@@ -1,2 +1,3 @@
-/** Exposes validated institution-pack lookup as the package's public API. */
-export * from "./packs";
+export * from "./branding";
+export * from "./schema";
+export * from "./registry";

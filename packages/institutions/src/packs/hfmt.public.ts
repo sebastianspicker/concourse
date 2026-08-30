@@ -1,4 +1,3 @@
-/** Public HfMT Cologne pack containing only publishable identity, campus, room, and source data. */
 export const hfmtPublicPack = {
   id: "hfmt",
   name: "University for Music and Dance (HfMT Cologne)",

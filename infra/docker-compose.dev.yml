@@ -3,7 +3,7 @@ services:
   bff:
     build:
       context: ..
-      dockerfile: apps/bff/Dockerfile
+      dockerfile: apps/api/Dockerfile
     ports:
       - "4000:4000"
     environment:

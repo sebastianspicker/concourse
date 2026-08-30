@@ -1,4 +1,3 @@
-# Provides memorable local aliases without hiding the underlying repository scripts.
 .PHONY: ci verify lint typecheck test build gitleaks
 
 SHELL := /bin/bash

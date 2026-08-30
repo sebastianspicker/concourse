@@ -23,7 +23,7 @@ body:
         - Concourse workflows
         - Design kit / institution branding
         - Accessibility / responsive behavior
-        - Public BFF / connectors
+        - Public API / sources
         - Institution pack setup
         - Build / deployment
         - Documentation / developer experience
@@ -40,7 +40,7 @@ body:
     id: outcome
     attributes:
       label: What worked and what did not?
-      description: Include expected and observed behavior plus sanitized screenshots when useful.
+      description: Include expected and observed behavior with enough detail to reproduce the result.
     validations:
       required: true
   - type: textarea
@@ -58,5 +58,5 @@ body:
       options:
         - label: I removed secrets, private endpoints, student data, internal URLs, and signing material.
           required: true
-        - label: I checked the alpha guide, FAQ, and runbook for this topic.
+        - label: I checked the README, support guide, and runbook for this topic.
           required: true

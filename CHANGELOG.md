@@ -26,7 +26,7 @@ No changes yet.
   one-time migration from legacy local storage keys.
 - Three institution-selectable design presets: the default `wayfinding` preset plus
   `atelier` and `precision`.
-- Responsive rail and tab navigation, virtualized public resource lists, public detail workflows, localized freshness/error states, and Playwright/axe coverage with current candidate screenshots.
+- Responsive rail and tab navigation, virtualized public resource lists, public detail workflows, and localized freshness and error states.
 - BFF institution identity headers and client-side configuration mismatch detection.
 - Strict release metadata preflight for SemVer tags, workspace packages, Expo marketing version, and changelog notes.
 
@@ -35,16 +35,13 @@ No changes yet.
 - Upgraded the mobile app to Expo SDK 57, React Native 0.86, React 19.2, and Node.js 22.13 or newer.
 - Replaced the demo Profile/authentication experience with Settings while retaining a compatibility redirect.
 - Consolidated frontend styling on typed React Native tokens, shared workflow primitives, and pack-controlled design presets.
-- Made `pnpm verify` enforce release identity, browser accessibility/responsive checks, and deterministic BFF E2E flows.
+- Made `pnpm verify` enforce release identity, architecture boundaries, focused tests, and fresh builds.
 - Moved the release BFF image to Node 22.13 and added a non-default-port health smoke before registry publication.
 - Hardened public ICS parsing with bounded recurrence work, explicit timezone handling, and broader malformed-input coverage.
 - Pinned the owner-managed EAS CLI path and added an explicit Docker build-context boundary for local artifacts and secrets.
 
 ### Fixed
 
-- Fixed screenshot inputs by pinning browser locale, timezone, color scheme,
-  motion preference, and clock, and by requiring the exact nine-file evidence
-  set in the source-candidate gate.
 - Made the BFF health version explicit in release images and its container
   health probes honor both `BFF_PORT` and enabled bearer authentication.
 - Included the repository MIT notice in BFF container images.

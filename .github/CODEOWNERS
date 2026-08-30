@@ -9,9 +9,8 @@ SECURITY.md                            @sebastianspicker
 docs/release.md                        @sebastianspicker
 **/package.json                        @sebastianspicker
 pnpm-lock.yaml                         @sebastianspicker
-apps/mobile/app.json                   @sebastianspicker
-apps/mobile/app.config.ts              @sebastianspicker
-apps/mobile/eas.json                   @sebastianspicker
-apps/bff/Dockerfile*                   @sebastianspicker
-packages/shared/src/domain/            @sebastianspicker
+apps/client/app.config.ts              @sebastianspicker
+apps/client/eas.json                   @sebastianspicker
+apps/api/Dockerfile*                   @sebastianspicker
+packages/contracts/src/                @sebastianspicker
 packages/institutions/src/packs/       @sebastianspicker

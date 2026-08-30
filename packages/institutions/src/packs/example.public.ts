@@ -1,4 +1,3 @@
-/** Safe generic pack used for documentation, previews, and downstream customization. */
 export const examplePublicPack = {
   id: "example",
   name: "Example University",

@@ -1,4 +1,3 @@
-/** Deterministic fictional pack used by integration tests and reproducible release evidence. */
 export const mockuniPublicPack = {
   id: "mockuni",
   name: "Technische Universität Musterstadt",

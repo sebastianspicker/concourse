@@ -1,4 +1,3 @@
-/** Serves the prepared GitHub Pages artifact from its production base path. */
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -18,13 +17,11 @@ const contentTypes = {
   ".ttf": "font/ttf",
 };
 
-/** Resolves a request beneath the artifact root. */
 function safeJoin(requestedPath) {
   const candidate = resolve(outputRoot, `.${normalize(requestedPath)}`);
   return candidate === outputRoot || candidate.startsWith(`${outputRoot}${sep}`) ? candidate : null;
 }
 
-/** Returns a regular file or null without exposing filesystem errors. */
 async function existingFile(candidate) {
   if (!candidate) return null;
   try {
@@ -34,7 +31,6 @@ async function existingFile(candidate) {
   }
 }
 
-/** Maps the production base path to exported HTML and static assets. */
 async function resolveFile(pathname) {
   if (pathname !== basePath && !pathname.startsWith(`${basePath}/`)) return null;
   const relativePath = pathname.slice(basePath.length) || "/";

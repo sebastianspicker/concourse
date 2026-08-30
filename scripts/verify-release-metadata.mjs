@@ -1,22 +1,26 @@
 #!/usr/bin/env node
 /** Validates release identity and optionally extracts one bounded changelog section. */
 
+import { execFile } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
+import { promisify } from "node:util";
 import { resolve } from "node:path";
+
+const execFileAsync = promisify(execFile);
 
 const packagePaths = [
   "package.json",
-  "apps/bff/package.json",
-  "apps/mobile/package.json",
+  "apps/api/package.json",
+  "apps/client/package.json",
+  "packages/contracts/package.json",
   "packages/institutions/package.json",
-  "packages/shared/package.json",
 ];
 const expectedPackageNames = {
   "package.json": "concourse-campus-kit",
-  "apps/bff/package.json": "@concourse/bff",
-  "apps/mobile/package.json": "@concourse/mobile",
+  "apps/api/package.json": "@concourse/api",
+  "apps/client/package.json": "@concourse/client",
+  "packages/contracts/package.json": "@concourse/contracts",
   "packages/institutions/package.json": "@concourse/institutions",
-  "packages/shared/package.json": "@concourse/shared",
 };
 const expectedExpoIdentity = {
   name: "Concourse",
@@ -79,12 +83,45 @@ function isIsoDate(value) {
     [0, 1, 2, 3, 5, 6, 8, 9].every((index) => isAsciiDigit(value[index]));
 }
 
-/** Reads repository JSON using the current working directory as the release root. */
 async function readJson(path) {
   return JSON.parse(await readFile(resolve(path), "utf8"));
 }
 
-/** Returns only the requested dated release section, stopping at the next level-two heading. */
+/** Evaluates Expo's executable config so release checks use the build-time source of truth. */
+async function resolveExpoConfig(environment = {}) {
+  const { EAS_BUILD_PROFILE: _ignoredBuildProfile, ...baseEnvironment } = process.env;
+  const result = await execFileAsync(
+    "pnpm",
+    ["exec", "expo", "config", "--type", "public", "--json"],
+    {
+      cwd: resolve("apps/client"),
+      env: { ...baseEnvironment, ...environment },
+      maxBuffer: 1024 * 1024,
+    },
+  );
+  return JSON.parse(result.stdout);
+}
+
+/** Confirms executable release validation rejects both current and retired template package identities. */
+async function rejectsTemplateIdentifiers() {
+  const templateIdentifiers = ["com.concoursecampuskit.mobile", "com.campusappkit.mobile"];
+  for (const identifier of templateIdentifiers) {
+    try {
+      await resolveExpoConfig({
+        EAS_BUILD_PROFILE: "production",
+        EXPO_PUBLIC_BFF_BASE_URL: "https://api.example.test",
+        INSTITUTION_ID: "example",
+        MOBILE_ANDROID_PACKAGE: identifier,
+        MOBILE_BUNDLE_IDENTIFIER: identifier,
+      });
+      return false;
+    } catch {
+      // Expected: the executable config rejects each template identity.
+    }
+  }
+  return true;
+}
+
 function changelogSection(lines, version) {
   const headingPrefix = `## [${version}] - `;
   const start = lines.findIndex((line) => line.startsWith(headingPrefix));
@@ -97,7 +134,6 @@ function changelogSection(lines, version) {
   return lines.slice(start + 1, nextHeading === -1 ? lines.length : nextHeading);
 }
 
-/** Parses the release version and optional release-notes output without accepting stray flags. */
 function parseArguments(arguments_) {
   let version;
   let notesOutput;
@@ -153,47 +189,41 @@ for (const path of packagePaths) {
 }
 
 if (semver) {
-  const mobileConfig = await readJson("apps/mobile/app.json");
+  let mobileConfig;
+  try {
+    mobileConfig = await resolveExpoConfig();
+  } catch (error) {
+    errors.push(`apps/client/app.config.ts could not be evaluated: ${error instanceof Error ? error.message : String(error)}`);
+  }
   const expectedMobileVersion = `${semver.major}.${semver.minor}.${semver.patch}`;
-  if (mobileConfig.expo?.version !== expectedMobileVersion) {
+  if (mobileConfig?.version !== expectedMobileVersion) {
     errors.push(
-      `apps/mobile/app.json has Expo version ${mobileConfig.expo?.version ?? "<missing>"}; ` +
+      `resolved Expo config has version ${mobileConfig?.version ?? "<missing>"}; ` +
         `expected platform-safe base version ${expectedMobileVersion}`,
     );
   }
   for (const [key, expectedValue] of Object.entries(expectedExpoIdentity)) {
-    if (mobileConfig.expo?.[key] !== expectedValue) {
+    if (mobileConfig?.[key] !== expectedValue) {
       errors.push(
-        `apps/mobile/app.json has Expo ${key} ${mobileConfig.expo?.[key] ?? "<missing>"}; ` +
+        `resolved Expo config has ${key} ${mobileConfig?.[key] ?? "<missing>"}; ` +
           `expected ${expectedValue}`,
       );
     }
   }
-  if (mobileConfig.expo?.icon !== expectedExpoAssets.icon) {
-    errors.push(`apps/mobile/app.json has Expo icon ${mobileConfig.expo?.icon ?? "<missing>"}; expected ${expectedExpoAssets.icon}`);
+  if (mobileConfig?.icon !== expectedExpoAssets.icon) {
+    errors.push(`resolved Expo config has icon ${mobileConfig?.icon ?? "<missing>"}; expected ${expectedExpoAssets.icon}`);
   }
-  if (mobileConfig.expo?.android?.adaptiveIcon?.foregroundImage !== expectedExpoAssets.androidForegroundImage) {
-    errors.push("apps/mobile/app.json does not use the Concourse Android adaptive icon");
+  if (mobileConfig?.android?.adaptiveIcon?.foregroundImage !== expectedExpoAssets.androidForegroundImage) {
+    errors.push("resolved Expo config does not use the Concourse Android adaptive icon");
   }
-  if (mobileConfig.expo?.android?.adaptiveIcon?.backgroundColor !== "#FFFFFF") {
-    errors.push("apps/mobile/app.json does not use the Concourse Android adaptive icon background");
+  if (mobileConfig?.android?.adaptiveIcon?.backgroundColor !== "#FFFFFF") {
+    errors.push("resolved Expo config does not use the Concourse Android adaptive icon background");
   }
-  if (mobileConfig.expo?.web?.favicon !== expectedExpoAssets.webFavicon) {
-    errors.push("apps/mobile/app.json does not use the Concourse web favicon");
+  if (mobileConfig?.web?.favicon !== expectedExpoAssets.webFavicon) {
+    errors.push("resolved Expo config does not use the Concourse web favicon");
   }
-  const dynamicConfig = await readFile(resolve("apps/mobile/app.config.ts"), "utf8");
-  const expectedFallback = `version: withDefault(config.version, "${expectedMobileVersion}")`;
-  if (!dynamicConfig.includes(expectedFallback)) {
-    errors.push(`apps/mobile/app.config.ts does not use fallback version ${expectedMobileVersion}`);
-  }
-  for (const [key, expectedValue] of Object.entries(expectedExpoIdentity)) {
-    const expectedDynamicFallback = `${key}: withDefault(config.${key}, "${expectedValue}")`;
-    if (!dynamicConfig.includes(expectedDynamicFallback)) {
-      errors.push(`apps/mobile/app.config.ts does not use fallback ${key} ${expectedValue}`);
-    }
-  }
-  if (!dynamicConfig.includes('const LEGACY_TEMPLATE_PACKAGE = "com.campusappkit.mobile"')) {
-    errors.push("apps/mobile/app.config.ts does not reject the legacy template identifier");
+  if (!(await rejectsTemplateIdentifiers())) {
+    errors.push("apps/client/app.config.ts does not reject both Concourse and legacy template identifiers for production builds");
   }
 }
 

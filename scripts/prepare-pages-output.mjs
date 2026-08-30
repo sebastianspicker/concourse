@@ -1,4 +1,3 @@
-/** Adds directory indexes so GitHub Pages and plain static servers resolve clean routes. */
 import { copyFile, mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, sep } from "node:path";
 
@@ -6,7 +5,6 @@ const outputRoot = join(process.cwd(), "dist-pages");
 const generatedPnpmDirectory = join(outputRoot, "assets", "__node_modules", ".pnpm");
 const publishedPnpmDirectory = join(outputRoot, "assets", "__node_modules", "_pnpm");
 
-/** Returns every file below a directory without following generated links. */
 async function listFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(entries.map((entry) => {
@@ -16,7 +14,6 @@ async function listFiles(directory) {
   return nested.flat();
 }
 
-/** Keeps public route HTML while excluding framework and parameter templates. */
 function isPublicRouteHtml(file) {
   if (extname(file) !== ".html" || basename(file) === "index.html") return false;
   return relative(outputRoot, file)

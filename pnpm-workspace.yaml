@@ -1,4 +1,3 @@
-# Declares workspace packages and the authoritative dependency override policy.
 packages:
   - apps/*
   - packages/*

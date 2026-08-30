@@ -1,76 +1,26 @@
-# Frontend conventions
+# Client conventions
 
-The Expo application implements the product scope in
-[`PRODUCT.md`](../PRODUCT.md) and the token and component rules in
-[`DESIGN.md`](../DESIGN.md).
+apps/client is the Expo Router application for native and responsive web targets. Its routes live in apps/client/app/; product behavior and visual rules are defined in [PRODUCT.md](../PRODUCT.md) and [DESIGN.md](../DESIGN.md).
 
-## Routes and data
+## Data and state
 
-Expo Router owns Today, Events, Rooms, Settings, and the event, room, and
-schedule detail routes under `apps/mobile/app/`.
+Public-data hooks live in apps/client/src/data/public/ and use the transport layer in apps/client/src/platform/http/. They abort superseded requests, retain usable rows during refresh, validate API responses with @concourse/contracts, and coordinate the persisted cache.
 
-Resource hooks call the BFF through `src/data/publicApi.ts`. The shared loader
-aborts superseded requests, preserves existing rows while refreshing, and
-returns loading, error, refresh, and freshness state. Persisted public data can
-be used during offline or degraded operation.
+EXPO_PUBLIC_BFF_BASE_URL is required for API-backed use. If the API returns x-institution-id, it must match the client's configured institution. The UI must distinguish initial loading, current data, cached/offline data, degraded data, empty data, configuration errors, and request errors. Do not display raw server errors or present stale data as current.
 
-The client requires `EXPO_PUBLIC_BFF_BASE_URL`. It validates BFF responses with
-the schemas in `@concourse/shared`. When a response includes
-`x-institution-id`, that ID must match the mobile build.
+CONCOURSE_STATIC_DEMO=1 selects fixture-only static-demo behavior. It is for the Pages artifact and must not contact the API or external sources.
 
-## Theme and layout
+## Design system and layout
 
-- `src/ui/designPresets.ts` owns institution preset palettes and metrics.
-- `src/ui/theme.ts` owns shared typography, spacing, and semantic colors.
-- `ThemeProvider` resolves system, light, dark, and high-contrast appearance.
-- The selected institution pack supplies the default locale, preset, and accent.
-- High-contrast mode ignores institution palette overrides.
+- src/design-system/ owns shared components, tokens, theming, and state UI.
+- src/shell/ owns shared application chrome and error boundaries.
+- src/features/ owns route-oriented feature composition.
+- src/localization/ owns supported locale and campus-time presentation.
 
-Under 900 pixels, routes use one content column and horizontally scrollable top
-navigation. At 900 pixels and above, identity and navigation share one row and
-Today uses two columns. Tab routes use up to 1400 pixels and detail content uses
-up to 1280 pixels.
+Do not add remote fonts, a second styling system, or per-screen theme tokens. Below 900 px use one content column and scrollable top navigation; at 900 px and above use the desktop layout. Tab content is bounded to 1400 px and details to 1280 px.
 
-Do not add a second styling system, remote fonts, or per-screen theme tokens.
-Build routes from the shared components in `src/ui/` and `src/components/`.
+## Accessibility and release checks
 
-## State presentation
+WCAG 2.2 AA is a target, not a conformance claim. Keep 44-point targets, visible web focus, clear labels, radio semantics for appearance/language choices, live status updates, reduced-motion support, and non-color-only state.
 
-Each public resource distinguishes:
-
-- initial loading
-- current data
-- cached or offline data
-- partial or degraded data
-- empty data
-- configuration and request errors
-
-Keep stale or selected records visible during refresh when possible. Source
-status and recovery actions must describe the resource currently on screen.
-Do not display raw server errors.
-
-## Accessibility
-
-WCAG 2.2 AA is a target, not a conformance claim.
-
-- Controls use at least 44 by 44 point targets.
-- Search inputs have visible labels and clear actions.
-- Language and appearance choices expose radio semantics.
-- Status changes use live regions.
-- System font scaling remains enabled.
-- Web focus is visible.
-- Loading placeholders do not animate.
-- Interaction does not depend on hover.
-
-## Native checks
-
-Before distributing a signed native artifact, verify on target devices:
-
-- VoiceOver and TalkBack
-- large and bold text
-- reduced motion
-- portrait and landscape orientation
-- offline and recovery announcements
-- navigation and back behavior
-
-Browser and native accessibility remain owner-managed release checks.
+Before distributing a signed native artifact, validate VoiceOver/TalkBack, large and bold text, orientation, navigation/back behavior, and offline recovery on target devices. Browser and local test evidence do not replace those checks.

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Reproduces the main CI job with a frozen install followed by the source-alpha gate.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

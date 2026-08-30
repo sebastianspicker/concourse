@@ -1,6 +1,6 @@
 # Captures reproducible public-template defects without soliciting private campus data.
 name: Bug report
-description: Report something that’s broken or misleading in the template
+description: Report a reproducible Concourse defect
 labels: ["bug"]
 body:
   - type: textarea
@@ -41,13 +41,6 @@ body:
       render: shell
     validations:
       required: false
-  - type: textarea
-    id: screenshots
-    attributes:
-      label: Screenshots
-      description: Attach sanitized screenshots when they clarify the visible problem.
-    validations:
-      required: false
   - type: input
     id: version
     attributes:
@@ -60,11 +53,11 @@ body:
     id: area
     attributes:
       label: Area
-      description: Which part of the public template is affected?
+      description: Which part of the project is affected?
       options:
-        - Mobile app
-        - BFF
-        - Shared schemas
+        - Client
+        - API
+        - Public contracts
         - Institution packs
         - Public connectors
         - Documentation

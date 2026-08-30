@@ -1,51 +1,26 @@
-# Deploy: Mobile (EAS)
+# Deploy: client (EAS)
 
-## Profiles
-
-Profiles are defined in `apps/mobile/eas.json`.
+EAS profiles are in apps/client/eas.json. This repository does not contain an EAS project ID, signing credentials, generated native projects, store records, or a deployed API; those are adopting-institution responsibilities.
 
 ## Required configuration
 
-- Link the fork to an EAS project owned by the adopting institution. The public
-  template intentionally does not contain an Expo project ID or signing setup.
-- Set `INSTITUTION_ID` to the bundled public institution pack for preview and production builds.
-- Set a valid HTTP(S) `EXPO_PUBLIC_BFF_BASE_URL` for preview and production builds.
-- For production, set institution-owned app identifiers via
-  `MOBILE_BUNDLE_IDENTIFIER` (iOS) and `MOBILE_ANDROID_PACKAGE` (Android).
-- Keep `app.json#expo.version` on the numeric `X.Y.Z` base. EAS uses remote,
-  auto-incremented build numbers as configured in `eas.json`.
+- Preview and production need INSTITUTION_ID and a credential-free HTTPS EXPO_PUBLIC_BFF_BASE_URL.
+- Production additionally needs institution-owned MOBILE_BUNDLE_IDENTIFIER and MOBILE_ANDROID_PACKAGE values.
+- Production config rejects the current and legacy template identifiers.
+- apps/client/app.config.ts keeps the Expo version at numeric X.Y.Z; EAS owns remote build-number increments according to eas.json.
 
-Production config evaluation rejects both the current template identifier
-`com.concoursecampuskit.mobile` and the legacy identifier
-`com.campusappkit.mobile`. It fails before EAS starts when either production
-identifier, the institution id, or the BFF URL is missing. Bundle identifiers,
-package names, store records, signing, privacy disclosures, and device evidence
-are owner-managed release inputs.
+Set owner-managed values in the shell or EAS environment before building:
 
-## Commands
-
-The package scripts fetch the explicitly pinned `eas-cli@20.5.1`; the CLI is
-not added to workspace dependencies because Expo discourages project-local EAS
-CLI installs. EAS builds are online, owner-managed operations and are not part
-of `pnpm verify`.
-
-Set the adopting institution's values in the shell or its EAS environment
-before running a build. The reserved example values below illustrate the shape;
-replace them before distribution:
-
-```bash
+~~~bash
 export INSTITUTION_ID=example
 export EXPO_PUBLIC_BFF_BASE_URL=https://campus-api.example.edu
 export MOBILE_BUNDLE_IDENTIFIER=edu.example.campus
 export MOBILE_ANDROID_PACKAGE=edu.example.campus
 
-pnpm --filter @concourse/mobile start
-pnpm --filter @concourse/mobile dev
-pnpm --filter @concourse/mobile build:preview
-pnpm --filter @concourse/mobile build:production
-```
+pnpm --filter @concourse/client start
+pnpm --filter @concourse/client dev
+pnpm --filter @concourse/client build:preview
+pnpm --filter @concourse/client build:production
+~~~
 
-For the source candidate, start with `build:preview`, install the
-signed artifact on target devices, and complete the manual
-accessibility/native matrix in [Frontend conventions](../frontend.md) before
-considering production.
+The package invokes pinned eas-cli@20.5.1 on demand. EAS is online and owner-managed, so it is outside pnpm verify. Install and test a signed preview on target devices, including the manual checks in [client conventions](../frontend.md), before considering a production distribution.

@@ -11,12 +11,13 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node ../../scripts/clean-package-dist.mjs && tsc -p tsconfig.build.json",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
-    "@concourse/shared": "workspace:*"
+    "@concourse/contracts": "workspace:*",
+    "zod": "3.25.76"
   }
 }

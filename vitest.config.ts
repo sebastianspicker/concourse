@@ -1,4 +1,3 @@
-/** Provides the repository-wide Node test defaults inherited by package suites. */
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
