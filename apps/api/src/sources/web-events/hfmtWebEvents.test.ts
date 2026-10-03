@@ -75,4 +75,61 @@ describe("fetchPublicEvents", () => {
     });
     expect(JSON.stringify(log.mock.calls)).not.toContain("reader:secret");
   });
+
+  it("bounds malformed HTML scanning and keeps the source-label fallback", async () => {
+    vi.stubEnv("PUBLIC_EVENTS_MODE", "auto");
+    fetchTextWithTimeout.mockResolvedValueOnce([
+      "<article>".repeat(4_000),
+      '<div class="event">'.repeat(4_000),
+      '<a href="/event">'.repeat(4_000),
+    ].join(""));
+
+    const result = await fetchPublicEvents(institution("malformed-html", "https://www.hfmt-koeln.de/veranstaltungen"));
+
+    expect(result).toEqual({
+      events: [{
+        id: expect.any(String),
+        title: "Campus calendar",
+        date: expect.any(String),
+        sourceUrl: "https://www.hfmt-koeln.de/veranstaltungen"
+      }],
+      degraded: true
+    });
+  });
+
+  it("keeps ordinary HfMT article extraction", async () => {
+    vi.stubEnv("PUBLIC_EVENTS_MODE", "auto");
+    fetchTextWithTimeout.mockResolvedValueOnce(`
+      <article data-event-title="Public recital" data-event-url="/veranstaltungen/recital">
+        <time datetime="2026-11-04T19:30:00+01:00"></time>
+      </article>
+    `);
+
+    const result = await fetchPublicEvents(institution("hfmt-article", "https://www.hfmt-koeln.de/veranstaltungen"));
+
+    expect(result).toMatchObject({
+      degraded: false,
+      events: [{ title: "Public recital", sourceUrl: "https://www.hfmt-koeln.de/veranstaltungen/recital" }]
+    });
+  });
+
+  it("preserves offsets around Unicode text and quoted greater-than characters", async () => {
+    vi.stubEnv("PUBLIC_EVENTS_MODE", "auto");
+    fetchTextWithTimeout.mockResolvedValueOnce(`
+      ${"İ".repeat(10)}
+      <article data-event-title="İstanbul recital > Encore" data-event-url="/veranstaltungen/encore">
+        <time datetime="2026-11-04T19:30:00+01:00"></time>
+      </article>
+    `);
+
+    const result = await fetchPublicEvents(institution("hfmt-unicode", "https://www.hfmt-koeln.de/veranstaltungen"));
+
+    expect(result).toMatchObject({
+      degraded: false,
+      events: [{
+        title: "İstanbul recital > Encore",
+        sourceUrl: "https://www.hfmt-koeln.de/veranstaltungen/encore"
+      }]
+    });
+  });
 });

@@ -56,9 +56,10 @@ export function getRetryDelayMs(
   maxDelayMs: number
 ): number {
   const retryAfterSeconds = isHttpLikeError(err) ? err.retryAfterInSeconds : undefined;
-  return typeof retryAfterSeconds === "number"
-    ? retryAfterSeconds * 1000
-    : backoffWithJitter(baseDelayMs, attempt, multiplier, maxDelayMs);
+  const maximum = Math.max(0, maxDelayMs);
+  return typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
+    ? Math.min(retryAfterSeconds * 1000, maximum)
+    : backoffWithJitter(baseDelayMs, attempt, multiplier, maximum);
 }
 
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {

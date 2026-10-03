@@ -30,6 +30,11 @@ dev for the client requires an installed compatible development client. EXPO_PUB
 | BFF_TRUSTED_PROXIES | Optional exact IP/CIDR allowlist for forwarded identity. |
 | BFF_TRUST_PROXY | never by default; accepts never or always. |
 
+ICS recurrence processing accepts `FREQ`, positive `INTERVAL`, `COUNT`, `UNTIL`,
+`WKST`, unnumbered `BYDAY` on daily-or-coarser rules, and time selectors no finer
+than their recurrence frequency. Other `BY*` combinations are treated as an
+unsupported recurrence and the base event remains available without expansion.
+
 BFF_TRUSTED_PROXIES enables trusted-proxy mode if no explicit mode overrides it. always trusts client-supplied forwarding headers and is appropriate only behind an isolated edge that replaces them.
 
 | Client variable | Behavior |

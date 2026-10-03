@@ -60,4 +60,31 @@ describe("parseIcs", () => {
     expect(event.title).toBe("S".repeat(SCHEDULE_TITLE_MAX_LENGTH - 1));
     expect(event.title).not.toContain("\uFFFD");
   });
+
+  it("rejects recurrence intervals that cannot make forward progress", () => {
+    const [event] = parseIcs(calendar(
+      "UID:negative-interval\nSUMMARY:Safe fallback\nDTSTART:20260202T140000Z\nRRULE:FREQ=DAILY;INTERVAL=-1"
+    ), { referenceDate: new Date("2026-02-01T00:00:00.000Z") });
+
+    expect(event).toMatchObject({ id: "negative-interval", title: "Safe fallback" });
+    expect(event.isRecurring).toBeUndefined();
+  });
+
+  it("rejects filters whose dependency search is not horizon-bounded", () => {
+    const [event] = parseIcs(calendar(
+      "UID:impossible-filter\nSUMMARY:Safe fallback\nDTSTART:20260202T140000Z\nRRULE:FREQ=HOURLY;BYMONTH=2;BYMONTHDAY=30"
+    ), { referenceDate: new Date("2026-02-01T00:00:00.000Z") });
+
+    expect(event).toMatchObject({ id: "impossible-filter", title: "Safe fallback" });
+    expect(event.isRecurring).toBeUndefined();
+  });
+
+  it("retains bounded weekly weekday recurrence", () => {
+    const events = parseIcs(calendar(
+      "UID:weekday-series\nSUMMARY:Workshop\nDTSTART:20260202T140000Z\nRRULE:FREQ=WEEKLY;BYDAY=MO,WE;COUNT=4"
+    ), { referenceDate: new Date("2026-02-01T00:00:00.000Z"), rruleHorizonDays: 30 });
+
+    expect(events).toHaveLength(4);
+    expect(events.every((event) => event.isRecurring)).toBe(true);
+  });
 });

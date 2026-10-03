@@ -20,6 +20,8 @@ const EXPLICIT_BY_RULE_PART = /(?:^|;)BY[A-Z]+=/i;
 const UTC_UNTIL_PATTERN = /(?:^|;)UNTIL=[^;]+Z(?:;|$)/i;
 const MAX_RRULE_WORK_PER_EVENT = 10_000;
 const UNSUPPORTED_RECURRENCE = -1;
+const SAFE_RRULE_KEYS = new Set(["FREQ", "COUNT", "UNTIL", "INTERVAL", "WKST", "BYDAY", "BYHOUR", "BYMINUTE", "BYSECOND"]);
+const UNNUMBERED_WEEKDAYS = /^(?:MO|TU|WE|TH|FR|SA|SU)(?:,(?:MO|TU|WE|TH|FR|SA|SU))*$/i;
 const FREQUENCY_MILLISECONDS = [
   31_536_000_000,
   2_419_200_000,
@@ -58,7 +60,8 @@ function recurrenceStepsBetween(start: Date, end: Date, rrule: RRule): number {
 
 /** Accepts only finite declared COUNT values that fit the expansion policy. */
 function isSupportedCount(declaredCount: number | null): boolean {
-  return (declaredCount ?? 0) <= MAX_RRULE_WORK_PER_EVENT;
+  if (declaredCount === null) return true;
+  return Number.isSafeInteger(declaredCount) && declaredCount >= 0 && declaredCount <= MAX_RRULE_WORK_PER_EVENT;
 }
 
 type RecurrenceWorkInput = {
@@ -133,12 +136,79 @@ function parseRule(input: RuleParseInput): RRule {
   const ruleString = input.ruleValue.startsWith(RRULE_PREFIX) ? input.ruleValue : `${RRULE_PREFIX}${input.ruleValue}`;
   const parsed = rrulestr(ruleString, { dtstart: input.startDate, tzid: null });
   if (parsed instanceof RRuleSet) throw new Error("Unsupported recurrence rule set");
+  if (!hasBoundedSearch(input.ruleValue, parsed)) throw new Error("Unsupported recurrence rule");
   if (!input.timeZone || !parsed.options.until || !UTC_UNTIL_PATTERN.test(input.ruleValue)) return parsed;
   return new RRule({
     ...parsed.origOptions,
     dtstart: input.startDate,
     until: instantToFloatingDate(parsed.options.until, input.timeZone),
     tzid: null
+  });
+}
+
+/** Accepts only recurrence grammar whose iterator is guaranteed to emit or advance to its horizon. */
+function hasBoundedSearch(ruleValue: string, rule: RRule): boolean {
+  const clauses = parseRuleClauses(ruleValue);
+  if (!clauses) return false;
+  const { freq, interval } = rule.options;
+  return [
+    hasValidRecurrenceScalars(rule),
+    hasSupportedByDay(clauses.get("BYDAY"), freq, interval),
+    hasSupportedNumberFilter(clauses, "BYHOUR", freq, RRule.DAILY, 23),
+    hasSupportedNumberFilter(clauses, "BYMINUTE", freq, RRule.HOURLY, 59),
+    hasSupportedNumberFilter(clauses, "BYSECOND", freq, RRule.MINUTELY, 59)
+  ].every(Boolean);
+}
+
+function hasSupportedByDay(value: string | undefined, frequency: number, interval: number): boolean {
+  if (value === undefined) return true;
+  if (!UNNUMBERED_WEEKDAYS.test(value) || frequency > RRule.DAILY) return false;
+  return frequency !== RRule.DAILY || interval === 1;
+}
+
+function hasSupportedNumberFilter(
+  clauses: Map<string, string>,
+  key: string,
+  frequency: number,
+  maximumFrequency: number,
+  maximumValue: number
+): boolean {
+  if (!clauses.has(key)) return true;
+  if (frequency > maximumFrequency) return false;
+  return isNumberListInRange(clauses.get(key), 0, maximumValue);
+}
+
+function parseRuleClauses(ruleValue: string): Map<string, string> | null {
+  const clauses = new Map<string, string>();
+  for (const clause of ruleValue.replace(/^RRULE:/i, "").split(";")) {
+    const separator = clause.indexOf("=");
+    const key = clause.slice(0, separator).toUpperCase();
+    const value = clause.slice(separator + 1);
+    if (separator < 1 || !value || !SAFE_RRULE_KEYS.has(key) || clauses.has(key)) return null;
+    clauses.set(key, value);
+  }
+  return clauses;
+}
+
+function hasValidRecurrenceScalars(rule: RRule): boolean {
+  const { count, freq, interval, until } = rule.options;
+  return [
+    isSupportedFrequency(freq),
+    Number.isSafeInteger(interval) && interval > 0,
+    isSupportedCount(count),
+    until === null || Number.isFinite(until.getTime())
+  ].every(Boolean);
+}
+
+function isSupportedFrequency(frequency: number): boolean {
+  return Number.isSafeInteger(frequency) && frequency >= RRule.YEARLY && frequency <= RRule.SECONDLY;
+}
+
+function isNumberListInRange(value: string | undefined, minimum: number, maximum: number): boolean {
+  if (value === undefined) return true;
+  return value.split(",").every((part) => {
+    const parsed = Number(part);
+    return /^\d+$/.test(part) && Number.isSafeInteger(parsed) && parsed >= minimum && parsed <= maximum;
   });
 }
 

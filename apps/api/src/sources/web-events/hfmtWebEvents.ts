@@ -10,8 +10,12 @@ import { BFF_ENV } from "../../runtime/config";
 
 const DEFAULT_TIME_ZONE = "Europe/Berlin";
 const MAX_EVENTS_PER_SOURCE = 8;
+const MAX_HTML_BLOCKS_TO_INSPECT = 256;
+const MAX_HTML_OPENING_TAG_LENGTH = 16 * 1024;
+const MAX_HTML_BLOCK_LENGTH = 256 * 1024;
 export type FetchPublicEventsResult = { events: PublicEvent[]; degraded: boolean };
 type PublicEventSource = { url: string; label: string };
+type HtmlBlock = { content: string; full: string; openingTag: string };
 
 function sourceLabelEvents(
   sources: PublicEventSource[],
@@ -110,14 +114,16 @@ function extractHfmtEvents(
   // The public HfMT site has used multiple event-card shapes. Prefer explicit
   // article markup, then event tiles, then the generic link fallback.
   const articleEvents = extractEventsFromBlocks(
-    html.match(/<article[\s\S]*?<\/article>/gi) ?? [],
+    collectHtmlBlocks(html, "article").map((block) => block.full),
     sourceUrl,
     timeZone
   );
   if (articleEvents.length > 0) return articleEvents;
 
   const tileEvents = extractEventsFromBlocks(
-    html.match(/<div[^>]*class="[^"]*event[^"]*"[\s\S]*?<\/div>/gi) ?? [],
+    collectHtmlBlocks(html, "div", (openingTag) =>
+      getDoubleQuotedAttribute(openingTag, "class")?.toLowerCase().includes("event") ?? false
+    ).map((block) => block.full),
     sourceUrl,
     timeZone
   );
@@ -167,17 +173,15 @@ function extractGenericEvents(
   sourceUrl: string
 ): PublicEvent[] {
   const events: PublicEvent[] = [];
-  const anchorRegex = /<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-  let match: RegExpExecArray | null;
+  const anchors = collectHtmlBlocks(html, "a", (openingTag) =>
+    getDoubleQuotedAttribute(openingTag, "href") !== null
+  );
 
-  while ((match = anchorRegex.exec(html)) !== null) {
-    const href = match[1];
-    const rawTitle = match[2]
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+  for (const anchor of anchors) {
+    const href = getDoubleQuotedAttribute(anchor.openingTag, "href");
+    const rawTitle = normalizeVisibleText(anchor.content);
 
-    if (rawTitle.length < 4 || rawTitle.length > 120) {
+    if (!href || rawTitle.length < 4 || rawTitle.length > 120) {
       continue;
     }
 
@@ -217,28 +221,18 @@ function dedupeAndSortEvents(events: PublicEvent[]): PublicEvent[] {
 }
 
 function extractTitle(block: string): string | null {
-  const dataTitleMatch = block.match(/data-event-title="([^"]+)"/i);
-  if (dataTitleMatch) {
-    const cleaned = dataTitleMatch[1].trim();
+  const openingTag = openingTagFromBlock(block);
+  const dataTitle = getDoubleQuotedAttribute(openingTag, "data-event-title");
+  if (dataTitle) {
+    const cleaned = dataTitle.trim();
     return cleaned.length > 0 ? cleaned : null;
   }
 
-  const headingMatch = block.match(/<(h2|h3)[^>]*>([\s\S]*?)<\/\1>/i);
-  if (headingMatch) {
-    const cleaned = headingMatch[2]
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    return cleaned.length > 0 ? cleaned : null;
-  }
-
-  const anchorTextMatch = block.match(/<a[^>]*>([\s\S]*?)<\/a>/i);
-  if (anchorTextMatch) {
-    const cleaned = anchorTextMatch[1]
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    return cleaned.length > 0 ? cleaned : null;
+  for (const tagName of ["h2", "h3", "a"]) {
+    const nested = collectHtmlBlocks(block, tagName, undefined, 1)[0];
+    if (!nested) continue;
+    const cleaned = normalizeVisibleText(nested.content);
+    if (cleaned.length > 0) return cleaned;
   }
 
   return null;
@@ -292,17 +286,123 @@ function extractDate(block: string, timeZone: string): string | null {
 }
 
 function extractHref(block: string, sourceUrl: string): string | null {
-  const dataUrlMatch = block.match(/data-event-url="([^"]+)"/i);
-  if (dataUrlMatch) {
-    return safeResolveUrl(dataUrlMatch[1], sourceUrl);
-  }
+  const openingTag = openingTagFromBlock(block);
+  const dataUrl = getDoubleQuotedAttribute(openingTag, "data-event-url");
+  if (dataUrl) return safeResolveUrl(dataUrl, sourceUrl);
+  const anchor = collectHtmlBlocks(block, "a", undefined, 1)[0];
+  const href = getDoubleQuotedAttribute(anchor?.openingTag ?? openingTag, "href");
+  return href ? safeResolveUrl(href, sourceUrl) : null;
+}
 
-  const hrefMatch = block.match(/href="([^"]+)"/i);
-  if (!hrefMatch) {
-    return null;
+/** Collects closed elements with one forward-only pass and explicit work budgets. */
+function collectHtmlBlocks(
+  html: string,
+  tagName: string,
+  acceptsOpeningTag: ((openingTag: string) => boolean) | undefined = undefined,
+  limit = MAX_HTML_BLOCKS_TO_INSPECT
+): HtmlBlock[] {
+  const blocks: HtmlBlock[] = [];
+  let cursor = 0;
+  while (blocks.length < limit) {
+    const opening = findNextOpeningTag(html, tagName, cursor);
+    if (!opening) break;
+    cursor = opening.end + 1;
+    const openingTag = html.slice(opening.start, cursor);
+    if (acceptsOpeningTag && !acceptsOpeningTag(openingTag)) continue;
+    const closing = findNextClosingTag(html, tagName, cursor);
+    if (!closing) break;
+    const blockEnd = closing.end + 1;
+    if (blockEnd - opening.start <= MAX_HTML_BLOCK_LENGTH) {
+      blocks.push({ content: html.slice(cursor, closing.start), full: html.slice(opening.start, blockEnd), openingTag });
+    }
+    cursor = blockEnd;
   }
+  return blocks;
+}
 
-  return safeResolveUrl(hrefMatch[1], sourceUrl);
+/** Finds one real opening tag without retrying a closing-tag search from every candidate. */
+function findNextOpeningTag(html: string, tagName: string, from: number): { start: number; end: number } | null {
+  const normalizedTagName = tagName.toLowerCase();
+  let start = html.indexOf("<", from);
+  while (start >= 0) {
+    const nameStart = start + 1;
+    const nameEnd = nameStart + tagName.length;
+    const boundary = html[nameEnd];
+    const matchesName = html.slice(nameStart, nameEnd).toLowerCase() === normalizedTagName;
+    if (matchesName && (boundary === ">" || boundary === "/" || /\s/.test(boundary ?? ""))) {
+      const end = findTagEnd(html, nameEnd);
+      if (end === null) return null;
+      return { start, end };
+    }
+    start = html.indexOf("<", start + 1);
+  }
+  return null;
+}
+
+function findNextClosingTag(html: string, tagName: string, from: number): { start: number; end: number } | null {
+  const normalizedTagName = tagName.toLowerCase();
+  let start = html.indexOf("<", from);
+  while (start >= 0) {
+    const nameStart = start + 2;
+    const nameEnd = nameStart + tagName.length;
+    const matchesName = html[start + 1] === "/"
+      && html.slice(nameStart, nameEnd).toLowerCase() === normalizedTagName;
+    if (matchesName) {
+      const end = findTagEnd(html, nameEnd);
+      if (end === null) return null;
+      if (html.slice(nameEnd, end).trim() === "") return { start, end };
+    }
+    start = html.indexOf("<", start + 1);
+  }
+  return null;
+}
+
+/** Finds a tag boundary without treating greater-than characters inside attributes as markup. */
+function findTagEnd(value: string, from: number): number | null {
+  const limit = Math.min(value.length, from + MAX_HTML_OPENING_TAG_LENGTH);
+  let quote: '"' | "'" | null = null;
+  for (let cursor = from; cursor < limit; cursor += 1) {
+    const character = value[cursor];
+    if (quote && character === quote) quote = null;
+    else if (!quote && (character === '"' || character === "'")) quote = character;
+    else if (!quote && character === ">") return cursor;
+  }
+  return null;
+}
+
+/** Reads a double-quoted attribute from one bounded opening tag. */
+function getDoubleQuotedAttribute(openingTag: string, attributeName: string): string | null {
+  const needle = `${attributeName.toLowerCase()}="`;
+  for (let start = 0; start <= openingTag.length - needle.length; start += 1) {
+    const preceding = openingTag[start - 1];
+    const matchesName = openingTag.slice(start, start + needle.length).toLowerCase() === needle;
+    if (matchesName && (start === 0 || preceding === "<" || /\s/.test(preceding))) {
+      const valueStart = start + needle.length;
+      const valueEnd = openingTag.indexOf('"', valueStart);
+      return valueEnd < 0 ? null : openingTag.slice(valueStart, valueEnd);
+    }
+  }
+  return null;
+}
+
+function openingTagFromBlock(block: string): string {
+  const end = findTagEnd(block, 1);
+  return end === null ? "" : block.slice(0, end + 1);
+}
+
+/** Removes markup in linear time before normalizing visible whitespace. */
+function normalizeVisibleText(value: string): string {
+  let text = "";
+  let cursor = 0;
+  while (cursor < value.length) {
+    const open = value.indexOf("<", cursor);
+    if (open < 0) { text += value.slice(cursor); break; }
+    text += `${value.slice(cursor, open)} `;
+    const close = findTagEnd(value, open + 1);
+    if (close === null) { text += value.slice(open); break; }
+    cursor = close + 1;
+  }
+  return text.replace(/\s+/g, " ").trim();
 }
 
 function safeResolveUrl(href: string, sourceUrl: string): string | null {
