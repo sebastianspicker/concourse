@@ -2,7 +2,7 @@
 
 Concourse is a TypeScript workspace for presenting public university information. A Node.js API reads a selected institution pack, normalizes public campus web pages and ICS feeds, and returns validated JSON to an Expo client for native and web. The client retains public data locally and makes its current, cached, degraded, offline, empty, unavailable, and error states visible.
 
-[Open the static demo](https://sebastianspicker.github.io/concourse/). It uses the fictional example pack only. It does not call the API, campus services, or external sources; controls marked “Simulated” do not perform the corresponding real-world action.
+[Open the static demo](https://sebastianspicker.github.io/concourse-campus-kit/). It uses the fictional example pack only. It does not call the API, campus services, or external sources; controls marked “Simulated” do not perform the corresponding real-world action.
 
 ## Scope
 

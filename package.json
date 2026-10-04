@@ -6,11 +6,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sebastianspicker/concourse.git"
+    "url": "https://github.com/sebastianspicker/concourse-campus-kit.git"
   },
-  "homepage": "https://github.com/sebastianspicker/concourse#readme",
+  "homepage": "https://github.com/sebastianspicker/concourse-campus-kit#readme",
   "bugs": {
-    "url": "https://github.com/sebastianspicker/concourse/issues"
+    "url": "https://github.com/sebastianspicker/concourse-campus-kit/issues"
   },
   "keywords": [
     "accessibility",

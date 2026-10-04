@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { extname, join, normalize, resolve, sep } from "node:path";
 
 const outputRoot = resolve(process.argv[2] ?? join(process.cwd(), "dist-pages"));
-const basePath = "/concourse";
+const basePath = "/concourse-campus-kit";
 const port = Number.parseInt(process.env.PORT ?? "8082", 10);
 if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) throw new Error("PORT must be between 1 and 65535");
 

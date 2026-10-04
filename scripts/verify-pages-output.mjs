@@ -3,7 +3,7 @@ import { lstat, readFile, readdir } from "node:fs/promises";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
 
 const outputRoot = resolve(process.argv[2] ?? join(process.cwd(), "dist-pages"));
-const basePath = "/concourse/";
+const basePath = "/concourse-campus-kit/";
 
 const expectedHtml = new Set([
   "(tabs)/events.html",

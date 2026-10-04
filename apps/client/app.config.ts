@@ -113,7 +113,7 @@ function withCampusDefaults(config: ConfigContext["config"]): ExpoConfig {
     },
     experiments: {
       ...config.experiments,
-      ...(staticDemo ? { baseUrl: "/concourse" } : {}),
+      ...(staticDemo ? { baseUrl: "/concourse-campus-kit" } : {}),
     },
     ios: {
       ...config.ios,

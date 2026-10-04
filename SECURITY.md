@@ -6,7 +6,7 @@ Before the first alpha tag, security fixes target the default branch. After publ
 
 ## Reporting a vulnerability
 
-Use the repository's private [Security Advisory form](https://github.com/sebastianspicker/concourse/security/advisories/new). Do not open a public issue or attach exploit details, credentials, private URLs, or personal data to public discussions.
+Use the repository's private [Security Advisory form](https://github.com/sebastianspicker/concourse-campus-kit/security/advisories/new). Do not open a public issue or attach exploit details, credentials, private URLs, or personal data to public discussions.
 
 ## Scope and data boundary
 
