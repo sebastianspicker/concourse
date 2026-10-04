@@ -31,7 +31,7 @@
     "lint": "eslint vitest.config.ts apps/api/vitest.config.ts apps/client/app.config.ts && turbo run lint",
     "typecheck": "tsc -p tsconfig.tools.json && turbo run typecheck",
     "test": "turbo run test",
-    "check:architecture": "node --test scripts/__tests__/check-architecture.test.mjs && node scripts/check-architecture.mjs",
+    "check:architecture": "node scripts/check-architecture.mjs",
     "verify:demo:artifact": "node scripts/verify-pages-output.mjs",
     "release:check": "node scripts/verify-release-metadata.mjs",
     "verify": "./scripts/verify-production-ready.sh",

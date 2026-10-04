@@ -10,10 +10,8 @@
   },
   "include": ["config/**/*.js", "config/**/*.d.ts", "app/**/*.ts", "app/**/*.tsx", "src/**/*.ts", "src/**/*.tsx"],
   "exclude": [
-    "app/**/__tests__/**",
     "app/**/*.test.ts",
     "app/**/*.test.tsx",
-    "src/**/__tests__/**",
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "src/test/**"

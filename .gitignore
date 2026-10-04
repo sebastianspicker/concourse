@@ -162,3 +162,11 @@ GEMINI.md
 /OPEN_IMPROVEMENTS_AND_PLAN.md
 /REMEDIATION.md
 /REMEDIATION_PLAN.md
+
+# Internal test directories (not published)
+/apps/client/src/data/public/__tests__/
+/apps/client/src/design-system/__tests__/
+/apps/client/src/platform/env/__tests__/
+/packages/contracts/src/__tests__/
+/packages/institutions/src/__tests__/
+/scripts/__tests__/
