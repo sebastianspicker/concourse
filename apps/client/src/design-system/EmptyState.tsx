@@ -1,25 +1,28 @@
 import { StyleSheet, Text, View } from "react-native";
+import { useLocale } from "@/localization/LocaleContext";
+import { StatusTag } from "./StatusLamp";
 import { spacing, typography } from "./theme";
-import { getDesignPreset } from "./designPresets";
-import { useTheme } from "./ThemeContext";
+import { useTheme, useDesignMetrics } from "./ThemeProvider";
 
-export type EmptyStateProps = { message: string; icon?: string; hint?: string };
+export type EmptyStateProps = { message: string; hint?: string; label?: string };
 
-export function EmptyState({ message, hint }: EmptyStateProps): JSX.Element {
+/** An empty board: says plainly that there is nothing to show, and why it might be so. */
+export function EmptyState({ message, hint, label }: EmptyStateProps): JSX.Element {
   const theme = useTheme();
-  const metrics = getDesignPreset(theme.designPreset).metrics;
+  const metrics = useDesignMetrics();
+  const { t } = useLocale();
   return (
     <View
       style={[
         styles.container,
         {
-          borderColor: theme.colors.border,
-          borderTopWidth: theme.ui.borderWidth,
+          borderBottomColor: theme.colors.border,
           borderBottomWidth: theme.ui.borderWidth,
           paddingVertical: metrics.contentGap,
         },
       ]}
     >
+      <StatusTag label={label ?? t("noEntries")} tone="muted" shape="hollow" />
       <Text selectable style={[styles.message, { color: theme.colors.text }]}>{message}</Text>
       {hint ? <Text style={[styles.hint, { color: theme.colors.muted }]}>{hint}</Text> : null}
     </View>
@@ -27,7 +30,7 @@ export function EmptyState({ message, hint }: EmptyStateProps): JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  container: { gap: spacing.sm, paddingHorizontal: spacing.lg },
-  message: { ...typography.body, fontWeight: "600" },
+  container: { gap: spacing.sm, paddingHorizontal: spacing.xs },
+  message: { ...typography.cardTitle, marginTop: spacing.xs },
   hint: { ...typography.caption, maxWidth: 520 },
 });

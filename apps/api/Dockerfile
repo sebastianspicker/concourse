@@ -1,29 +1,44 @@
-# Development BFF image that compiles the required workspace packages in one container.
-FROM node:22.13.0-alpine
+# Development-tagged BFF image built from a complete production dependency deploy.
+FROM node:22.13.0-alpine AS builder
 
 WORKDIR /repo
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json turbo.json ./
-COPY LICENSE ./LICENSE
-COPY apps/api/package.json apps/api/tsconfig*.json ./apps/api/
-COPY apps/api/src ./apps/api/src
-COPY packages/contracts/package.json packages/contracts/tsconfig*.json ./packages/contracts/
-COPY packages/contracts/src ./packages/contracts/src
-COPY packages/institutions/package.json packages/institutions/tsconfig*.json ./packages/institutions/
-COPY packages/institutions/src ./packages/institutions/src
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY apps/api/package.json ./apps/api/package.json
+COPY packages/contracts/package.json ./packages/contracts/package.json
+COPY packages/institutions/package.json ./packages/institutions/package.json
 
 RUN pnpm install --frozen-lockfile
 
+COPY tsconfig.base.json ./tsconfig.base.json
+COPY scripts/clean-package-dist.mjs ./scripts/clean-package-dist.mjs
+COPY apps/api/tsconfig*.json ./apps/api/
+COPY apps/api/src ./apps/api/src
+COPY packages/contracts/tsconfig*.json ./packages/contracts/
+COPY packages/contracts/src ./packages/contracts/src
+COPY packages/institutions/tsconfig*.json ./packages/institutions/
+COPY packages/institutions/src ./packages/institutions/src
+
 RUN pnpm --filter @concourse/contracts build && \
     pnpm --filter @concourse/institutions build && \
-    pnpm --filter @concourse/api build
+    pnpm --filter @concourse/api build && \
+    pnpm --filter @concourse/api deploy --prod /app
 
-WORKDIR /repo/apps/api
-ENV BFF_PORT=4000
-EXPOSE 4000
+FROM node:22.13.0-alpine AS runner
+
+ARG APP_VERSION=development
+
+WORKDIR /app
+ENV NODE_ENV=production \
+    BFF_PORT=4000 \
+    APP_VERSION=${APP_VERSION}
+
+COPY --from=builder --chown=node:node /app ./
+COPY --chown=node:node LICENSE ./LICENSE
 
 USER node
+EXPOSE 4000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "const http=require('node:http');const headers=process.env.BFF_AUTH_TOKEN?{authorization:'Bearer '+process.env.BFF_AUTH_TOKEN}:undefined;const req=http.get({host:'127.0.0.1',port:process.env.BFF_PORT||'4000',path:'/health',headers},res=>process.exit(res.statusCode>=200&&res.statusCode<300?0:1));req.on('error',()=>process.exit(1));req.setTimeout(4000,()=>{req.destroy();process.exit(1);});"

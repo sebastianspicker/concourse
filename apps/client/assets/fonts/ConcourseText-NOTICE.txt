@@ -1,0 +1,10 @@
+Concourse Text is a Latin subset of Source Sans 3 (Light, Regular, SemiBold
+static instances of the variable font), made with fontTools for this app.
+
+Source Sans 3 is licensed under the SIL Open Font License 1.1 with the Reserved
+Font Name "Source" (see OFL-ConcourseText.txt). Because subsetting modifies the
+font, this version is renamed "Concourse Text" and does not use the Reserved
+Font Name. The original copyright notice is kept in the font files.
+
+Outfit (Black and ExtraBold, Latin subset) is licensed under the SIL Open Font
+License 1.1 without a Reserved Font Name (see OFL-Outfit.txt).

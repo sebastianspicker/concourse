@@ -5,15 +5,21 @@ export const InstitutionDesignPresetSchema = z.enum(["wayfinding", "atelier", "p
 
 export type InstitutionDesignPreset = z.infer<typeof InstitutionDesignPresetSchema>;
 
-/** Neutral canvases against which institution accents must remain identifiable. */
+/**
+ * Neutral canvases of each preset. The institution color is used as a flat fill (blocks,
+ * primary actions) with black or white text on top; wherever it has to read as text, the
+ * client derives a darker (light mode) or lighter (dark mode) tint of the same hue.
+ */
 export const INSTITUTION_DESIGN_CANVASES = {
-  wayfinding: { light: "#EEF3F2", dark: "#111614" },
-  atelier: { light: "#F5F3F6", dark: "#141216" },
-  precision: { light: "#F2F5F6", dark: "#0D1215" },
+  wayfinding: { light: "#FEFEFE", dark: "#0D0D0D" },
+  atelier: { light: "#FEFEFD", dark: "#0E0C0F" },
+  precision: { light: "#FDFEFE", dark: "#0B0D0F" },
 } as const satisfies Record<InstitutionDesignPreset, { light: string; dark: string }>;
 
-const STANDARD_CANVASES = Object.values(INSTITUTION_DESIGN_CANVASES)
-  .flatMap(({ light, dark }) => [light, dark]);
+const LIGHT_CANVASES = Object.values(INSTITUTION_DESIGN_CANVASES).map(({ light }) => light);
+
+/** A fill must differ visibly from the canvas around it (a pale yellow on white is about 1.3:1). */
+const MIN_BLOCK_CONTRAST = 1.2;
 
 /** Converts an sRGB hex color into WCAG relative luminance. */
 function relativeLuminance(hex: string): number {
@@ -33,10 +39,14 @@ export function getContrastRatio(first: string, second: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-/** Accepts only hex accents that remain visible and support readable foreground content. */
+/**
+ * Accepts hex colors that carry readable black or white text as a fill (4.5:1) and stand out
+ * from every light canvas as a visible block. Vivid flats and deep institutional colors
+ * (navy, crimson) both qualify.
+ */
 export function isAccessibleInstitutionAccent(accent: string): boolean {
   if (!/^#[0-9a-f]{6}$/i.test(accent)) return false;
-  const hasCanvasContrast = STANDARD_CANVASES.every((canvas) => getContrastRatio(accent, canvas) >= 3);
+  const hasCanvasContrast = LIGHT_CANVASES.every((canvas) => getContrastRatio(accent, canvas) >= MIN_BLOCK_CONTRAST);
   const hasForegroundContrast = Math.max(getContrastRatio(accent, "#000000"), getContrastRatio(accent, "#FFFFFF")) >= 4.5;
   return hasCanvasContrast && hasForegroundContrast;
 }

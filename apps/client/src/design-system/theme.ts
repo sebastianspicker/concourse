@@ -1,19 +1,43 @@
-import { getContrastRatio } from "@concourse/institutions";
+import { getContrastRatio, type InstitutionDesignPreset } from "@concourse/institutions";
+import { fonts } from "./fonts";
+
+export { fonts };
 
 export type ColorScheme = "light" | "dark" | "highContrast";
 
+export type ThemePreference = "light" | "dark" | "highContrast" | "system";
+
+/**
+ * Color roles for the "Stage" system: black on white with a light grey band, one theme per
+ * render, the institution color as a flat fill (`brand`, with `brandText` on top), a readable
+ * tint of it for text (`accent`), and a flat orange block for whatever is happening now (`signal`).
+ */
 export type ThemeColors = {
+  /** The institution color as given: flat blocks and cards, with `brandText` on top. */
+  brand: string;
+  brandText: string;
+  /** Page canvas. */
   background: string;
+  /** Raised but flat areas: inputs and fact tables. */
   surface: string;
   text: string;
   muted: string;
+  /** Institution accent: links, focus, selection. Never decoration. */
   accent: string;
   accentText: string;
+  /** The flat orange "now" block; `signalText` sits on top of it. */
   signal: string;
   signalText: string;
   inverseSurface: string;
   inverseText: string;
+  /** The Now/Next board and its type (in-theme, never an inverted panel). */
+  board: string;
+  boardText: string;
+  boardMuted: string;
+  boardRule: string;
+  /** Hairline rules between rows. */
   border: string;
+  /** Strong rules and control outlines (at least 3:1 against surface). */
   controlBorder: string;
   error: string;
   errorSurface: string;
@@ -36,59 +60,81 @@ export type ThemeUi = {
   borderRadiusScale: number;
 };
 
+export type Theme = {
+  colors: ThemeColors;
+  ui: ThemeUi;
+  isDark: boolean;
+  colorScheme: ColorScheme;
+  designPreset: InstitutionDesignPreset;
+};
+
 export const lightColors: ThemeColors = {
-  background: "#EEF1F6",
-  surface: "#FFFFFF",
-  text: "#0B1424",
-  muted: "#4A5A72",
-  accent: "#3B5FCF",
+  brand: "#2A62F0",
+  brandText: "#FFFFFF",
+  background: "#FEFEFE",
+  surface: "#F4F4F4",
+  text: "#0D0D0D",
+  muted: "#6B6B6B",
+  accent: "#2A62F0",
   accentText: "#FFFFFF",
-  signal: "#E8A800",
-  signalText: "#3A2A00",
-  inverseSurface: "#0B1424",
-  inverseText: "#FFFFFF",
-  border: "#C5CDD8",
-  controlBorder: "#536177",
-  error: "#B42318",
-  errorSurface: "#FFF1F0",
-  success: "#176B45",
-  successSurface: "#EDF8F1",
-  warning: "#765100",
-  warningSurface: "#FFF5D7",
-  info: "#3B5FCF",
-  infoSurface: "#EEF1FF",
-  overlay: "rgba(11, 20, 36, 0.68)",
-  disabled: "#65738A",
-  placeholder: "#536177",
+  signal: "#FF6A1A",
+  signalText: "#0D0D0D",
+  inverseSurface: "#0D0D0D",
+  inverseText: "#FEFEFE",
+  board: "#F4F4F4",
+  boardText: "#0D0D0D",
+  boardMuted: "#6B6B6B",
+  boardRule: "#DEDEDE",
+  border: "#DEDEDE",
+  controlBorder: "#8A8A8A",
+  error: "#A8251C",
+  errorSurface: "#F7E2DF",
+  success: "#1B6943",
+  successSurface: "#DCEDE3",
+  warning: "#744A00",
+  warningSurface: "#F5E9CF",
+  info: "#2E54B5",
+  infoSurface: "#E1E7F5",
+  overlay: "rgba(13, 13, 13, 0.68)",
+  disabled: "#8A8A8A",
+  placeholder: "#6B6B6B",
 };
 
 export const darkColors: ThemeColors = {
-  background: "#08111F",
-  surface: "#0E1A2C",
-  text: "#EEF1F6",
-  muted: "#C0CAD9",
-  accent: "#8EA7FF",
-  accentText: "#0B1424",
-  signal: "#FFDC75",
-  signalText: "#0B1424",
-  inverseSurface: "#EEF1F6",
-  inverseText: "#0B1424",
-  border: "#536177",
-  controlBorder: "#C0CAD9",
-  error: "#FFB4AB",
-  errorSurface: "#4A1717",
-  success: "#9DE8B9",
-  successSurface: "#123C2C",
-  warning: "#FFDC75",
-  warningSurface: "#493800",
-  info: "#B9C6FF",
-  infoSurface: "#17275A",
+  brand: "#2A62F0",
+  brandText: "#FFFFFF",
+  background: "#0D0D0D",
+  surface: "#1A1A1A",
+  text: "#F4F4F4",
+  muted: "#A3A3A3",
+  accent: "#5581F3",
+  accentText: "#0D0D0D",
+  signal: "#FF6A1A",
+  signalText: "#0D0D0D",
+  inverseSurface: "#F4F4F4",
+  inverseText: "#0D0D0D",
+  board: "#1A1A1A",
+  boardText: "#F4F4F4",
+  boardMuted: "#A3A3A3",
+  boardRule: "#2E2E2E",
+  border: "#2E2E2E",
+  controlBorder: "#6E6E6E",
+  error: "#FF9D94",
+  errorSurface: "#3A1714",
+  success: "#7ED0A4",
+  successSurface: "#11301F",
+  warning: "#F2C46B",
+  warningSurface: "#33280F",
+  info: "#9DB4FF",
+  infoSurface: "#1A2547",
   overlay: "rgba(0, 0, 0, 0.72)",
-  disabled: "#AAB6C8",
-  placeholder: "#C0CAD9",
+  disabled: "#6E6E6E",
+  placeholder: "#A3A3A3",
 };
 
 export const highContrastColors: ThemeColors = {
+  brand: "#000000",
+  brandText: "#FFFFFF",
   background: "#000000",
   surface: "#000000",
   text: "#FFFFFF",
@@ -99,6 +145,10 @@ export const highContrastColors: ThemeColors = {
   signalText: "#000000",
   inverseSurface: "#FFFFFF",
   inverseText: "#000000",
+  board: "#000000",
+  boardText: "#FFFFFF",
+  boardMuted: "#FFFFFF",
+  boardRule: "#FFFFFF",
   border: "#FFFFFF",
   controlBorder: "#FFFFFF",
   error: "#FFB3B3",
@@ -142,36 +192,60 @@ export const uiSchemes: Record<ColorScheme, ThemeUi> = {
   highContrast: highContrastUi,
 };
 
-export const spacing = { xs: 4, sm: 8, md: 12, lg: 20, xl: 28, xxl: 40 } as const;
+export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48, huge: 64 } as const;
+
+/**
+ * Type scale with two voices. Outfit, heavy and uppercase, states the one thing that matters
+ * (the current entry, the campus clock, record titles, calls to action); Concourse Text, light
+ * for titles and regular for reading, carries everything else. Weight comes from the family,
+ * never from `fontWeight`.
+ */
+type FigureVariant = "lining-nums" | "tabular-nums";
+const FIGURES: FigureVariant[] = ["lining-nums", "tabular-nums"];
+const UPPER = "uppercase" as const;
 
 export const typography = {
-  display: { fontSize: 36, fontWeight: "700" as const, lineHeight: 40, letterSpacing: -1.1 },
-  heading: { fontSize: 28, fontWeight: "700" as const, lineHeight: 34, letterSpacing: -0.7 },
-  subheading: { fontSize: 20, fontWeight: "700" as const, lineHeight: 26, letterSpacing: -0.35 },
-  body: { fontSize: 16, lineHeight: 23, letterSpacing: -0.1 },
-  caption: { fontSize: 13, lineHeight: 18, letterSpacing: 0.05 },
-  small: { fontSize: 12, lineHeight: 16 },
-  relative: {
-    display: { fontSize: 36, fontWeight: "700" as const, lineHeight: 40, letterSpacing: -1.1, allowFontScaling: true },
-    heading: { fontSize: 28, fontWeight: "700" as const, lineHeight: 34, letterSpacing: -0.7, allowFontScaling: true },
-    subheading: { fontSize: 20, fontWeight: "700" as const, lineHeight: 26, letterSpacing: -0.35, allowFontScaling: true },
-    body: { fontSize: 16, lineHeight: 23, letterSpacing: -0.1, allowFontScaling: true },
-    caption: { fontSize: 13, lineHeight: 18, letterSpacing: 0.05, allowFontScaling: true },
-  },
+  wordmark: { fontFamily: fonts.display, fontSize: 19, lineHeight: 22, letterSpacing: 0.2, textTransform: UPPER },
+  /** The current entry on Today. */
+  hero: { fontFamily: fonts.display, fontSize: 64, lineHeight: 64, letterSpacing: -0.5, textTransform: UPPER },
+  clock: { fontFamily: fonts.display, fontSize: 56, lineHeight: 58, letterSpacing: -1, fontVariant: FIGURES },
+  /** Record titles on detail views. */
+  display: { fontFamily: fonts.display, fontSize: 52, lineHeight: 54, letterSpacing: -0.4, textTransform: UPPER },
+  title: { fontFamily: fonts.light, fontSize: 56, lineHeight: 62, letterSpacing: -0.6 },
+  heading: { fontFamily: fonts.light, fontSize: 40, lineHeight: 46, letterSpacing: -0.4 },
+  subheading: { fontFamily: fonts.sansSemibold, fontSize: 17, lineHeight: 24 },
+  cardTitle: { fontFamily: fonts.light, fontSize: 26, lineHeight: 32, letterSpacing: -0.2 },
+  rowTitle: { fontFamily: fonts.sans, fontSize: 20, lineHeight: 26 },
+  body: { fontFamily: fonts.sans, fontSize: 17, lineHeight: 26 },
+  bodyStrong: { fontFamily: fonts.sansSemibold, fontSize: 17, lineHeight: 26 },
+  caption: { fontFamily: fonts.sans, fontSize: 15, lineHeight: 21 },
+  captionStrong: { fontFamily: fonts.sansSemibold, fontSize: 15, lineHeight: 21 },
+  small: { fontFamily: fonts.sans, fontSize: 13, lineHeight: 18 },
+  data: { fontFamily: fonts.sans, fontSize: 17, lineHeight: 24, fontVariant: FIGURES },
+  dataStrong: { fontFamily: fonts.sansSemibold, fontSize: 17, lineHeight: 24, fontVariant: FIGURES },
+  dataSmall: { fontFamily: fonts.sans, fontSize: 15, lineHeight: 21, fontVariant: FIGURES },
+  label: { fontFamily: fonts.sansSemibold, fontSize: 15, lineHeight: 20, fontVariant: FIGURES },
+  /** Heavy uppercase for calls to action and row states ("All events", "Now"). */
+  action: { fontFamily: fonts.displayBold, fontSize: 15, lineHeight: 20, letterSpacing: 0.4, textTransform: UPPER },
+  /** Secondary line in light weight: dates, counts, and asides. */
+  dateline: { fontFamily: fonts.light, fontSize: 19, lineHeight: 26, fontVariant: FIGURES },
 } as const;
 
+/** Square everywhere; `full` is reserved for the round arrow buttons and radio controls. */
 export const borderRadius = { sm: 0, md: 0, lg: 0, xl: 0, full: 9999 } as const;
 
-export const durations = { instant: 0, fast: 140, normal: 420, slow: 650 } as const;
-export const zIndex = { base: 0, dropdown: 10, sticky: 20, fixed: 30, modal: 40, popover: 50, tooltip: 60 } as const;
+/** Motion is feedback only. Durations stay short; reduced motion removes transitions. */
+export const motion = {
+  fast: 120,
+  base: 180,
+  easing: "cubic-bezier(0.2, 0, 0, 1)",
+} as const;
 
-export function getThemeColors(colorScheme: ColorScheme): ThemeColors {
-  return colorSchemes[colorScheme];
-}
+/** One content measure for the header and every screen, so left edges align at all widths. */
+export const CONTENT_MAX_WIDTH = 1328;
 
-export function getThemeUi(colorScheme: ColorScheme): ThemeUi {
-  return uiSchemes[colorScheme];
-}
+/** Fixed width of the time/date column shared by every board-style row. */
+export const BOARD_TIME_COLUMN = 72;
 
 export function getContrastTextColor(backgroundColor: string): string {
   return getContrastRatio(backgroundColor, "#000000") >= getContrastRatio(backgroundColor, "#FFFFFF")
@@ -192,7 +266,7 @@ export function scaled(value: number, ui: ThemeUi): number {
 }
 
 export function scaledRadius(value: number, ui: ThemeUi): number {
-  return Math.min(12, Math.round(value * ui.borderRadiusScale));
+  return Math.min(16, Math.round(value * ui.borderRadiusScale));
 }
 
 export function scaledFont(value: number, ui: ThemeUi): number {

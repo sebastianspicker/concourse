@@ -9,9 +9,13 @@ const getClientSnapshot = (): boolean => true;
 /** Keeps server rendering width-neutral until the browser snapshot takes over. */
 const getServerSnapshot = (): boolean => false;
 
+/** True after hydration; React re-renders once on the client so device-specific values can apply. */
+export function useHydrated(): boolean {
+  return useSyncExternalStore(subscribe, getClientSnapshot, getServerSnapshot);
+}
+
 /** Returns zero until hydration so server rendering cannot commit to a device-specific layout. */
 export function useHydratedWindowWidth(): number {
   const { width } = useWindowDimensions();
-  const hydrated = useSyncExternalStore(subscribe, getClientSnapshot, getServerSnapshot);
-  return hydrated ? width : 0;
+  return useHydrated() ? width : 0;
 }

@@ -2,16 +2,14 @@
 
 import type { InstitutionPack } from "@concourse/institutions";
 import { isPublicHttpUrl, type ScheduleItem } from "@concourse/contracts";
-import { getCached } from "../../runtime/cache";
-import { fetchTextWithTimeout } from "../../runtime/httpClient";
 import { log } from "../../runtime/logger";
-
+import { getCached } from "../upstream/cache";
+import { getPublicSourceBreaker } from "../upstream/circuitBreaker";
+import { fetchTextWithTimeout } from "../upstream/httpClient";
 import { parseIcs, type ParsedIcsEvent } from "./icsParser";
-import { getPublicSourceBreaker } from "../../runtime/sourceBreakerRegistry";
-
-import { BFF_ENV } from "../../runtime/config";
 
 export type FetchPublicScheduleResult = { schedule: ScheduleItem[]; degraded: boolean };
+export type PublicScheduleOptions = { cacheTtlMs: number; rruleHorizonDays: number };
 type ScheduleSource = { url: string; label: string };
 type SettledScheduleSource = PromiseSettledResult<ParsedIcsEvent[]>;
 
@@ -28,11 +26,11 @@ function toScheduleItem(p: ParsedIcsEvent): ScheduleItem {
 }
 
 /** Fetches and parses one source through its source-scoped circuit breaker. */
-async function loadScheduleSource(source: ScheduleSource, signal: AbortSignal): Promise<ParsedIcsEvent[]> {
+async function loadScheduleSource(source: ScheduleSource, signal: AbortSignal, rruleHorizonDays: number): Promise<ParsedIcsEvent[]> {
   const text = await getPublicSourceBreaker("public-schedule", source.url).call(
     () => fetchTextWithTimeout(source.url, { signal })
   );
-  return parseIcs(text, { rruleHorizonDays: BFF_ENV.rruleExpansionHorizonDays });
+  return parseIcs(text, { rruleHorizonDays });
 }
 
 /** Logs a failed source and returns no events so successful sources remain usable. */
@@ -63,10 +61,11 @@ function combineScheduleSources(
 async function loadScheduleSources(
   sources: ScheduleSource[],
   signal: AbortSignal,
-  hasRejectedSource: boolean
+  hasRejectedSource: boolean,
+  rruleHorizonDays: number
 ): Promise<FetchPublicScheduleResult> {
   const settledSources = await Promise.allSettled(
-    sources.map((source) => loadScheduleSource(source, signal))
+    sources.map((source) => loadScheduleSource(source, signal, rruleHorizonDays))
   );
 
   if (hasRejectedSource && sources.length === 0) {
@@ -81,14 +80,15 @@ async function loadScheduleSources(
 
 /** Fetches configured ICS sources independently and returns partial data when one fails. */
 export async function fetchPublicSchedule(
-  institution: InstitutionPack
+  institution: InstitutionPack,
+  options: PublicScheduleOptions
 ): Promise<FetchPublicScheduleResult> {
   const configuredSources = institution.publicSources?.schedules ?? [];
   const sources = configuredSources.filter((source): source is ScheduleSource => isPublicHttpUrl(source.url));
   const hasRejectedSource = sources.length !== configuredSources.length;
   const cacheKey = `public-schedule:${institution.id}`;
-  const ttlMs = BFF_ENV.defaultCacheTtl * 1000;
-  const loader = (signal: AbortSignal) => loadScheduleSources(sources, signal, hasRejectedSource);
+  const ttlMs = options.cacheTtlMs;
+  const loader = (signal: AbortSignal) => loadScheduleSources(sources, signal, hasRejectedSource, options.rruleHorizonDays);
 
   return getCached(
     cacheKey,

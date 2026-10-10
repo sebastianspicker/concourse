@@ -8,10 +8,10 @@ const { fetchTextWithTimeout, log } = vi.hoisted(() => ({
   log: vi.fn()
 }));
 
-vi.mock("../../runtime/httpClient", () => ({ fetchTextWithTimeout }));
+vi.mock("../upstream/httpClient", () => ({ fetchTextWithTimeout }));
 vi.mock("../../runtime/logger", () => ({ log }));
 
-import { clearCache } from "../../runtime/cache";
+import { clearCache } from "../upstream/cache";
 import { fetchPublicSchedule } from "./publicSchedule";
 
 afterEach(() => {
@@ -29,6 +29,7 @@ function institution(id: string, schedules: Array<{ label: string; url: string }
   };
 }
 
+const OPTIONS = { cacheTtlMs: 300_000, rruleHorizonDays: 90 };
 const VALID_CALENDAR = "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:public\nSUMMARY:Open lecture\nDTSTART:20260101T100000Z\nEND:VEVENT\nEND:VCALENDAR";
 
 describe("fetchPublicSchedule", () => {
@@ -36,7 +37,7 @@ describe("fetchPublicSchedule", () => {
     await expect(fetchPublicSchedule(institution("unsafe-schedule", [{
       label: "Campus calendar",
       url: "https://reader:secret@example.org/calendar.ics"
-    }]))).rejects.toThrow("All public schedule sources failed");
+    }]), OPTIONS)).rejects.toThrow("All public schedule sources failed");
 
     expect(fetchTextWithTimeout).not.toHaveBeenCalled();
     expect(log).not.toHaveBeenCalled();
@@ -50,7 +51,7 @@ describe("fetchPublicSchedule", () => {
     const result = await fetchPublicSchedule(institution("safe-schedule-log", [
       { label: "Published calendar", url: "https://www.example.org/calendar.ics" },
       { label: "Events archive", url: "https://events.example.org/archive.ics" }
-    ]));
+    ]), OPTIONS);
 
     expect(result.degraded).toBe(true);
     expect(result.schedule).toHaveLength(1);

@@ -106,7 +106,7 @@ jobs:
       contents: read
       packages: write
     env:
-      IMAGE: ghcr.io/${{ github.repository }}/bff
+      IMAGE: ghcr.io/sebastianspicker/concourse/bff
       VERSION: ${{ needs.validate.outputs.version }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -151,36 +151,7 @@ jobs:
           tags: ${{ steps.image.outputs.tags }}
 
       - name: Smoke image on a non-default port
-        run: |
-          set -euo pipefail
-          container_id=""
-          cleanup() {
-            if [[ -n "$container_id" ]]; then
-              docker rm --force "$container_id" >/dev/null 2>&1 || true
-            fi
-          }
-          trap cleanup EXIT
-          container_id="$(docker run --detach \
-            --env INSTITUTION_ID=example \
-            --env BFF_PORT=4100 \
-            --publish 127.0.0.1:4100:4100 \
-            "$IMAGE:$VERSION")"
-
-          body=""
-          for _ in $(seq 1 30); do
-            if body="$(curl --silent --show-error --fail http://127.0.0.1:4100/health 2>/dev/null)"; then
-              break
-            fi
-            sleep 1
-          done
-          if [[ -z "$body" ]]; then
-            docker logs "$container_id"
-            exit 1
-          fi
-          printf '%s' "$body" | VERSION="$VERSION" node -e '
-            const body = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
-            if (body.status !== "ok" || body.version !== process.env.VERSION) process.exit(1);
-          '
+        run: node scripts/smoke-api-image.mjs "$IMAGE:$VERSION" "$VERSION"
 
       - name: Push verified image tags
         env:
@@ -203,7 +174,7 @@ jobs:
         env:
           IMAGE_RESULT: ${{ needs.build-bff-docker.result }}
           RELEASE_RESULT: ${{ needs.create-release.result }}
-          REPO: ${{ github.repository }}
+          IMAGE: ghcr.io/sebastianspicker/concourse/bff
           TAG: ${{ github.ref_name }}
           VALIDATE_RESULT: ${{ needs.validate.result }}
           VERSION: ${{ needs.validate.outputs.version }}
@@ -217,7 +188,7 @@ jobs:
             echo "- BFF image job: $IMAGE_RESULT"
             echo "- GitHub release job: $RELEASE_RESULT"
             if [[ "$IMAGE_RESULT" == "success" ]]; then
-              echo "- Image target: ghcr.io/$REPO/bff:$VERSION"
+              echo "- Image target: $IMAGE:$VERSION"
             fi
             if [[ "$VALIDATE_RESULT" != "success" || "$IMAGE_RESULT" != "success" || "$RELEASE_RESULT" != "success" ]]; then
               echo ""

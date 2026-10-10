@@ -1,7 +1,11 @@
 /** Owns abortable fetch state and guards against late responses after refresh or unmount. */
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ResourceLoadResult } from "./publicApiRequest";
+import type { ResourceLoadResult } from "./publicApi";
 import { toUiError, type UiError } from "@/platform/http/uiError";
+import { isPublicDataRecoveryBlocked, isTransientPublicDataFailure } from "@/platform/http/errors";
+import { registerPublicDataRecovery, type PublicDataRecoveryState } from "./publicDataRecovery";
+import { subscribePublicDataClear } from "./publicDataLifecycle";
+import { replaceRequestController } from "./requestGuard";
 
 export type PublicResource<T> = {
   data: T | null;
@@ -92,15 +96,10 @@ function useRequestOwner<T>(
     []
   );
   const startLoad = useCallback((force: boolean): RequestController => {
-    controllerRef.current?.abort();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    let load: Promise<ResourceLoadResult<T>>;
-    try {
-      load = loaderRef.current({ force, signal: controller.signal });
-    } catch (error: unknown) {
-      load = Promise.reject(error);
-    }
+    const { controller, load } = replaceRequestController(
+      controllerRef,
+      (signal) => loaderRef.current({ force, signal }),
+    );
     const promise = load
       .then((result) => {
         if (owns(controller)) acceptResult(result);
@@ -116,8 +115,12 @@ function useRequestOwner<T>(
     controllerRef.current?.abort();
     controllerRef.current = null;
   }, []);
+  const cancel = useCallback(() => {
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+  }, []);
 
-  return useMemo(() => ({ owns, startLoad, mount, unmount }), [mount, owns, startLoad, unmount]);
+  return useMemo(() => ({ owns, startLoad, mount, unmount, cancel }), [cancel, mount, owns, startLoad, unmount]);
 }
 
 /** Runs key-driven loads, retaining fulfilled data while the replacement request is pending. */
@@ -163,8 +166,33 @@ export function usePublicResource<T>(
   key?: string
 ): PublicResource<T> {
   const { resource, operations } = useResourceState<T>();
-  const owner = useRequestOwner(loader, operations.acceptResult, operations.acceptError);
+  const recoveryState = useRef<PublicDataRecoveryState>({ source: null, updatedAt: null, transientFailure: false, recoveryBlocked: false });
+  const acceptResult = useCallback((result: ResourceLoadResult<T>) => {
+    recoveryState.current = { source: result.source, updatedAt: result.updatedAt, transientFailure: false, recoveryBlocked: false };
+    operations.acceptResult(result);
+  }, [operations]);
+  const acceptError = useCallback((error: unknown) => {
+    if (!(error instanceof Error && error.name === "AbortError")) {
+      recoveryState.current = {
+        ...recoveryState.current,
+        transientFailure: isTransientPublicDataFailure(error),
+        recoveryBlocked: isPublicDataRecoveryBlocked(error),
+      };
+    }
+    operations.acceptError(error);
+  }, [operations]);
+  const owner = useRequestOwner(loader, acceptResult, acceptError);
   useKeyLoad(key, operations, owner);
   const refresh = useRefresh(operations, owner);
+
+  useEffect(() => subscribePublicDataClear(() => {
+    owner.cancel();
+    operations.finishKeyLoad();
+  }), [operations, owner]);
+  useEffect(() => registerPublicDataRecovery({
+    getState: () => recoveryState.current,
+    recover: () => { void refresh(); },
+  }), [refresh]);
+
   return { ...resource, refresh };
 }

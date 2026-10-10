@@ -45,7 +45,14 @@ for (const source of routeFiles) {
   await copyFile(source, destination);
 }
 
+// The interactive design preview is a single self-contained page. Publish it
+// next to the exported demo so the hosted tour includes the design reference.
+const designPreviewSource = join(process.cwd(), "design-preview", "index.html");
+const designPreviewTarget = join(outputRoot, "design-preview", "index.html");
+await mkdir(dirname(designPreviewTarget), { recursive: true });
+await copyFile(designPreviewSource, designPreviewTarget);
+
 await writeFile(join(outputRoot, ".nojekyll"), "");
 process.stdout.write(
-  `Prepared ${routeFiles.length} clean static routes and ${rewrittenAssetReferences} publishable asset references for GitHub Pages\n`,
+  `Prepared ${routeFiles.length} clean static routes, the design preview, and ${rewrittenAssetReferences} publishable asset references for GitHub Pages\n`,
 );

@@ -1,17 +1,50 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+## Repository naming migration
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The repository moves from `sebastianspicker/concourse` to
+`sebastianspicker/concourse-campus-kit`. Product commands, data formats, and runtime
+identifiers remain unchanged. The demo moves to
+https://sebastianspicker.github.io/concourse-campus-kit/.
 
-`1.2.0-alpha.1` is the current source candidate. It is not considered
-published until the matching tag workflow creates the GitHub prerelease and
-versioned BFF image.
+All notable changes to this project will be documented here.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
+this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+`1.2.0-alpha.1` is the current source candidate. It is not published until the
+matching tag workflow creates the GitHub prerelease and the versioned BFF image.
 
 ## [Unreleased]
 
-No changes yet.
+### Changed
+
+- Client redesign, "Departure Hall": bundled Atkinson Hyperlegible Next and
+  Mono, a mineral hall palette with one ink Now/Next board, status lamps whose
+  shape carries the state, board-style rows, a bottom navigation bar on
+  phones, and rewritten English and German copy.
+- Client redesign, "Stage", on top of Departure Hall: Outfit (heavy,
+  uppercase) for the current entry, clock, titles, and actions; Concourse Text
+  (renamed Source Sans 3 subset) for everything else; black on white with flat
+  orange "now" and institution-color blocks; event cards with round arrows;
+  square corners. Atkinson Hyperlegible is no longer bundled.
+- Institution accents are validated as flat fills (readable black or white
+  text, visible against the canvas); the client derives a readable tint for
+  text use. The example pack uses `#2A62F0`.
+- Today's Now shows the schedule entry in progress instead of "Campus is
+  open", and Next shows the nearest entry that has not started, regardless of
+  sort order. While the schedule loads or fails, the board says so.
+- The campus clock and Now/Next update every minute.
+
+### Fixed
+
+- The static demo's Events tab lists events from the current campus day
+  instead of a fixed date weeks in the past.
+- Time spans use a spaced hyphen (`10:00 - 11:30`) instead of an en dash.
+- Dark mode on the web no longer mixes light server styles into a dark page
+  after hydration.
+- The static demo's Today schedule follows the current campus day instead of a
+  fixed past date.
 
 ---
 
@@ -19,30 +52,40 @@ No changes yet.
 
 ### Added
 
-- Concourse product and design contracts, English/German localization,
+- Concourse product and design contracts, English and German localization,
   institution identity, and light, dark, system, and high-contrast appearance
   settings.
-- Concourse Campus Kit technical identity, route-C application assets, and a
-  one-time migration from legacy local storage keys.
-- Three institution-selectable design presets: the default `wayfinding` preset plus
-  `atelier` and `precision`.
-- Responsive rail and tab navigation, virtualized public resource lists, public detail workflows, and localized freshness and error states.
-- BFF institution identity headers and client-side configuration mismatch detection.
-- Strict release metadata preflight for SemVer tags, workspace packages, Expo marketing version, and changelog notes.
+- The Concourse Campus Kit technical identity, route-C application assets, and a
+  one-time migration from the legacy local storage keys.
+- Three institution-selectable design presets: the default `wayfinding` preset,
+  plus `atelier` and `precision`.
+- Responsive rail and tab navigation, virtualized public resource lists, public
+  detail workflows, and localized freshness and error states.
+- BFF institution identity headers and client-side configuration mismatch
+  detection.
+- Strict release metadata preflight for SemVer tags, workspace packages, the
+  Expo marketing version, and changelog notes.
 
 ### Changed
 
-- Upgraded the mobile app to Expo SDK 57, React Native 0.86, React 19.2, and Node.js 22.13 or newer.
-- Replaced the demo Profile/authentication experience with Settings while retaining a compatibility redirect.
-- Consolidated frontend styling on typed React Native tokens, shared workflow primitives, and pack-controlled design presets.
-- Made `pnpm verify` enforce release identity, architecture boundaries, focused tests, and fresh builds.
-- Moved the release BFF image to Node 22.13 and added a non-default-port health smoke before registry publication.
-- Hardened public ICS parsing with bounded recurrence work, explicit timezone handling, and broader malformed-input coverage.
-- Pinned the owner-managed EAS CLI path and added an explicit Docker build-context boundary for local artifacts and secrets.
+- Upgraded the mobile app to Expo SDK 57, React Native 0.86, React 19.2, and
+  Node.js 22.13 or newer.
+- Replaced the demo Profile and authentication experience with Settings, keeping
+  a compatibility redirect.
+- Consolidated frontend styling on typed React Native tokens, shared workflow
+  primitives, and pack-controlled design presets.
+- Made `pnpm verify` enforce release identity, architecture boundaries, focused
+  tests, and fresh builds.
+- Moved the release BFF image to Node 22.13 and added a non-default-port health
+  smoke test before registry publication.
+- Hardened public ICS parsing with bounded recurrence work, explicit timezone
+  handling, and broader malformed-input coverage.
+- Pinned the owner-managed EAS CLI path and added an explicit Docker
+  build-context boundary for local artifacts and secrets.
 
 ### Fixed
 
-- Made the BFF health version explicit in release images and its container
+- Made the BFF health version explicit in release images, and its container
   health probes honor both `BFF_PORT` and enabled bearer authentication.
 - Included the repository MIT notice in BFF container images.
 

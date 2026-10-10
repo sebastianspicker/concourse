@@ -5,8 +5,8 @@
     "types": ["node"]
   },
   "include": [
-    "vitest.config.ts",
     "apps/api/vitest.config.ts",
+    "apps/client/vitest.config.ts",
     "apps/client/app.config.ts"
   ]
 }

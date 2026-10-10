@@ -2,7 +2,7 @@ import {
   getDateTimePartsInTimeZone,
   parseDateTimeInTimeZone,
   utcDateFromParts
-} from "../../runtime/time";
+} from "../time";
 
 const ICS_DATE_TIME_PATTERN = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z|[+-]\d{4}|[+-]\d{2}:\d{2})?$/;
 const FLOATING_DATE_TIME_PATTERN = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?$/;

@@ -1,3 +1,4 @@
+/** Coordinates cache keys, validation, persistence, and freshness metadata for public requests. */
 import {
   EventsResponseSchema,
   PublicRoute,
@@ -13,12 +14,126 @@ import {
   ScheduleResponseSchema,
   type TodayResponse,
 } from "@concourse/contracts";
-import type { ZodType } from "zod";
-import {
-  getCachedJson,
-  type RequestControls,
-  type ResourceLoadResult
-} from "./publicApiRequest";
+import type { z } from "zod";
+import { getJsonResult } from "@/platform/http/client";
+import { ApiErrorException } from "@/platform/http/errors";
+import { getCachedWithMetadata } from "./cache";
+import { getPublicCacheKey } from "./publicCacheKey";
+import { fetchNetworkFirstWithFallback } from "./persistedCache";
+import { isStaticDemo } from "./staticDemo";
+import { getStaticDemoResponse } from "./staticDemoData";
+
+const DEFAULT_TTL_MS = 60_000;
+
+export type RequestControls = {
+  force?: boolean;
+  signal?: AbortSignal;
+  offlineMode?: boolean;
+};
+
+type CachedJsonOptions = RequestControls & { queryParams?: Record<string, string> };
+
+export type ResourceLoadResult<T> = {
+  data: T;
+  source: "network" | "memory-cache" | "persisted-cache";
+  updatedAt: number;
+  cacheAge: number | null;
+};
+
+/** Converts schema-parser failures into an unavailable result instead of throwing into the UI. */
+function safeParse<T>(data: unknown, schema: z.ZodType<T>): T {
+  const result = schema.safeParse(data);
+  if (!result.success) {
+    throw new ApiErrorException({
+      status: 502,
+      code: "validation_error",
+      message: "Invalid response format"
+    });
+  }
+  return result.data;
+}
+
+/** Encodes only defined filters before adding them to an endpoint URL. */
+function getQueryString(queryParams?: Record<string, string>): string {
+  const query = queryParams ? new URLSearchParams(queryParams).toString() : "";
+  return query ? `?${query}` : "";
+}
+
+/**
+ * Loads a public resource through the memory and persisted-cache layers while preserving
+ * whether a result is fresh, stale, or degraded for the UI.
+ */
+async function getCachedJson<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  keySuffix: string,
+  options?: CachedJsonOptions
+): Promise<ResourceLoadResult<T>> {
+  const cacheKey = getPublicCacheKey(keySuffix, options?.queryParams);
+  const queryString = getQueryString(options?.queryParams);
+  const networkFirst = options?.offlineMode === true;
+  const coordinationKey = `${cacheKey}|${networkFirst ? "network-first" : "memory"}`;
+
+  if (isStaticDemo()) {
+    return {
+      data: safeParse(getStaticDemoResponse(path, options?.queryParams), schema),
+      source: "memory-cache",
+      updatedAt: Date.now(),
+      cacheAge: 0,
+    };
+  }
+
+  const cached = await getCachedWithMetadata(
+    coordinationKey,
+    async (sharedSignal) => {
+      if (!networkFirst) {
+        const result = await getJsonResult<T>(
+          `${path}${queryString}`,
+          (value) => safeParse(value, schema),
+          { signal: sharedSignal },
+        );
+        return {
+          data: result.data,
+          source: "network" as const,
+          updatedAt: Date.now(),
+          cacheAge: null,
+        };
+      }
+
+      const result = await fetchNetworkFirstWithFallback<T>(
+        cacheKey,
+        async () => (await getJsonResult<T>(
+          `${path}${queryString}`,
+          (data) => safeParse(data, schema),
+          { signal: sharedSignal },
+        )).data,
+        (value): value is T => schema.safeParse(value).success,
+      );
+      return {
+        data: result.data,
+        source: result.fromCache ? "persisted-cache" as const : "network" as const,
+        updatedAt: Date.now() - (result.cacheAge ?? 0),
+        cacheAge: result.cacheAge,
+      };
+    },
+    DEFAULT_TTL_MS,
+    networkFirst || (options?.force ?? false),
+    options?.signal,
+  );
+
+  if (!cached.fromCache) return cached.value;
+  if (cached.value.source === "persisted-cache") {
+    return {
+      ...cached.value,
+      cacheAge: Math.max(0, Date.now() - cached.value.updatedAt),
+    };
+  }
+  return {
+    ...cached.value,
+    source: "memory-cache",
+    cacheAge: Math.max(0, Date.now() - cached.value.updatedAt),
+  };
+}
 
 export type EventsQuery = PublicEventsQuery;
 
@@ -31,25 +146,15 @@ function serializeQuery(query: PublicQuery): Record<string, string> {
   );
 }
 
-function fetchPublicResource<T>(
-  path: string,
-  schema: ZodType<T>,
-  keySuffix: string,
-  query: PublicQuery,
-  controls: RequestControls
-): Promise<ResourceLoadResult<T>> {
-  return getCachedJson(path, schema, keySuffix, { ...controls, queryParams: serializeQuery(query) });
-}
-
 function dispatchPublicEndpoint<T, Q extends PublicQuery>(
   options: PublicRequestOptions<Q>,
   path: string,
-  schema: ZodType<T>,
+  schema: z.ZodType<T>,
   keySuffix: string
 ): Promise<ResourceLoadResult<T>> {
   const { force, signal, offlineMode, ...query } = options;
 
-  return fetchPublicResource(path, schema, keySuffix, query, { force, signal, offlineMode });
+  return getCachedJson(path, schema, keySuffix, { force, signal, offlineMode, queryParams: serializeQuery(query) });
 }
 
 export function fetchEvents(options: PublicRequestOptions<EventsQuery> = {}): Promise<ResourceLoadResult<EventsResponse>> {

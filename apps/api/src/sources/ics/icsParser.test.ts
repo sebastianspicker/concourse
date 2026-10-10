@@ -8,6 +8,8 @@ import { parseIcs } from "./icsParser";
 
 const calendar = (event: string) => `BEGIN:VCALENDAR\nBEGIN:VEVENT\n${event}\nEND:VEVENT\nEND:VCALENDAR`;
 
+const calendarOf = (events: string[]) => `BEGIN:VCALENDAR\n${events.map((event) => `BEGIN:VEVENT\n${event}\nEND:VEVENT`).join("\n")}\nEND:VCALENDAR`;
+
 describe("parseIcs", () => {
   it("normalizes public event fields without external fixture data", () => {
     expect(parseIcs(calendar("UID:event-1\nSUMMARY:Open\\, Lecture\nDTSTART:20260101T100000Z\nDTEND:20260101T110000Z\nLOCATION:Room \\; 101"))).toEqual([{
@@ -86,5 +88,23 @@ describe("parseIcs", () => {
 
     expect(events).toHaveLength(4);
     expect(events.every((event) => event.isRecurring)).toBe(true);
+  });
+
+  it("retains the same highest-priority events across input orders near the output limit", () => {
+    const referenceDate = new Date("2026-06-01T00:00:00.000Z");
+    const inputs = Array.from({ length: 1_004 }, (_, index) => {
+      const startsAt = new Date(referenceDate.getTime() - 502 * 60_000 + Math.floor(index / 2) * 60_000)
+        .toISOString().replaceAll(/[-:]/g, "").replace(".000Z", "Z");
+      return `UID:event-${String(index).padStart(4, "0")}\nSUMMARY:Shared ${index % 3}\nDTSTART:${startsAt}`;
+    });
+    const alternating = Array.from({ length: inputs.length }, (_, index) =>
+      inputs[index % 2 === 0 ? index / 2 : inputs.length - 1 - Math.floor(index / 2)]!
+    );
+    const parse = (ordered: string[]) => parseIcs(calendarOf(ordered), { maxTotalEvents: 1_000, referenceDate });
+
+    const ascending = parse(inputs);
+    expect(parse([...inputs].reverse())).toEqual(ascending);
+    expect(parse(alternating)).toEqual(ascending);
+    expect(ascending).toHaveLength(1_000);
   });
 });

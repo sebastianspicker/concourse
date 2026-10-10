@@ -9,7 +9,7 @@ type Props = {
 };
 
 export function OfflineIndicator({ showCacheAge = true }: Props): JSX.Element | null {
-  const { isOffline } = useOfflineCache();
+  const { isOffline, hasOfflineData } = useOfflineCache();
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
   const insets = useSafeAreaInsets();
 
@@ -26,7 +26,7 @@ export function OfflineIndicator({ showCacheAge = true }: Props): JSX.Element | 
     return (
       <OfflineBanner
         topPadding={topPadding}
-        hasOfflineData={false}
+        hasOfflineData={hasOfflineData}
         showCacheAge={showCacheAge}
       />
     );

@@ -5,7 +5,7 @@ export const examplePublicPack = {
     displayName: "Example University",
     defaultLocale: "en",
     designPreset: "wayfinding",
-    accent: "#4067D0"
+    accent: "#2A62F0"
   },
   type: "music-and-dance",
   campuses: [

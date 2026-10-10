@@ -1,10 +1,7 @@
+/** Today's heading row: the date as the page heading, and the campus clock in the display voice. */
 import { Text, View } from "react-native";
-import { useTheme } from "@/design-system/ThemeContext";
-import { ClockFace } from "./ClockFace";
+import { useTheme } from "@/design-system/ThemeProvider";
 import { styles } from "./ClockBlock.styles";
-import { ClockMeta } from "./ClockMeta";
-import { FreshnessRow } from "./FreshnessRow";
-import type { TodaySourceTone } from "./todaySourceStatus";
 
 export function ClockBlock({
   date,
@@ -12,45 +9,25 @@ export function ClockBlock({
   isWide,
   timeZone,
   campusLocalLabel,
-  showFreshnessChip,
-  chromeLabel,
-  chromeColor,
-  chromeTone,
 }: {
   date: string;
   localTime: string;
   isWide: boolean;
   timeZone: string;
   campusLocalLabel: string;
-  showFreshnessChip: boolean;
-  chromeLabel: string;
-  chromeColor: string;
-  chromeTone: TodaySourceTone;
 }): JSX.Element {
   const theme = useTheme();
+  // The zone stays in the spoken label; on screen, "Campus time" is enough.
+  const zone = timeZone.replace(/_/g, " ");
   return (
-    <View
-      testID="today-clock-block"
-      style={[
-        styles.clockBlock,
-        isWide && styles.clockBlockWide,
-        { borderColor: theme.colors.border },
-      ]}
-    >
-      <Text accessibilityRole="header" style={[styles.date, { color: theme.colors.muted }]}>
+    <View testID="today-clock-block" style={styles.row}>
+      <Text accessibilityRole="header" style={[styles.date, !isWide && styles.dateCompact, { color: theme.colors.text }]}>
         {date}
       </Text>
-      <ClockFace
-        localTime={localTime}
-        textColor={theme.colors.text}
-        colonColor={theme.colors.signal}
-      />
-      {isWide ? (
-        <ClockMeta campusLocalLabel={campusLocalLabel} timeZone={timeZone} />
-      ) : null}
-      {showFreshnessChip ? (
-        <FreshnessRow label={chromeLabel} color={chromeColor} tone={chromeTone} />
-      ) : null}
+      <View accessible accessibilityLabel={`${campusLocalLabel}, ${zone}: ${localTime}`} style={styles.time}>
+        <Text style={[styles.clock, !isWide && styles.clockCompact, { color: theme.colors.text }]}>{localTime}</Text>
+        <Text style={[styles.metaText, { color: theme.colors.muted }]}>{campusLocalLabel}</Text>
+      </View>
     </View>
   );
 }

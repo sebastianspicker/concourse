@@ -1,6 +1,7 @@
 # Runs the development BFF with the public HfMT pack on the standard local port.
 services:
   bff:
+    stop_grace_period: 15s
     build:
       context: ..
       dockerfile: apps/api/Dockerfile

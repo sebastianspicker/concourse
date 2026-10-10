@@ -13,6 +13,7 @@ const expectedHtml = new Set([
   "(tabs)/settings.html",
   "+not-found.html",
   "_sitemap.html",
+  "design-preview/index.html",
   "events.html",
   "events/[id].html",
   "events/index.html",
@@ -47,6 +48,11 @@ const expectedAssets = new Set([
   "_expo/.routes.json",
   "_expo/static/js/web/index-{hash}.js",
   "assets/MaterialIcons.{hash}.ttf",
+  "assets/assets/fonts/ConcourseText-Light.{hash}.ttf",
+  "assets/assets/fonts/ConcourseText-Regular.{hash}.ttf",
+  "assets/assets/fonts/ConcourseText-SemiBold.{hash}.ttf",
+  "assets/assets/fonts/Outfit-Black.{hash}.ttf",
+  "assets/assets/fonts/Outfit-ExtraBold.{hash}.ttf",
   "assets/arrow_down.{hash}.png",
   "assets/back-icon-mask.{hash}.png",
   "assets/back-icon.{hash}.png",
@@ -90,6 +96,9 @@ async function listFiles(directory) {
 function logicalAssetPath(file) {
   if (file.startsWith("_expo/static/js/web/")) {
     return file.replace(/index-[0-9a-f]{32}\.js$/, "index-{hash}.js");
+  }
+  if (file.startsWith("assets/assets/fonts/")) {
+    return file.replace(/\.[0-9a-f]{32}\.ttf$/, ".{hash}.ttf");
   }
   if (file.startsWith("assets/__node_modules/_pnpm/")) {
     return `assets/${basename(file).replace(/\.[0-9a-f]{32}(@[234]x)?\./, ".{hash}$1.")}`;

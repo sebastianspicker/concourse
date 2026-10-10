@@ -1,15 +1,17 @@
 /** Provides local appearance, language, and cache controls for the mobile client. */
 import { useState } from "react";
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, StyleSheet, Text, View } from "react-native";
 import { clearPublicDataState } from "@/data/public/publicDataLifecycle";
-import { SignalPageHeader } from "@/shell/SignalPageHeader";
+import { PageHeader } from "@/design-system/PageHeader";
 import { getInstitutionDisplayName } from "@/platform/env/institution";
 import { useLocale, type LanguagePreference } from "@/localization/LocaleContext";
 import { Screen } from "@/design-system/Screen";
-import { ChoiceRow, SettingsGroup } from "@/design-system/SettingsGroup";
-import { useTheme, useThemePreference, type ThemePreference } from "@/design-system/ThemeContext";
-import { spacing, typography } from "@/design-system/theme";
-import { getDesignPreset } from "@/design-system/designPresets";
+import { ChoiceRow } from "@/design-system/ChoiceRow";
+import { SettingsGroup } from "@/design-system/SettingsGroup";
+import { useTheme, useThemePreference, type ThemePreference } from "@/design-system/ThemeProvider";
+import { Button } from "@/design-system/Button";
+import { StatusLamp } from "@/design-system/StatusLamp";
+import { CONTENT_MAX_WIDTH, spacing, typography } from "@/design-system/theme";
 import { useHydratedWindowWidth } from "@/design-system/useHydratedWindowWidth";
 import { isStaticDemo } from "@/data/public/staticDemo";
 
@@ -63,58 +65,48 @@ function WebClearConfirmation({
   onConfirm: () => void;
 }): JSX.Element {
   return (
-    <View accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.confirmation, { backgroundColor: theme.colors.errorSurface, borderColor: theme.colors.error, borderWidth: theme.ui.borderWidth }]} testID="clear-saved-data-confirmation">
+    <View accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.confirmation, { backgroundColor: theme.colors.errorSurface, borderLeftColor: theme.colors.error, borderLeftWidth: theme.ui.emphasisBorderWidth + 2 }]} testID="clear-saved-data-confirmation">
       <Text style={[styles.confirmationTitle, { color: theme.colors.text }]}>{t("clearConfirmTitle")}</Text>
-      <Text style={[styles.help, { color: theme.colors.muted }]}>{t("clearConfirmBody")}</Text>
+      <Text style={[styles.help, { color: theme.colors.text }]}>{t("clearConfirmBody")}</Text>
       <View style={styles.confirmationActions}>
-        <Pressable accessibilityRole="button" onPress={onCancel} style={styles.confirmationButton} testID="clear-saved-data-cancel">
-          <Text style={[styles.confirmationButtonText, { color: theme.colors.text }]}>{t("cancel")}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" onPress={onConfirm} style={styles.confirmationButton} testID="clear-saved-data-confirm">
-          <Text style={[styles.confirmationButtonText, { color: theme.colors.error }]}>{t("clear")}</Text>
-        </Pressable>
+        <Button variant="secondary" label={t("cancel")} onPress={onCancel} testID="clear-saved-data-cancel" />
+        <Button variant="destructive" icon="delete-outline" label={t("clear")} onPress={onConfirm} testID="clear-saved-data-confirm" />
       </View>
     </View>
   );
 }
 
-/** Presents the destructive cache action with the existing localized labels and sizing. */
+/** Presents the destructive cache action with its consequence stated before the button. */
 const ClearSavedDataGroup = ({
   t,
   theme,
-  minHeight,
   onPress,
   staticDemo,
 }: {
   t: Translation;
   theme: ReturnType<typeof useTheme>;
-  minHeight: number;
   onPress: () => void;
   staticDemo: boolean;
 }): JSX.Element => {
+  const label = staticDemo ? `${t("clearSavedData")} · ${t("simulated")}` : t("clearSavedData");
   return (
-    <SettingsGroup title={staticDemo ? `${t("clearSavedData")} · ${t("simulated")}` : t("clearSavedData")}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityHint={t("clearSavedDataHint")}
-        onPress={onPress}
-        testID="clear-saved-data"
-        style={({ pressed }) => [styles.action, { backgroundColor: pressed ? theme.colors.errorSurface : theme.colors.surface, minHeight }]}
-      >
-        <Text style={[styles.actionTitle, { color: theme.colors.error }]}>{staticDemo ? `${t("clearSavedData")} · ${t("simulated")}` : t("clearSavedData")}</Text>
+    <SettingsGroup title={t("savedData")}>
+      <View style={styles.block}>
         <Text style={[styles.help, { color: theme.colors.muted }]}>{staticDemo ? t("simulatedClearHint") : t("clearSavedDataHint")}</Text>
-      </Pressable>
+        <Button variant="destructive" icon="delete-outline" label={label} accessibilityHint={t("clearSavedDataHint")} onPress={onPress} testID="clear-saved-data" />
+      </View>
     </SettingsGroup>
   );
 };
 
-/** Displays institution metadata using the same row geometry as the destructive action. */
-const AboutGroup = ({ t, theme, minHeight }: { t: Translation; theme: ReturnType<typeof useTheme>; minHeight: number }): JSX.Element => {
+/** States what the app is and where its data comes from. */
+const AboutGroup = ({ t, theme }: { t: Translation; theme: ReturnType<typeof useTheme> }): JSX.Element => {
   return (
     <SettingsGroup title={t("about")}>
-      <View style={[styles.about, { minHeight }]}>
-        <Text style={[styles.actionTitle, { color: theme.colors.text }]}>{getInstitutionDisplayName()}</Text>
+      <View style={styles.block}>
+        <Text style={[styles.aboutTitle, { color: theme.colors.text }]}>{getInstitutionDisplayName()}</Text>
         <Text style={[styles.help, { color: theme.colors.muted }]}>{t("appInformation")}</Text>
+        <Text style={[styles.product, { color: theme.colors.muted }]}>Concourse</Text>
       </View>
     </SettingsGroup>
   );
@@ -124,13 +116,12 @@ const AboutGroup = ({ t, theme, minHeight }: { t: Translation; theme: ReturnType
 export default function SettingsScreen(): JSX.Element {
   const theme = useTheme();
   const width = useHydratedWindowWidth();
-  const metrics = getDesignPreset(theme.designPreset).metrics;
   const { preference: themePreference, setPreference: setThemePreference } = useThemePreference();
   const { preference: languagePreference, setPreference: setLanguagePreference, t } = useLocale();
   const [status, setStatus] = useState<{ message: string; kind: StatusKind } | null>(null);
   const [webConfirmationVisible, setWebConfirmationVisible] = useState(false);
   const isWide = width >= 900;
-  const minHeight = Math.max(52, metrics.rowMinHeight - 12);
+  const columnStyle = [styles.settingsColumn, isWide && styles.settingsColumnWide];
   const staticDemo = isStaticDemo();
   const themeChoices: Array<{ value: ThemePreference; label: string }> = [
     { value: "system", label: t("systemTheme") },
@@ -168,42 +159,47 @@ export default function SettingsScreen(): JSX.Element {
   };
 
   return (
-    <Screen maxWidth={1400} testID="settings-screen">
-      <SignalPageHeader title={t("settings")} />
+    <Screen maxWidth={CONTENT_MAX_WIDTH} testID="settings-screen">
+      <PageHeader title={t("settings")} intro={t("settingsIntro")} />
       <View style={[styles.settingsGrid, isWide && styles.settingsGridWide]}>
-        <View style={styles.settingsColumn}>
+        <View style={columnStyle}>
           <SettingsChoiceGroup title={t("appearance")} choices={themeChoices} selected={themePreference} onSelect={setThemePreference} testIDPrefix="theme" />
         </View>
-        <View style={styles.settingsColumn}>
+        <View style={columnStyle}>
           <SettingsChoiceGroup title={t("language")} choices={languageChoices} selected={languagePreference} onSelect={setLanguagePreference} testIDPrefix="language" />
         </View>
       </View>
       <View style={[styles.settingsGrid, isWide && styles.settingsGridWide]}>
-        <View style={styles.settingsColumn}>
-          <ClearSavedDataGroup t={t} theme={theme} minHeight={minHeight} onPress={confirmClear} staticDemo={staticDemo} />
+        <View style={columnStyle}>
+          <ClearSavedDataGroup t={t} theme={theme} onPress={confirmClear} staticDemo={staticDemo} />
           {webConfirmationVisible ? <WebClearConfirmation t={t} theme={theme} onCancel={() => setWebConfirmationVisible(false)} onConfirm={() => { setWebConfirmationVisible(false); clearSavedData(); }} /> : null}
+          {status ? (
+            <View accessibilityLiveRegion={status.kind === "error" ? "assertive" : "polite"} style={styles.statusRow}>
+              <StatusLamp shape={status.kind === "error" ? "crossed" : "filled"} color={status.kind === "error" ? theme.colors.error : theme.colors.success} />
+              <Text style={[styles.status, { color: theme.colors.text }]}>{status.message}</Text>
+            </View>
+          ) : null}
         </View>
-        <View style={styles.settingsColumn}>
-          <AboutGroup t={t} theme={theme} minHeight={minHeight} />
+        <View style={columnStyle}>
+          <AboutGroup t={t} theme={theme} />
         </View>
       </View>
-      {status ? <Text accessibilityLiveRegion={status.kind === "error" ? "assertive" : "polite"} style={[styles.status, { color: status.kind === "error" ? theme.colors.error : theme.colors.success }]}>{status.message}</Text> : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  settingsGrid: { gap: spacing.xxl },
-  settingsGridWide: { flexDirection: "row", alignItems: "flex-start" },
-  settingsColumn: { flex: 1, minWidth: 0 },
-  action: { padding: spacing.md, justifyContent: "center" },
-  about: { padding: spacing.md, gap: spacing.xs, justifyContent: "center" },
-  confirmation: { gap: spacing.sm, marginTop: spacing.sm, padding: spacing.md },
-  confirmationActions: { flexDirection: "row", gap: spacing.md },
-  confirmationButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.sm },
-  confirmationButtonText: { ...typography.caption, fontWeight: "600" },
-  confirmationTitle: { ...typography.body, fontWeight: "600" },
-  actionTitle: { ...typography.body, fontWeight: "600" },
+  settingsGrid: { gap: spacing.xxxl },
+  settingsGridWide: { flexDirection: "row", alignItems: "flex-start", gap: spacing.xxxl + spacing.lg },
+  settingsColumn: { minWidth: 0, gap: spacing.md },
+  settingsColumnWide: { flex: 1 },
+  block: { gap: spacing.md, paddingTop: spacing.lg },
+  confirmation: { gap: spacing.sm, padding: spacing.lg },
+  confirmationActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
+  confirmationTitle: { ...typography.bodyStrong },
+  aboutTitle: { ...typography.bodyStrong },
+  product: { ...typography.label },
   help: { ...typography.caption },
-  status: { ...typography.caption, fontWeight: "600" },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  status: { ...typography.captionStrong },
 });

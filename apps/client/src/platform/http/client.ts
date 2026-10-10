@@ -7,40 +7,10 @@ import { fetchJsonResponseWithTimeout } from "./fetchHelpers";
 import { ApiErrorException } from "./errors";
 import { withRetry } from "./retry";
 
-/** Delegates request, retry, validation, and institution checks, then unwraps the response payload. */
-export async function getJson<T>(
-  path: string,
-  parse?: (data: unknown) => T,
-  options?: { signal?: AbortSignal }
-): Promise<T> {
-  const result = await getJsonResult(path, parse, options);
-  return result.data;
-}
-
 export type ApiJsonResult<T> = {
   data: T;
   institutionId: string | null;
 };
-
-/** Converts HTTP-shaped transport failures to the API exception used by retry and UI layers. */
-function toApiErrorException(error: unknown): ApiErrorException | undefined {
-  if (
-    typeof error !== "object" ||
-    error === null ||
-    !("status" in error) ||
-    typeof (error as Record<string, unknown>).status !== "number"
-  ) {
-    return undefined;
-  }
-
-  const details = error as Record<string, unknown>;
-  return new ApiErrorException({
-    status: details.status as number,
-    code: typeof details.code === "string" ? details.code : "unknown_error",
-    message: error instanceof Error ? error.message : "Request failed",
-    retryAfterInSeconds: typeof details.retryAfterInSeconds === "number" ? details.retryAfterInSeconds : undefined,
-  });
-}
 
 /** Checks that a response belongs to the configured institution before exposing its data. */
 function getResponseInstitutionId(response: { headers: Headers }): string | null {
@@ -76,10 +46,7 @@ export async function getJsonResult<T>(
 ): Promise<ApiJsonResult<T>> {
   const url = createBffRequestUrl(path);
   const response = await withRetry(
-    () => fetchJsonResponseWithTimeout<unknown>(url, { signal: options?.signal })
-      .catch((error: unknown) => {
-        throw toApiErrorException(error) ?? error;
-      }),
+    () => fetchJsonResponseWithTimeout<unknown>(url, { signal: options?.signal }),
     { signal: options?.signal }
   );
   const institutionId = getResponseInstitutionId(response);

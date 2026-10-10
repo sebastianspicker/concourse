@@ -19,5 +19,8 @@
   "dependencies": {
     "@concourse/contracts": "workspace:*",
     "zod": "3.25.76"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

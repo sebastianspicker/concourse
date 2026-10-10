@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocale } from "@/localization/LocaleContext";
 import { spacing, typography } from "./theme";
-import { useTheme } from "./ThemeContext";
+import { useTheme, useDesignMetrics } from "./ThemeProvider";
 
 export type SearchBarProps = {
   value: string;
@@ -12,7 +12,6 @@ export type SearchBarProps = {
   label?: string;
   placeholder?: string;
   debounceMs?: number;
-  onImmediateChange?: (text: string) => void;
   testID?: string;
 };
 
@@ -23,11 +22,11 @@ export function SearchBar({
   label,
   placeholder,
   debounceMs = 250,
-  onImmediateChange,
   testID,
 }: SearchBarProps): JSX.Element {
   const theme = useTheme();
   const { t } = useLocale();
+  const metrics = useDesignMetrics();
   const [localValue, setLocalValue] = useState(value);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visibleLabel = label ?? placeholder ?? t("search");
@@ -37,26 +36,24 @@ export function SearchBar({
 
   const update = useCallback((next: string) => {
     setLocalValue(next);
-    onImmediateChange?.(next);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => onChangeText(next), debounceMs);
-  }, [debounceMs, onChangeText, onImmediateChange]);
+  }, [debounceMs, onChangeText]);
 
   return (
     <View style={styles.field}>
-      <Text style={[styles.label, { color: theme.colors.text }]}>{visibleLabel}</Text>
+      <Text style={[styles.label, { color: theme.colors.muted }]}>{visibleLabel}</Text>
       <View
         style={[
           styles.control,
           {
             backgroundColor: theme.colors.surface,
-            borderColor: theme.colors.controlBorder,
-            borderWidth: theme.ui.borderWidth,
+            borderRadius: metrics.controlRadius,
           },
         ]}
         accessibilityRole="search"
       >
-        <MaterialIcons name="search" size={22} color={theme.colors.muted} />
+        <MaterialIcons name="search" size={22} color={theme.colors.text} />
         <TextInput
           testID={testID}
           style={[styles.input, { color: theme.colors.text }]}
@@ -78,7 +75,7 @@ export function SearchBar({
             style={styles.clear}
             testID={testID ? `${testID}-clear` : undefined}
           >
-            <MaterialIcons name="cancel" size={22} color={theme.colors.muted} />
+            <MaterialIcons name="close" size={22} color={theme.colors.text} />
           </Pressable>
         ) : null}
       </View>
@@ -86,12 +83,10 @@ export function SearchBar({
   );
 }
 
-export const SearchField = SearchBar;
-
 const styles = StyleSheet.create({
   field: { gap: spacing.sm },
-  label: { ...typography.caption, fontWeight: "700", letterSpacing: 0.9, textTransform: "uppercase" },
-  control: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingLeft: spacing.lg },
-  input: { ...typography.body, flex: 1, minWidth: 0, paddingVertical: spacing.sm },
+  label: { ...typography.label },
+  control: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingLeft: spacing.md },
+  input: { ...typography.body, fontSize: 19, flex: 1, minWidth: 0, paddingVertical: spacing.sm },
   clear: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
 });

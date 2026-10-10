@@ -11,7 +11,7 @@ export function getRoomHref(room: Room): {
   return { pathname: "/rooms/[id]", params: { id: room.id } };
 }
 
-/** Shapes room data into a display card and omits an absent campus subtitle. */
+/** Shapes room data into a directory row and omits an absent campus subtitle. */
 export function getRoomCard(room: Room): { title: string; subtitle?: string } {
   return {
     title: room.name,

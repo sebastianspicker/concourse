@@ -35,5 +35,6 @@ module.exports = {
     sourceType: "module",
     ecmaFeatures: { jsx: true }
   },
-  ignorePatterns: ["dist", "build"]
+  overrides: [{ files: ["apps/client/e2e-web/**/*.mjs"], env: { browser: true } }],
+  ignorePatterns: ["node_modules", "dist", "build", "coverage"]
 };

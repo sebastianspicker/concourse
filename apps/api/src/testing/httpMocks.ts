@@ -10,12 +10,6 @@ export type MockHttpResponse = {
   getStatus: () => number | undefined;
 };
 
-type RouteHandler<Institution> = (
-  request: IncomingMessage,
-  response: ServerResponse,
-  institution: Institution
-) => Promise<void> | void;
-
 /** Captures status, headers, and a text body without opening a listener. */
 export function createMockResponse(options: { headersSent?: boolean; initialStatus?: number; writableEnded?: boolean } = {}): MockHttpResponse {
   let body = "";
@@ -78,64 +72,8 @@ export function createMockReqRes(options: {
   };
 }
 
-
-export function expectNotFound(body: { error: { code: string } }) {
-  expect(body.error.code).toBe("not_found");
-}
-
-export function expectNotFoundRoute(status: number | undefined, body: { error: { code: string } }) {
-  expect(status).toBe(404);
-  expectNotFound(body);
-}
-
-export function expectEventFields(events: Array<Record<string, unknown>>) {
-  for (const event of events) {
-    expect(event).toHaveProperty("id");
-    expect(event).toHaveProperty("title");
-    expect(event).toHaveProperty("date");
-    expect(event).toHaveProperty("sourceUrl");
-  }
-}
-
-export function expectRoomsCollection(body: { rooms: unknown }) {
-  expect(body).toHaveProperty("rooms");
-  expect(Array.isArray(body.rooms)).toBe(true);
-}
-
 export function expectCapturedError(capture: MockHttpResponse, status: number, code: string) {
   expect(capture.getStatus()).toBe(status);
   expect(JSON.parse(capture.getBody() || "{}").error.code).toBe(code);
 }
 
-export function expectErrorEnvelope(body: Record<string, unknown>) {
-  expect(body).toHaveProperty("error");
-  const error = body.error as Record<string, unknown>;
-  expect(error).toHaveProperty("code");
-  expect(error).toHaveProperty("message");
-}
-
-/** Restores optional environment variables without leaving cross-test state behind. */
-export function restoreEnvironment(values: Record<string, string | undefined>) {
-  for (const [name, value] of Object.entries(values)) {
-    if (value === undefined) delete process.env[name];
-    else process.env[name] = value;
-  }
-}
-
-/** Invokes a route and returns its captured status, headers, and decoded JSON body. */
-export async function invokeRoute<Institution>(
-  handler: RouteHandler<Institution>,
-  institution: Institution,
-  url = "/",
-  method = "GET"
-) {
-  const capture = createMockResponse();
-  await handler(createMockRequest(url, method), capture.response, institution);
-
-  return {
-    body: JSON.parse(capture.getBody() ?? "{}"),
-    headers: capture.getHeaders(),
-    rawBody: capture.getBody(),
-    status: capture.getStatus()
-  };
-}

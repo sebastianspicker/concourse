@@ -1,11 +1,10 @@
 /** Resolves a room route to a detail view and reconciles stale list selection. */
 import { useLocalSearchParams } from "expo-router";
-import { useEffect } from "react";
-import { useRooms } from "@/data/public/useRooms";
+import { useRooms } from "@/data/public/resources";
 import { MetaRow } from "@/design-system/MetaRow";
 import { ResourceDetailScreen } from "@/design-system/ResourceDetailScreen";
 import { useLocale } from "@/localization/LocaleContext";
-import { reconcileSelectedDetailRecord, selectDetailRecord, selectedRoomDetails } from "@/data/public/selectedDetailRecords";
+import { selectedRoomDetails, useSelectedDetail } from "@/data/public/selectedDetailRecords";
 import { formatCampusId } from "@/localization/dateFormat";
 import { STATIC_DEMO_ROOM_IDS } from "@/data/public/staticDemoData";
 
@@ -14,17 +13,8 @@ export default function RoomDetailScreen(): JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
   const state = useRooms();
   const collection = state.data?.rooms ?? null;
-  const room = selectDetailRecord(
-    id,
-    collection,
-    state.source,
-    selectedRoomDetails.get(id)
-  );
+  const room = useSelectedDetail(selectedRoomDetails, id, collection, state.source);
   const { t } = useLocale();
-
-  useEffect(() => {
-    reconcileSelectedDetailRecord(selectedRoomDetails, id, collection, state.source);
-  }, [collection, id, state.source]);
 
   return (
     <ResourceDetailScreen
@@ -32,8 +22,8 @@ export default function RoomDetailScreen(): JSX.Element {
       error={state.error}
       item={room ?? null}
       notFoundMessage={t("errorNotFound")}
-      cardTitle={room ? room.name : `Room ID: ${id}`}
-      cardSubtitle={room?.campusId ? formatCampusId(room.campusId) : undefined}
+      kicker={t("kickerRoom")}
+      cardTitle={room ? room.name : t("unknownRoom", { id: String(id) })}
       renderMeta={
         room
           ? () => (

@@ -1,7 +1,7 @@
 /** Validates and persists the user’s selected color-scheme preference. */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { readAndMigrateLegacyValue } from "@/platform/storage/readAndMigrateLegacyValue";
-import type { ThemePreference } from "./themeTypes";
+import type { ThemePreference } from "./theme";
 
 export const THEME_PREFERENCE_STORAGE_NAME = "@concourse/theme-preference";
 const LEGACY_THEME_PREFERENCE_STORAGE_NAME = "@campus-app/theme-preference";

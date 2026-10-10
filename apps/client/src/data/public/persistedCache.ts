@@ -1,18 +1,41 @@
 /** Persists validated public data and implements network-first offline fallback semantics. */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { z } from "zod";
-import { ApiErrorException } from "@/platform/http/errors";
+import { isTransientPublicDataFailure } from "@/platform/http/errors";
 import type { StorageValueReader } from "@/platform/storage/readAndMigrateLegacyValue";
-import { HttpError, RequestTimeoutError } from "@/platform/http/fetchHelpers";
+import {
+  EventsResponseSchema,
+  RoomsResponseSchema,
+  ScheduleResponseSchema,
+  TodayResponseSchema,
+} from "@concourse/contracts";
 
 type StorageLike = StorageValueReader & {
   getAllKeys?: () => Promise<readonly string[]>;
+  multiGet?: (keys: readonly string[]) => Promise<readonly (readonly [string, string | null])[]>;
   multiRemove?: (keys: readonly string[]) => Promise<void>;
 };
 
 export const CACHE_STORAGE_NAMESPACE = "concourse:";
-const LEGACY_CACHE_STORAGE_NAMESPACE = "campus-app-kit:";
+export const LEGACY_CACHE_STORAGE_NAMESPACE = "campus-app-kit:";
+const CACHE_INDEX_STORAGE_KEY = "concourse:public-cache-index:v1";
+const CURRENT_PUBLIC_PREFIX = `${CACHE_STORAGE_NAMESPACE}public:v`;
+const LEGACY_PUBLIC_PREFIX = `${LEGACY_CACHE_STORAGE_NAMESPACE}public:v`;
+const PUBLIC_LOGICAL_KEY_PATTERN = /^public:v\d+:/;
 const memory = new Map<string, string>();
+const memoryStorage: StorageLike = {
+  getItem: async (key) => memory.get(key) ?? null,
+  setItem: async (key, value) => { memory.set(key, value); },
+  removeItem: async (key) => { memory.delete(key); },
+  getAllKeys: async () => [...memory.keys()],
+  multiGet: async (keys) => keys.map((key) => [key, memory.get(key) ?? null] as const),
+  multiRemove: async (keys) => { for (const key of keys) memory.delete(key); },
+};
+
+export const OFFLINE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+export const MAX_PERSISTED_CACHE_ENTRIES = 50;
+export const MAX_PERSISTED_CACHE_BYTES = 4 * 1024 * 1024;
+export const MAX_PERSISTED_ENTRY_BYTES = 1024 * 1024;
 
 export type CachedEntry<T> = {
   data: T;
@@ -21,53 +44,17 @@ export type CachedEntry<T> = {
 };
 
 type CacheValidator<T> = (value: unknown) => value is T;
+type RawCacheEntry<T> = { raw: string; entry: CachedEntry<T> };
+type CacheIndexEntry = { timestamp: number; bytes: number; isValid: boolean; isOffline?: boolean };
+type CacheIndex = { entries: Record<string, CacheIndexEntry> };
+export type PersistedCacheMutation = "write" | "offline" | "migration" | "clear";
 
-const NON_RETRYABLE_ERROR_CODES = new Set(["institution_mismatch", "validation_error"]);
-
-// Public campus data is useful offline, but stale schedules/events can mislead
-// users. After this window, network errors should be surfaced instead.
-export const OFFLINE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-
-/** Uses AsyncStorage when available and an in-memory adapter for unsupported test or web runtimes. */
-async function getStorage(): Promise<StorageLike> {
-  return (await getNativeStorage()) ?? createMemoryStorage();
-}
-
-/** Creates the unsupported-runtime storage adapter without sharing state with unrelated keys. */
-function createMemoryStorage(): StorageLike {
-  return {
-    getItem: async (key) => memory.get(key) ?? null,
-    setItem: async (key, value) => {
-      memory.set(key, value);
-    },
-    removeItem: async (key) => {
-      memory.delete(key);
-    },
-    getAllKeys: async () => [...memory.keys()],
-    multiRemove: async (keys) => {
-      for (const key of keys) memory.delete(key);
-    }
-  };
-}
-
-/** Uses the native adapter only after confirming its backing implementation responds. */
-async function getNativeStorage(): Promise<StorageLike | null> {
-  // Try to use AsyncStorage directly (native), but fall back if the JS object
-  // exists without a working native backing implementation.
-  if (!isStorageAdapter(AsyncStorage)) return null;
-
-  try {
-    await AsyncStorage.getItem(`${CACHE_STORAGE_NAMESPACE}__probe__`);
-    return AsyncStorage as StorageLike;
-  } catch {
-    return null;
-  }
-}
-
-function isStorageAdapter(value: unknown): value is StorageLike {
-  return typeof value === "object" && value !== null && "getItem" in value &&
-    typeof value.getItem === "function";
-}
+const mutationListeners = new Set<(mutation: PersistedCacheMutation) => void>();
+let publicDataGeneration = 0;
+let mutationTail: Promise<void> = Promise.resolve();
+let nativeStorageState: StorageLike | null | undefined;
+let nativeStorageProbe: Promise<StorageLike | null> | null = null;
+const indexByStorage = new WeakMap<object, Promise<CacheIndex>>();
 
 const CACHE_ENTRY_ENVELOPE_SCHEMA = z.object({
   data: z.unknown(),
@@ -76,14 +63,84 @@ const CACHE_ENTRY_ENVELOPE_SCHEMA = z.object({
 }).refine((entry) => Object.hasOwn(entry, "data"), { message: "Cache entry data is required" })
   .refine((entry) => entry.timestamp <= Date.now() + 5 * 60 * 1000, { message: "Cache entry timestamp is in the future" });
 
-/** Validates cache envelope shape and optionally narrows its payload before it reaches callers. */
+function notifyMutation(mutation: PersistedCacheMutation): void {
+  for (const listener of mutationListeners) listener(mutation);
+}
+
+export function subscribePersistedCacheMutations(
+  listener: (mutation: PersistedCacheMutation) => void,
+): () => void {
+  mutationListeners.add(listener);
+  return () => mutationListeners.delete(listener);
+}
+
+function createMemoryStorage(): StorageLike {
+  return memoryStorage;
+}
+
+function isStorageAdapter(value: unknown): value is StorageLike {
+  return typeof value === "object" && value !== null && "getItem" in value &&
+    typeof value.getItem === "function";
+}
+
+async function probeNativeStorage(): Promise<StorageLike | null> {
+  if (!isStorageAdapter(AsyncStorage)) return null;
+  try {
+    await AsyncStorage.getItem(`${CACHE_STORAGE_NAMESPACE}__probe__`);
+    return AsyncStorage as StorageLike;
+  } catch {
+    return null;
+  }
+}
+
+/** Retries a previously unavailable native adapter at the next foreground boundary. */
+export function retryNativeStorageOnForeground(): void {
+  if (nativeStorageState === null) nativeStorageState = undefined;
+}
+
+async function getStorage(): Promise<StorageLike> {
+  if (nativeStorageState !== undefined) return nativeStorageState ?? createMemoryStorage();
+  nativeStorageProbe ??= probeNativeStorage();
+  nativeStorageState = await nativeStorageProbe;
+  nativeStorageProbe = null;
+  return nativeStorageState ?? createMemoryStorage();
+}
+
+function byteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function isVersionedPublicLogicalKey(key: string): boolean {
+  return PUBLIC_LOGICAL_KEY_PATTERN.test(key);
+}
+
+function isVersionedPublicStorageKey(key: string): boolean {
+  return (key.startsWith(CURRENT_PUBLIC_PREFIX) || key.startsWith(LEGACY_PUBLIC_PREFIX)) &&
+    PUBLIC_LOGICAL_KEY_PATTERN.test(key.slice(key.indexOf("public:v")));
+}
+
+function logicalKeyFromStorageKey(key: string): string | null {
+  if (key.startsWith(CACHE_STORAGE_NAMESPACE)) return key.slice(CACHE_STORAGE_NAMESPACE.length);
+  if (key.startsWith(LEGACY_CACHE_STORAGE_NAMESPACE)) return key.slice(LEGACY_CACHE_STORAGE_NAMESPACE.length);
+  return null;
+}
+
+function isPayloadValidForStorageKey(storageKey: string, data: unknown): boolean {
+  const logicalKey = logicalKeyFromStorageKey(storageKey);
+  const endpoint = logicalKey?.match(/:(events|rooms|today|schedule)(?:\?|$)/)?.[1];
+  if (endpoint === "events") return EventsResponseSchema.safeParse(data).success;
+  if (endpoint === "rooms") return RoomsResponseSchema.safeParse(data).success;
+  if (endpoint === "today") return TodayResponseSchema.safeParse(data).success;
+  if (endpoint === "schedule") return ScheduleResponseSchema.safeParse(data).success;
+  return false;
+}
+
 function isCacheEntry<T>(value: unknown, validator?: CacheValidator<T>): value is CachedEntry<T> {
   const envelope = CACHE_ENTRY_ENVELOPE_SCHEMA.safeParse(value);
   if (!envelope.success) return false;
   return validator ? validator(envelope.data.data) : true;
 }
 
-/** Parses a cache envelope without mutating either storage namespace. */
 function parseCacheEntry<T>(raw: string, validator?: CacheValidator<T>): CachedEntry<T> | null {
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -93,88 +150,257 @@ function parseCacheEntry<T>(raw: string, validator?: CacheValidator<T>): CachedE
   }
 }
 
-type RawCacheEntry<T> = { raw: string; entry: CachedEntry<T> };
+function isFreshEntry(entry: CachedEntry<unknown>, now = Date.now()): boolean {
+  return Math.max(0, now - entry.timestamp) <= OFFLINE_CACHE_MAX_AGE_MS;
+}
 
-/** Reads a cache envelope and removes it when validation fails. */
-async function readCacheEntry<T>(storage: StorageLike, key: string, validator?: CacheValidator<T>): Promise<RawCacheEntry<T> | null> {
-  const raw = await storage.getItem(key);
+async function batchRead(storage: StorageLike, keys: readonly string[]): Promise<Array<readonly [string, string | null]>> {
+  if (keys.length === 0) return [];
+  if (storage.multiGet) return [...await storage.multiGet(keys)];
+  return Promise.all(keys.map(async (key) => [key, await storage.getItem(key)] as const));
+}
+
+async function discoverIndex(storage: StorageLike): Promise<CacheIndex> {
+  const keys = (await storage.getAllKeys?.() ?? []).filter(isVersionedPublicStorageKey);
+  const entries: Record<string, CacheIndexEntry> = {};
+  for (const [key, raw] of await batchRead(storage, keys)) {
+    if (!raw) continue;
+    const bytes = byteLength(raw);
+    const entry = parseCacheEntry<unknown>(raw);
+    if (!entry || !isPayloadValidForStorageKey(key, entry.data)) {
+      entries[key] = { timestamp: 0, bytes, isValid: false };
+      continue;
+    }
+    entries[key] = {
+      timestamp: entry.timestamp,
+      bytes,
+      isValid: true,
+      ...(entry.isOffline === true ? { isOffline: true } : {}),
+    };
+  }
+  return { entries };
+}
+
+async function loadIndex(storage: StorageLike): Promise<CacheIndex> {
+  const existing = indexByStorage.get(storage as object);
+  if (existing) return existing;
+  // The persisted index is only a compatibility/diagnostics artifact. Rebuild
+  // once per adapter so older metadata cannot advertise schema-invalid data.
+  const loading = discoverIndex(storage);
+  indexByStorage.set(storage as object, loading);
+  try {
+    return await loading;
+  } catch (error: unknown) {
+    if (indexByStorage.get(storage as object) === loading) indexByStorage.delete(storage as object);
+    throw error;
+  }
+}
+
+async function removeMany(storage: StorageLike, keys: readonly string[]): Promise<void> {
+  if (keys.length === 0) return;
+  if (storage.multiRemove) await storage.multiRemove(keys);
+  else await Promise.all(keys.map((key) => storage.removeItem(key)));
+}
+
+function selectEvictions(index: CacheIndex, now = Date.now()): string[] {
+  const ordered = Object.entries(index.entries).sort(([keyA, a], [keyB, b]) =>
+    a.timestamp - b.timestamp || (keyA < keyB ? -1 : keyA > keyB ? 1 : 0));
+  const expired = ordered.filter(([, entry]) =>
+    now - entry.timestamp > OFFLINE_CACHE_MAX_AGE_MS || entry.bytes > MAX_PERSISTED_ENTRY_BYTES);
+  const survivors = ordered.filter(([, entry]) =>
+    now - entry.timestamp <= OFFLINE_CACHE_MAX_AGE_MS && entry.bytes <= MAX_PERSISTED_ENTRY_BYTES);
+  const evictions = expired.map(([key]) => key);
+  let count = survivors.length;
+  let bytes = survivors.reduce((total, [, entry]) => total + entry.bytes, 0);
+  for (const [key, entry] of survivors) {
+    if (count <= MAX_PERSISTED_CACHE_ENTRIES && bytes <= MAX_PERSISTED_CACHE_BYTES) break;
+    evictions.push(key);
+    count -= 1;
+    bytes -= entry.bytes;
+  }
+  return evictions;
+}
+
+async function persistIndexAndEvict(storage: StorageLike, index: CacheIndex): Promise<void> {
+  const evictions = selectEvictions(index);
+  await removeMany(storage, evictions);
+  for (const key of evictions) delete index.entries[key];
+  await storage.setItem(CACHE_INDEX_STORAGE_KEY, JSON.stringify(index));
+}
+
+function enqueueMutation<T>(expectedGeneration: number, operation: () => Promise<T>): Promise<T | undefined> {
+  const run = mutationTail.then(async () => {
+    if (expectedGeneration !== publicDataGeneration) return undefined;
+    return operation();
+  });
+  mutationTail = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+function enqueueClear(operation: () => Promise<void>): Promise<void> {
+  const run = mutationTail.then(operation);
+  mutationTail = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+async function removeIndexedEntry(storage: StorageLike, storageKey: string, observedRaw?: string): Promise<void> {
+  if (observedRaw !== undefined && await storage.getItem(storageKey) !== observedRaw) return;
+  await storage.removeItem(storageKey);
+  const index = await loadIndex(storage);
+  delete index.entries[storageKey];
+  await storage.setItem(CACHE_INDEX_STORAGE_KEY, JSON.stringify(index));
+  notifyMutation("write");
+}
+
+async function readRawCacheEntry<T>(
+  storage: StorageLike,
+  storageKey: string,
+  validator: CacheValidator<T> | undefined,
+  expectedGeneration: number,
+): Promise<RawCacheEntry<T> | null> {
+  const raw = await storage.getItem(storageKey);
   if (raw === null) return null;
-
-  const entry = parseCacheEntry<T>(raw, validator);
-  if (entry) return { raw, entry };
-  await storage.removeItem(key).catch(() => undefined);
+  const entry = byteLength(raw) <= MAX_PERSISTED_ENTRY_BYTES ? parseCacheEntry<T>(raw, validator) : null;
+  if (entry && isFreshEntry(entry)) return { raw, entry };
+  void enqueueMutation(expectedGeneration, () => removeIndexedEntry(storage, storageKey, raw)).catch(() => undefined);
   return null;
 }
 
-/** Parses, schema-validates, and deletes malformed persisted envelopes before returning them. */
-async function getPersistedCacheEntry<T>(key: string, validator?: CacheValidator<T>): Promise<CachedEntry<T> | null> {
+async function getPersistedCacheRecord<T>(
+  key: string,
+  validator?: CacheValidator<T>,
+  expectedGeneration = publicDataGeneration,
+): Promise<RawCacheEntry<T> | null> {
+  if (!isVersionedPublicLogicalKey(key)) return null;
   const storage = await getStorage();
-  const storageKey = CACHE_STORAGE_NAMESPACE + key;
-  const currentEntry = await readCacheEntry<T>(storage, storageKey, validator);
-  if (currentEntry) return currentEntry.entry;
+  const currentStorageKey = CACHE_STORAGE_NAMESPACE + key;
+  const currentEntry = await readRawCacheEntry<T>(storage, currentStorageKey, validator, expectedGeneration);
+  if (expectedGeneration !== publicDataGeneration) return null;
+  if (currentEntry) return currentEntry;
 
   const legacyStorageKey = LEGACY_CACHE_STORAGE_NAMESPACE + key;
-  const legacyEntry = await readCacheEntry<T>(storage, legacyStorageKey, validator);
-  if (!legacyEntry) return null;
+  const legacyEntry = await readRawCacheEntry<T>(storage, legacyStorageKey, validator, expectedGeneration);
+  if (!legacyEntry || expectedGeneration !== publicDataGeneration) return null;
 
-  try {
-    await storage.setItem(storageKey, legacyEntry.raw);
-  } catch {
-    // Preserve the old value so a later launch can retry migration.
-    return legacyEntry.entry;
-  }
-  await storage.removeItem(legacyStorageKey).catch(() => undefined);
-  return legacyEntry.entry;
+  await enqueueMutation(expectedGeneration, async () => {
+    const index = await loadIndex(storage);
+    if (await storage.getItem(currentStorageKey) !== null || await storage.getItem(legacyStorageKey) !== legacyEntry.raw) return;
+    await storage.setItem(currentStorageKey, legacyEntry.raw);
+    await storage.removeItem(legacyStorageKey);
+    delete index.entries[legacyStorageKey];
+    index.entries[currentStorageKey] = {
+      timestamp: legacyEntry.entry.timestamp,
+      bytes: byteLength(legacyEntry.raw),
+      isValid: isPayloadValidForStorageKey(currentStorageKey, legacyEntry.entry.data),
+      ...(legacyEntry.entry.isOffline === true ? { isOffline: true } : {}),
+    };
+    await persistIndexAndEvict(storage, index);
+    notifyMutation("migration");
+  }).catch(() => undefined);
+  return expectedGeneration === publicDataGeneration ? legacyEntry : null;
 }
 
-/** Persists a value with the write timestamp required for stale-data disclosure. */
+async function getPersistedCacheEntry<T>(
+  key: string,
+  validator?: CacheValidator<T>,
+  expectedGeneration = publicDataGeneration,
+): Promise<CachedEntry<T> | null> {
+  return (await getPersistedCacheRecord(key, validator, expectedGeneration))?.entry ?? null;
+}
+
+async function setPersistedCacheAtGeneration<T>(key: string, value: T, expectedGeneration: number): Promise<void> {
+  if (!isVersionedPublicLogicalKey(key)) return;
+  const entry: CachedEntry<T> = { data: value, timestamp: Date.now() };
+  const raw = JSON.stringify(entry);
+  const bytes = byteLength(raw);
+  if (bytes > MAX_PERSISTED_ENTRY_BYTES) {
+    await enqueueMutation(expectedGeneration, async () => {
+      const storage = await getStorage();
+      await removeMany(storage, [CACHE_STORAGE_NAMESPACE + key, LEGACY_CACHE_STORAGE_NAMESPACE + key]);
+      const index = await loadIndex(storage);
+      delete index.entries[CACHE_STORAGE_NAMESPACE + key];
+      delete index.entries[LEGACY_CACHE_STORAGE_NAMESPACE + key];
+      await storage.setItem(CACHE_INDEX_STORAGE_KEY, JSON.stringify(index));
+      notifyMutation("write");
+    });
+    return;
+  }
+
+  await enqueueMutation(expectedGeneration, async () => {
+    const storage = await getStorage();
+    const storageKey = CACHE_STORAGE_NAMESPACE + key;
+    const index = await loadIndex(storage);
+    await storage.setItem(storageKey, raw);
+    index.entries[storageKey] = {
+      timestamp: entry.timestamp,
+      bytes,
+      isValid: isPayloadValidForStorageKey(storageKey, value),
+    };
+    await persistIndexAndEvict(storage, index);
+    notifyMutation("write");
+  });
+}
+
+/** Persists a public value, retaining the generation active when the write was requested. */
 export async function setPersistedCache<T>(key: string, value: T): Promise<void> {
-  const entry: CachedEntry<T> = {
-    data: value,
-    timestamp: Date.now()
-  };
-  const storage = await getStorage();
-  await storage.setItem(CACHE_STORAGE_NAMESPACE + key, JSON.stringify(entry));
+  await setPersistedCacheAtGeneration(key, value, publicDataGeneration);
 }
 
-/** Rewrites an existing entry with its offline marker while retaining the original timestamp. */
-export async function markCacheAsOffline<T>(key: string): Promise<void> {
-  const entry = await getPersistedCacheEntry<T>(key);
-  if (!entry) return;
-  
+async function markCacheAsOfflineAtGeneration<T>(key: string, expectedGeneration: number): Promise<void> {
+  const record = await getPersistedCacheRecord<T>(key, undefined, expectedGeneration);
+  if (!record || expectedGeneration !== publicDataGeneration) return;
   const storage = await getStorage();
-  const offlineEntry: CachedEntry<T> = {
-    ...entry,
-    isOffline: true
-  };
-  await storage.setItem(CACHE_STORAGE_NAMESPACE + key, JSON.stringify(offlineEntry));
+  const storageKey = CACHE_STORAGE_NAMESPACE + key;
+  const observedRaw = await storage.getItem(storageKey);
+  if (observedRaw !== record.raw) return;
+
+  await enqueueMutation(expectedGeneration, async () => {
+    const currentRaw = await storage.getItem(storageKey);
+    if (currentRaw !== observedRaw) return;
+    const current = parseCacheEntry<T>(currentRaw ?? "");
+    if (!current) return;
+    const offlineEntry: CachedEntry<T> = { ...current, isOffline: true };
+    const raw = JSON.stringify(offlineEntry);
+    const bytes = byteLength(raw);
+    if (bytes > MAX_PERSISTED_ENTRY_BYTES) return;
+    const index = await loadIndex(storage);
+    await storage.setItem(storageKey, raw);
+    index.entries[storageKey] = {
+      timestamp: current.timestamp,
+      bytes,
+      isValid: isPayloadValidForStorageKey(storageKey, current.data),
+      isOffline: true,
+    };
+    await persistIndexAndEvict(storage, index);
+    notifyMutation("offline");
+  });
 }
 
-/** Clears persisted cache without disturbing unrelated stored state. */
-export async function clearPersistedCache(key?: string): Promise<void> {
-  const storage = await getStorage();
 
-  if (key) {
-    await Promise.all([
-      storage.removeItem(CACHE_STORAGE_NAMESPACE + key),
-      storage.removeItem(LEGACY_CACHE_STORAGE_NAMESPACE + key),
-    ]);
-    return;
-  }
+/** Clears only versioned public cache records and invalidates every older queued mutation. */
+export function clearPersistedCache(key?: string): Promise<void> {
+  publicDataGeneration += 1;
+  return enqueueClear(async () => {
+    const storage = await getStorage();
+    if (nativeStorageState === null && isStorageAdapter(AsyncStorage)) {
+      throw new Error("Saved data storage is unavailable");
+    }
+    if (key !== undefined) {
+      if (!isVersionedPublicLogicalKey(key)) return;
+      await removeMany(storage, [CACHE_STORAGE_NAMESPACE + key, LEGACY_CACHE_STORAGE_NAMESPACE + key]);
+      await storage.removeItem(CACHE_INDEX_STORAGE_KEY).catch(() => undefined);
+      indexByStorage.delete(storage as object);
+      notifyMutation("clear");
+      return;
+    }
 
-  const allKeys = await storage.getAllKeys?.();
-  if (!allKeys || allKeys.length === 0) return;
-
-  const ours = allKeys.filter((k) =>
-    k.startsWith(CACHE_STORAGE_NAMESPACE) || k.startsWith(LEGACY_CACHE_STORAGE_NAMESPACE));
-  if (ours.length === 0) return;
-
-  if (storage.multiRemove) {
-    await storage.multiRemove(ours);
-    return;
-  }
-
-  await Promise.all(ours.map((k) => storage.removeItem(k)));
+    const allKeys = await storage.getAllKeys?.() ?? [];
+    const publicKeys = allKeys.filter(isVersionedPublicStorageKey);
+    await removeMany(storage, publicKeys);
+    await storage.removeItem(CACHE_INDEX_STORAGE_KEY).catch(() => undefined);
+    indexByStorage.delete(storage as object);
+    notifyMutation("clear");
+  });
 }
 
 export type OfflineFetchResult<T> = {
@@ -184,74 +410,56 @@ export type OfflineFetchResult<T> = {
   cacheAge: number | null;
 };
 
-/** Attempts network first, returning validated cache only for transient failures within the age limit. */
+/** Attempts network immediately, using one concurrently started persisted read after transient failure. */
 export async function fetchNetworkFirstWithFallback<T>(
   key: string,
   loader: () => Promise<T>,
-  validator?: CacheValidator<T>
+  validator?: CacheValidator<T>,
 ): Promise<OfflineFetchResult<T>> {
-  // Storage is an optional acceleration/offline layer. A read outage must not
-  // prevent a healthy network request from proceeding.
-  const cachedEntry = await getPersistedCacheEntry<T>(key, validator).catch(() => null);
+  const expectedGeneration = publicDataGeneration;
+  let network: Promise<T>;
+  try {
+    network = loader();
+  } catch (error: unknown) {
+    network = Promise.reject(error);
+  }
+  const cached = getPersistedCacheEntry<T>(key, validator, expectedGeneration).catch(() => null);
 
   try {
-    const freshData = await loader();
-
-    // A storage outage must not discard a successful network response.
-    await setPersistedCache(key, freshData).catch(() => undefined);
-
-    return {
-      data: freshData,
-      fromCache: false,
-      isOffline: false,
-      cacheAge: null
-    };
+    const freshData = await network;
+    if (expectedGeneration === publicDataGeneration) {
+      void setPersistedCacheAtGeneration(key, freshData, expectedGeneration).catch(() => undefined);
+    }
+    return { data: freshData, fromCache: false, isOffline: false, cacheAge: null };
   } catch (error: unknown) {
-    const fallback = await getTransientCacheFallback(key, cachedEntry, error);
+    if (!isTransientPublicDataFailure(error)) throw error;
+    const cachedEntry = await cached;
+    if (expectedGeneration !== publicDataGeneration) throw error;
+    const fallback = await getTransientCacheFallback(key, cachedEntry, error, expectedGeneration);
     if (fallback) return fallback;
     throw error;
   }
 }
 
-/** Returns a fresh-enough cached result only for failures safe to treat as transient. */
 async function getTransientCacheFallback<T>(
   key: string,
   cachedEntry: CachedEntry<T> | null,
-  error: unknown
+  error: unknown,
+  expectedGeneration: number,
 ): Promise<OfflineFetchResult<T> | null> {
-  if (!cachedEntry || !isTransientFailure(error)) return null;
-
+  if (!cachedEntry || !isTransientPublicDataFailure(error)) return null;
   const cacheAge = Math.max(0, Date.now() - cachedEntry.timestamp);
   if (cacheAge > OFFLINE_CACHE_MAX_AGE_MS) return null;
-
-  await markCacheAsOffline<T>(key).catch(() => undefined);
-  return {
-    data: cachedEntry.data,
-    fromCache: true,
-    isOffline: true,
-    cacheAge
-  };
+  await markCacheAsOfflineAtGeneration<T>(key, expectedGeneration).catch(() => undefined);
+  if (expectedGeneration !== publicDataGeneration) return null;
+  return { data: cachedEntry.data, fromCache: true, isOffline: true, cacheAge };
 }
 
-/** Allows fallback only for rate-limit and server failures that are not known validation mismatches. */
-function isRetryableResponseError(error: HttpError | ApiErrorException): boolean {
-  return !NON_RETRYABLE_ERROR_CODES.has(error.code) && (error.status === 429 || error.status >= 500);
-}
-
-/** Classifies timeout, transport, and retryable HTTP failures as eligible for cached fallback. */
-function isTransientFailure(error: unknown): boolean {
-  if (error instanceof RequestTimeoutError || error instanceof TypeError) return true;
-  if (error instanceof HttpError || error instanceof ApiErrorException) return isRetryableResponseError(error);
-  return false;
-}
-
-/** Reports whether the saved entry was produced by a network-failure fallback. */
 export async function isOfflineData(key: string): Promise<boolean> {
   const entry = await getPersistedCacheEntry<unknown>(key);
   return entry?.isOffline ?? false;
 }
 
-/** Get cache statistics for diagnostics screens and tests. */
 export async function getCacheStats(): Promise<{
   keyCount: number;
   oldestEntry: number | null;
@@ -259,49 +467,22 @@ export async function getCacheStats(): Promise<{
   offlineKeys: string[];
 }> {
   const storage = await getStorage();
-  const allKeys = await storage.getAllKeys?.() ?? [];
-  const ourKeys = allKeys.filter(k => k.startsWith(CACHE_STORAGE_NAMESPACE));
-  const stats = createCacheStats(ourKeys.length);
-
-  for (const key of ourKeys) {
-    updateCacheStats(stats, key, await storage.getItem(key));
+  const index = await loadIndex(storage);
+  const logicalEntries = new Map<string, CacheIndexEntry>();
+  for (const [storageKey, entry] of Object.entries(index.entries)) {
+    if (!entry.isValid || !isVersionedPublicStorageKey(storageKey) ||
+      Date.now() - entry.timestamp > OFFLINE_CACHE_MAX_AGE_MS) continue;
+    const logicalKey = logicalKeyFromStorageKey(storageKey);
+    if (logicalKey && (storageKey.startsWith(CACHE_STORAGE_NAMESPACE) || !logicalEntries.has(logicalKey))) {
+      logicalEntries.set(logicalKey, entry);
+    }
   }
 
-  return stats;
-}
-
-type CacheStats = {
-  keyCount: number;
-  oldestEntry: number | null;
-  newestEntry: number | null;
-  offlineKeys: string[];
-};
-
-function createCacheStats(keyCount: number): CacheStats {
-  return { keyCount, oldestEntry: null, newestEntry: null, offlineKeys: [] };
-}
-
-/** Incorporates a readable cache envelope into diagnostics and ignores malformed values. */
-function updateCacheStats(stats: CacheStats, key: string, raw: string | null): void {
-  const entry = parseCacheStatsEntry(raw);
-  if (!entry) return;
-
-  if (stats.oldestEntry === null || entry.timestamp < stats.oldestEntry) {
-    stats.oldestEntry = entry.timestamp;
-  }
-  if (stats.newestEntry === null || entry.timestamp > stats.newestEntry) {
-    stats.newestEntry = entry.timestamp;
-  }
-  if (entry.isOffline) stats.offlineKeys.push(key.replace(CACHE_STORAGE_NAMESPACE, ""));
-}
-
-function parseCacheStatsEntry(raw: string | null): CachedEntry<unknown> | null {
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw) as CachedEntry<unknown>;
-  } catch {
-    // Diagnostics must tolerate malformed values without failing the cache view.
-    return null;
-  }
+  const timestamps = [...logicalEntries.values()].map((entry) => entry.timestamp);
+  return {
+    keyCount: logicalEntries.size,
+    oldestEntry: timestamps.length > 0 ? Math.min(...timestamps) : null,
+    newestEntry: timestamps.length > 0 ? Math.max(...timestamps) : null,
+    offlineKeys: [...logicalEntries.entries()].filter(([, entry]) => entry.isOffline).map(([key]) => key).sort(),
+  };
 }

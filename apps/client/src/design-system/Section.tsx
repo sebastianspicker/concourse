@@ -1,47 +1,44 @@
-/** Provides consistent heading and optional action layout for screen subsections. */
+/** Sections: a light heading with a quiet count and an optional action; rows and cards bring their own rules. */
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { spacing, typography } from "./theme";
-import { getDesignPreset } from "./designPresets";
-import { useTheme } from "./ThemeContext";
+import { useTheme, useDesignMetrics } from "./ThemeProvider";
 
-/** Renders an accessible content section with a themed heading and optional action. */
-export function SectionHeader({ title, action, prominent = false }: { title: string; action?: React.ReactNode; prominent?: boolean }): JSX.Element {
+/** Renders an accessible section heading over an ink hairline, like the head of a printed catalogue. */
+export function SectionHeader({ title, meta, action }: { title: string; meta?: string; action?: React.ReactNode }): JSX.Element {
   const theme = useTheme();
-  const metrics = getDesignPreset(theme.designPreset).metrics;
   return (
-    <View style={[styles.titleRow, { paddingBottom: metrics.compactGutter - spacing.xs, borderBottomColor: theme.colors.border, borderBottomWidth: theme.ui.borderWidth }]}>
-      <Text style={[styles.title, prominent && styles.titleProminent, { color: theme.colors.text }]} accessibilityRole="header">{title}</Text>
+    <View style={styles.titleRow}>
+      <View style={styles.titleGroup}>
+        <Text style={[styles.title, { color: theme.colors.text }]} accessibilityRole="header">{title}</Text>
+        {meta ? <Text style={[styles.meta, { color: theme.colors.muted }]}>{meta}</Text> : null}
+      </View>
       {action ?? null}
     </View>
   );
 }
 
 /** Groups a labeled subsection with a consistent header-to-content relationship. */
-export function Section({ title, action, children, prominent = false }: { title: string; action?: React.ReactNode; children: React.ReactNode; prominent?: boolean }): JSX.Element {
-  const theme = useTheme();
-  const metrics = getDesignPreset(theme.designPreset).metrics;
+export function Section({ title, meta, action, children }: { title: string; meta?: string; action?: React.ReactNode; children: React.ReactNode }): JSX.Element {
+  const metrics = useDesignMetrics();
   return (
-    <View style={[styles.section, { marginBottom: metrics.sectionGap }]}>
-      <SectionHeader title={title} action={action} prominent={prominent} />
-      <View
-        style={[
-          styles.body,
-          {
-            backgroundColor: theme.colors.surface,
-          },
-        ]}
-      >
-        {children}
-      </View>
+    <View style={{ marginBottom: metrics.sectionGap }}>
+      <SectionHeader title={title} meta={meta} action={action} />
+      <View>{children}</View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  section: {},
-  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  title: { ...typography.caption, fontSize: 15, lineHeight: 20, fontWeight: "700", letterSpacing: 0.9, textTransform: "uppercase" },
-  titleProminent: { ...typography.heading, fontSize: 28, lineHeight: 34, letterSpacing: -0.7, textTransform: "none" },
-  body: { overflow: "hidden" },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingBottom: spacing.lg,
+    minHeight: 56,
+  },
+  titleGroup: { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", columnGap: spacing.md, rowGap: 2, flexShrink: 1, paddingBottom: spacing.xs },
+  title: { ...typography.heading },
+  meta: { ...typography.caption },
 });

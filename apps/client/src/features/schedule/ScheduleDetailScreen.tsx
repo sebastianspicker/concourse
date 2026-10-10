@@ -1,13 +1,12 @@
 /** Resolves a schedule route to a time-zone-aware detail view and reconciles selection. */
 import { useLocalSearchParams } from "expo-router";
-import { useEffect } from "react";
-import { useSchedule } from "@/data/public/useSchedule";
+import { useSchedule } from "@/data/public/resources";
 import { MetaRow } from "@/design-system/MetaRow";
 import { ResourceDetailScreen } from "@/design-system/ResourceDetailScreen";
-import { formatCampusId, formatEventDate, formatScheduleTime } from "@/localization/dateFormat";
+import { formatBoardDay, formatBoardTime, formatBoardTimeRange, formatCampusId, formatLongDate } from "@/localization/dateFormat";
 import { useLocale } from "@/localization/LocaleContext";
 import { getInstitutionTimeZone } from "@/platform/env/institution";
-import { reconcileSelectedDetailRecord, selectDetailRecord, selectedScheduleDetails } from "@/data/public/selectedDetailRecords";
+import { selectedScheduleDetails, useSelectedDetail } from "@/data/public/selectedDetailRecords";
 import { STATIC_DEMO_SCHEDULE_IDS } from "@/data/public/staticDemoData";
 
 /** Resolves a selected schedule entry into a campus-time-aware detail surface. */
@@ -15,19 +14,9 @@ export default function ScheduleDetailScreen(): JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
   const state = useSchedule();
   const collection = state.data?.schedule ?? null;
-  const scheduleItem = selectDetailRecord(
-    id,
-    collection,
-    state.source,
-    selectedScheduleDetails.get(id),
-    state.data?._degraded === true
-  );
+  const scheduleItem = useSelectedDetail(selectedScheduleDetails, id, collection, state.source, state.data?._degraded === true);
   const { locale, t } = useLocale();
   const timeZone = getInstitutionTimeZone();
-
-  useEffect(() => {
-    reconcileSelectedDetailRecord(selectedScheduleDetails, id, collection, state.source, state.data?._degraded === true);
-  }, [collection, id, state.data?._degraded, state.source]);
 
   return (
     <ResourceDetailScreen
@@ -35,23 +24,23 @@ export default function ScheduleDetailScreen(): JSX.Element {
       error={state.error}
       item={scheduleItem ?? null}
       notFoundMessage={t("errorNotFound")}
-      cardTitle={scheduleItem ? scheduleItem.title : "Schedule item"}
+      kicker={t("kickerSchedule")}
+      cardTitle={scheduleItem ? scheduleItem.title : t("unknownScheduleEntry", { id: String(id) })}
       cardSubtitle={
         scheduleItem
-          ? formatScheduleTime(scheduleItem.startsAt, locale, timeZone)
-          : `Schedule ID: ${id}`
+          ? `${formatBoardDay(scheduleItem.startsAt, locale, timeZone).weekday} ${formatBoardTimeRange(scheduleItem.startsAt, scheduleItem.endsAt, locale, timeZone)}`
+          : undefined
       }
       renderMeta={
         scheduleItem
           ? () => (
               <>
-                <MetaRow
-                  label={t("starts")}
-                  value={formatEventDate(scheduleItem.startsAt, locale, timeZone)}
-                />
+                <MetaRow label={t("date")} value={formatLongDate(scheduleItem.startsAt, locale, timeZone)} data />
+                <MetaRow label={t("starts")} value={formatBoardTime(scheduleItem.startsAt, locale, timeZone)} data />
                 <MetaRow
                   label={t("ends")}
-                  value={scheduleItem.endsAt ? formatEventDate(scheduleItem.endsAt, locale, timeZone) : t("toBeAnnounced")}
+                  value={scheduleItem.endsAt ? formatBoardTime(scheduleItem.endsAt, locale, timeZone) : t("toBeAnnounced")}
+                  data={Boolean(scheduleItem.endsAt)}
                 />
                 <MetaRow label={t("location")} value={scheduleItem.location ?? t("toBeAnnounced")} />
                 {scheduleItem.campusId ? (

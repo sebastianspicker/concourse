@@ -1,6 +1,5 @@
 /** Maps transport and API failures into stable UI-facing error categories. */
-import { ApiErrorException } from "./errors";
-import { HttpError, RequestTimeoutError } from "./fetchHelpers";
+import { ApiErrorException, isAbortError, RequestTimeoutError } from "./errors";
 
 export type UiErrorKind =
   | "offline"
@@ -34,11 +33,6 @@ const STATUS_ERROR_FACTORIES: Readonly<Record<number, ErrorFactory>> = {
   429: (retryAfterInSeconds) => ({ kind: "rateLimit", retryAfterInSeconds }),
 };
 
-/** Suppresses caller-requested cancellation rather than presenting it as a user-visible failure. */
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
-}
-
 /** Recognizes legacy transport timeout wording that is not represented by RequestTimeoutError. */
 function isTimeoutMessage(error: unknown): boolean {
   return error instanceof Error && /timeout|aborted/i.test(error.message);
@@ -56,9 +50,6 @@ function fromCode(code: string, status: number, retryAfterInSeconds?: number): U
 export function toUiError(error: unknown): UiError | null {
   if (error instanceof RequestTimeoutError) return { kind: "timeout" };
   if (isAbortError(error)) return null;
-  if (error instanceof HttpError) {
-    return fromCode(error.code, error.status, error.retryAfterInSeconds);
-  }
   if (error instanceof ApiErrorException) return fromCode(error.code, error.status, error.retryAfterInSeconds);
   if (error instanceof TypeError) return { kind: "offline" };
   if (isTimeoutMessage(error)) {

@@ -9,12 +9,11 @@ import {
   SCHEDULE_TITLE_MAX_LENGTH
 } from "@concourse/contracts";
 import { parseIcsDate } from "./recurrenceDate";
-import { expandRecurringEvent } from "./recurrenceRules";
-import type { IcsDateProperty, ParsedIcsEvent } from "./recurrenceTypes";
+import { expandRecurringEvent, type IcsDateProperty, type ParsedIcsEvent } from "./recurrenceRules";
 import { forEachValidIcsEvent, type IcsPropertyMap } from "./icsEventStream";
 import { countRecurringEvents } from "./icsRecurrenceCounter";
 
-export type { ParsedIcsEvent } from "./recurrenceTypes";
+export type { ParsedIcsEvent } from "./recurrenceRules";
 
 const DEFAULT_RRULE_HORIZON_DAYS = 90;
 const DEFAULT_RRULE_MAX_INSTANCES = 100;
@@ -70,6 +69,7 @@ const compareRetentionPriority = (first: ParsedIcsEvent, second: ParsedIcsEvent,
 
 /** Retains only the highest-priority events when the document output cap is reached. */
 const insertRelevantEvent = (events: ParsedIcsEvent[], event: ParsedIcsEvent, maxTotal: number, referenceTime: number): void => {
+  if (events.length === maxTotal && compareRetentionPriority(event, events[events.length - 1], referenceTime) >= 0) return;
   let low = 0;
   let high = events.length;
   while (low < high) {

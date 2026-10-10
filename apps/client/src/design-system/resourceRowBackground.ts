@@ -1,20 +1,13 @@
 import { withOpacity } from "./theme";
-import type { useTheme } from "./ThemeContext";
+import type { useTheme } from "./ThemeProvider";
 
+/** Rows sit directly on the hall; interaction tints them with a faint ink wash, never a color fill. */
 export function getResourceRowBackground(
   theme: ReturnType<typeof useTheme>,
   pressed: boolean,
-  active: boolean,
-  open: boolean,
-  timeline: boolean,
+  hovered: boolean,
 ): string {
-  if (pressed) {
-    if (timeline && active) return withOpacity(theme.colors.signal, 0.28);
-    return withOpacity(theme.colors.accent, 0.10);
-  }
-  // Timeline “next” wash outranks open transparent so the active spine stays legible.
-  if (timeline && active) return withOpacity(theme.colors.signal, 0.18);
-  if (open) return "transparent";
-  if (active) return withOpacity(theme.colors.accent, 0.07);
-  return theme.colors.surface;
+  if (pressed) return withOpacity(theme.colors.text, 0.08);
+  if (hovered) return withOpacity(theme.colors.text, 0.04);
+  return "transparent";
 }

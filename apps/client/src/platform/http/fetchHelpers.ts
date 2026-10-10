@@ -1,37 +1,12 @@
 /** Implements timeout-aware JSON fetches and defensive fallback parsing of BFF failures. */
-import { getApiErrorDetails } from "./errors";
-import { parseRetryAfterSeconds } from "./retryAfter";
+import { ApiErrorException, getApiErrorDetails, RequestTimeoutError } from "./errors";
+import { parseRetryAfterSeconds } from "./retry";
 import { PublicResponseHeader } from "@concourse/contracts";
 
-export type BffError = {
+type BffError = {
   code: string;
   message: string;
 };
-
-/** Preserves non-success HTTP status, BFF code, and optional Retry-After guidance for callers. */
-export class HttpError extends Error {
-  readonly status: number;
-  readonly code: string;
-  readonly retryAfterInSeconds: number | undefined;
-
-  /** Captures the HTTP status, machine-readable code, and optional server retry guidance. */
-  constructor(opts: { message: string; status: number; code: string; retryAfterInSeconds?: number }) {
-    super(opts.message);
-    this.name = "HttpError";
-    this.status = opts.status;
-    this.code = opts.code;
-    this.retryAfterInSeconds = opts.retryAfterInSeconds;
-  }
-}
-
-/** A timeout initiated by this client, distinct from a caller cancellation. */
-export class RequestTimeoutError extends Error {
-  /** Creates the distinct error used when the configured request deadline expires. */
-  constructor() {
-    super("Request timed out");
-    this.name = "RequestTimeoutError";
-  }
-}
 
 export type JsonResponse<T> = {
   data: T;
@@ -83,16 +58,6 @@ function assertClientHttpUrl(url: string): void {
   }
 }
 
-/** Fetches JSON through the deadline-aware response reader and returns only its payload. */
-export async function fetchJsonWithTimeout<T>(
-  url: string,
-  init?: RequestInit,
-  timeoutMs = 10_000
-): Promise<T> {
-  const response = await fetchJsonResponseWithTimeout<T>(url, init, timeoutMs);
-  return response.data;
-}
-
 /** Fetches and validates a JSON response while respecting caller cancellation and a hard timeout. */
 export async function fetchJsonResponseWithTimeout<T>(
   url: string,
@@ -138,7 +103,7 @@ function createTimedRequest(externalSignal: AbortSignal | null | undefined, time
 /** Validates a response and returns its parsed JSON while preserving its headers. */
 async function parseJsonResponse<T>(response: Response, signal: AbortSignal): Promise<JsonResponse<T>> {
   if (!response.ok) {
-    throw await createHttpError(response, signal);
+    throw await createApiErrorException(response, signal);
   }
 
   return {
@@ -148,13 +113,13 @@ async function parseJsonResponse<T>(response: Response, signal: AbortSignal): Pr
 }
 
 /** Builds the normalized HTTP failure consumed by retry and UI error handling. */
-async function createHttpError(response: Response, signal: AbortSignal): Promise<HttpError> {
+async function createApiErrorException(response: Response, signal: AbortSignal): Promise<ApiErrorException> {
   const bffError = await parseBffError(response, signal);
   const message = bffError.code === "unknown_error"
     ? `Request failed (${response.status})`
     : bffError.message;
 
-  return new HttpError({
+  return new ApiErrorException({
     message,
     status: response.status,
     code: bffError.code,

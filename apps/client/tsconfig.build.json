@@ -1,13 +1,6 @@
-// Emits mobile application modules without bundling test-only support code.
+// Type-checks the shipped client surface without test-only modules; Expo bundles the app itself.
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "noEmit": false,
-    "declaration": false,
-    "sourceMap": true,
-    "rootDir": ".",
-    "outDir": "dist"
-  },
   "include": ["config/**/*.js", "config/**/*.d.ts", "app/**/*.ts", "app/**/*.tsx", "src/**/*.ts", "src/**/*.tsx"],
   "exclude": [
     "app/**/*.test.ts",

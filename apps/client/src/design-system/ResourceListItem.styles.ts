@@ -1,59 +1,31 @@
 import { StyleSheet } from "react-native";
-import { spacing, typography } from "./theme";
-
-const SPINE_DOT_SIZE = 11;
-const SPINE_RING_PAD = 4;
+import { BOARD_TIME_COLUMN, fonts, spacing, typography } from "./theme";
 
 export const styles = StyleSheet.create({
   link: { width: "100%" },
   row: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    alignItems: "flex-start",
+    gap: spacing.xl,
+    paddingVertical: spacing.lg + 2,
   },
-  rowDivider: { borderBottomWidth: 1 },
-  copy: { flex: 1, minWidth: 0 },
-  title: { ...typography.body, fontWeight: "700", letterSpacing: -0.3 },
-  subtitle: { ...typography.caption, marginTop: 3 },
-  badge: {
-    ...typography.small,
-    marginTop: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-    alignSelf: "flex-start",
-    overflow: "hidden",
-  },
-  timelineTimeColumn: {
-    width: 72,
-    alignSelf: "stretch",
-    justifyContent: "center",
-  },
-  timelineTime: {
-    ...typography.caption,
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: "600",
-    fontVariant: ["tabular-nums"],
-  },
-  spineSlot: {
-    width: SPINE_DOT_SIZE + SPINE_RING_PAD * 2,
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "center",
-  },
-  spineRing: {
-    padding: SPINE_RING_PAD,
-    borderRadius: 9999,
-  },
-  spineDot: {
-    width: SPINE_DOT_SIZE,
-    height: SPINE_DOT_SIZE,
-    borderRadius: SPINE_DOT_SIZE / 2,
-    borderWidth: 2,
-  },
+  leading: { width: BOARD_TIME_COLUMN, paddingTop: 1 },
+  leadingTime: { ...typography.dataStrong },
+  leadingDetail: { ...typography.dataSmall },
+  dayWeekday: { ...typography.caption },
+  dayNumber: { fontFamily: fonts.display, fontSize: 30, lineHeight: 32, fontVariant: ["lining-nums", "tabular-nums"] },
+  copy: { flex: 1, minWidth: 0, gap: 2 },
+  title: { ...typography.rowTitle },
+  titleHovered: { textDecorationLine: "underline" },
+  subtitle: { ...typography.caption },
+  subtitleData: { ...typography.dataSmall },
+  aside: { ...typography.caption, textAlign: "right", maxWidth: 200, paddingTop: 2 },
+  asideFolded: { ...typography.caption },
+  status: { alignSelf: "flex-start", paddingTop: 1 },
+  tag: { ...typography.action, fontSize: 12, lineHeight: 16, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1.5, overflow: "hidden" },
+  card: { minHeight: 300, borderWidth: 1, padding: spacing.xl, justifyContent: "space-between", gap: spacing.xl },
+  cardHead: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
+  cardMeta: { ...typography.label },
+  cardBody: { gap: spacing.sm },
+  cardTitle: { ...typography.cardTitle },
 });

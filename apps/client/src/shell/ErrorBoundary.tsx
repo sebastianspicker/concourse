@@ -1,41 +1,21 @@
 import React, { Component, type ReactNode } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { spacing, typography } from "@/design-system/theme";
-import { useTheme } from "@/design-system/ThemeContext";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useTheme } from "@/design-system/ThemeProvider";
+import { Button } from "@/design-system/Button";
 import { useLocale } from "@/localization/LocaleContext";
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
     justifyContent: "center",
     padding: spacing.xl,
   },
-  errorIcon: { marginBottom: spacing.md },
-  title: {
-    ...typography.subheading,
-    fontWeight: "bold",
-    marginBottom: spacing.sm,
-    textAlign: "center",
-  },
-  message: {
-    ...typography.body,
-    textAlign: "center",
-    marginBottom: spacing.xl,
-    maxWidth: 300,
-  },
-  button: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm,
-  },
-  buttonPressed: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    ...typography.body,
-    fontWeight: "600",
-  },
+  panel: { width: "100%", maxWidth: 480, alignSelf: "center", gap: spacing.md, borderTopWidth: 2, paddingTop: spacing.lg },
+  label: { ...typography.label },
+  title: { ...typography.heading },
+  message: { ...typography.body },
+  action: { marginTop: spacing.sm },
 });
 
 interface Props {
@@ -44,7 +24,6 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error: Error | null;
 }
 
 function ErrorFallback({
@@ -57,27 +36,18 @@ function ErrorFallback({
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.errorIcon}><MaterialIcons name="error-outline" size={48} color={theme.colors.error} /></View>
-      <Text style={[styles.title, { color: theme.colors.text }]}>
-        {t("errorTitleGeneric")}
-      </Text>
-      <Text style={[styles.message, { color: theme.colors.muted }]}>
-        {t("errorUnknown")}
-      </Text>
-      <Pressable
-        style={({ pressed }) => [
-          styles.button,
-          { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent, borderWidth: theme.ui.borderWidth },
-          pressed && styles.buttonPressed,
-        ]}
-        onPress={onReset}
-        accessibilityRole="button"
-        accessibilityLabel={t("tryAgain")}
-      >
-        <Text style={[styles.buttonText, { color: theme.colors.accentText }]}>
-          {t("tryAgain")}
+      <View accessibilityRole="alert" style={[styles.panel, { borderTopColor: theme.colors.error }]}>
+        <Text style={[styles.label, { color: theme.colors.error }]}>{t("errorLabel")}</Text>
+        <Text accessibilityRole="header" style={[styles.title, { color: theme.colors.text }]}>
+          {t("errorTitleGeneric")}
         </Text>
-      </Pressable>
+        <Text style={[styles.message, { color: theme.colors.muted }]}>
+          {t("errorUnknown")}
+        </Text>
+        <View style={styles.action}>
+          <Button variant="primary" icon="refresh" label={t("tryAgain")} onPress={onReset} />
+        </View>
+      </View>
     </View>
   );
 }
@@ -85,11 +55,11 @@ function ErrorFallback({
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
@@ -101,7 +71,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   handleReset = (): void => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false });
   };
 
   render(): ReactNode {

@@ -7,6 +7,7 @@ import {
   type Room,
   type ScheduleItem
 } from "@concourse/contracts";
+import { useEffect } from "react";
 import type { z } from "zod";
 
 type RecordWithId = { id: string };
@@ -91,6 +92,23 @@ export function reconcileSelectedDetailRecord<T extends RecordWithId>(
   const current = collection.find((record) => record.id === id);
   if (current) store.remember(current, { authoritative: true });
   else if (!degraded) store.markMissing(id);
+}
+
+/** Resolves a detail record from the latest collection or retained selection and keeps the store reconciled. */
+export function useSelectedDetail<T extends RecordWithId>(
+  store: SelectedRecordStore<T>,
+  id: string | undefined,
+  collection: T[] | null,
+  source: DetailSource,
+  degraded = false
+): T | null {
+  const record = selectDetailRecord(id, collection, source, store.get(id), degraded);
+
+  useEffect(() => {
+    reconcileSelectedDetailRecord(store, id, collection, source, degraded);
+  }, [collection, degraded, id, source, store]);
+
+  return record;
 }
 
 /** Clears selected detail records without disturbing unrelated stored state. */

@@ -1,5 +1,0 @@
-# Excludes generated output and dependency trees from source linting.
-node_modules
-dist
-build
-coverage

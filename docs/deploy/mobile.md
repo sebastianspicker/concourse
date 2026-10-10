@@ -1,15 +1,21 @@
-# Deploy: client (EAS)
+# Deploy the client with EAS
 
-EAS profiles are in apps/client/eas.json. This repository does not contain an EAS project ID, signing credentials, generated native projects, store records, or a deployed API; those are adopting-institution responsibilities.
+EAS profiles live in `apps/client/eas.json`. This repository does not contain an
+EAS project ID, signing credentials, generated native projects, store records,
+or a deployed API. Those belong to the adopting institution.
 
 ## Required configuration
 
-- Preview and production need INSTITUTION_ID and a credential-free HTTPS EXPO_PUBLIC_BFF_BASE_URL.
-- Production additionally needs institution-owned MOBILE_BUNDLE_IDENTIFIER and MOBILE_ANDROID_PACKAGE values.
+- Preview and production need `INSTITUTION_ID` and a credential-free HTTPS
+  `EXPO_PUBLIC_BFF_BASE_URL`.
+- Production also needs institution-owned `MOBILE_BUNDLE_IDENTIFIER` and
+  `MOBILE_ANDROID_PACKAGE` values.
 - Production config rejects the current and legacy template identifiers.
-- apps/client/app.config.ts keeps the Expo version at numeric X.Y.Z; EAS owns remote build-number increments according to eas.json.
+- `apps/client/app.config.ts` keeps the Expo version at numeric `X.Y.Z`; EAS owns
+  remote build-number increments according to `eas.json`.
 
-Set owner-managed values in the shell or EAS environment before building:
+Set the owner-managed values in the shell or the EAS environment before
+building:
 
 ~~~bash
 export INSTITUTION_ID=example
@@ -23,4 +29,8 @@ pnpm --filter @concourse/client build:preview
 pnpm --filter @concourse/client build:production
 ~~~
 
-The package invokes pinned eas-cli@20.5.1 on demand. EAS is online and owner-managed, so it is outside pnpm verify. Install and test a signed preview on target devices, including the manual checks in [client conventions](../frontend.md), before considering a production distribution.
+The package invokes pinned `eas-cli@20.5.1` on demand. EAS is online and
+owner-managed, so it sits outside `pnpm verify`. Install and test a signed
+preview on target devices, including the manual checks in
+[client conventions](../frontend.md), before you consider a production
+distribution.

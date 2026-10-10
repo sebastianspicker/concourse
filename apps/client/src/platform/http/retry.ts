@@ -1,4 +1,107 @@
-import { createAbortError, getRetryDelayMs, shouldRetry, sleep } from "./retryHelpers";
+import { createAbortError } from "./errors";
+
+function parseRetryAfterDate(retryAfter: string): number | undefined {
+  const date = new Date(retryAfter);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  return Math.max(0, Math.ceil((date.getTime() - Date.now()) / 1000));
+}
+
+export function parseRetryAfterSeconds(retryAfter: string | null): number | undefined {
+  if (!retryAfter) {
+    return undefined;
+  }
+
+  // Retry-After can be either delay seconds or an absolute HTTP-date.
+  const seconds = Number.parseInt(retryAfter, 10);
+  return Number.isNaN(seconds) ? parseRetryAfterDate(retryAfter) : Math.max(0, seconds);
+}
+
+function isHttpLikeError(err: unknown): err is { status: number; retryAfterInSeconds?: number } {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "status" in err &&
+    typeof (err as Record<string, unknown>).status === "number"
+  );
+}
+
+export function shouldRetry(err: unknown): boolean {
+  if (err instanceof Error && err.name === "AbortError") return false;
+
+  if (isHttpLikeError(err)) {
+    if (err.status === 429) return true;
+    return err.status >= 500;
+  }
+
+  // Network errors often surface as TypeError in fetch.
+  return err instanceof TypeError;
+}
+
+function randomUnitInterval(): number {
+  const bytes = new Uint32Array(1);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+    return bytes[0] / 0x100000000;
+  }
+  return 0.5;
+}
+
+function backoffWithJitter(
+  baseDelayMs: number,
+  attempt: number,
+  multiplier: number,
+  maxDelayMs: number
+): number {
+  const exp = Math.min(6, attempt);
+  const calculated = baseDelayMs * Math.pow(multiplier, exp);
+  // +-25% jitter: random in [-0.25, +0.25]
+  const jitterFactor = (randomUnitInterval() - 0.5) * 0.5;
+  const withJitter = calculated + jitterFactor * calculated;
+  return Math.min(Math.floor(withJitter), maxDelayMs);
+}
+
+export function getRetryDelayMs(
+  err: unknown,
+  baseDelayMs: number,
+  attempt: number,
+  multiplier: number,
+  maxDelayMs: number
+): number {
+  const retryAfterSeconds = isHttpLikeError(err) ? err.retryAfterInSeconds : undefined;
+  const maximum = Math.max(0, maxDelayMs);
+  return typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
+    ? Math.min(retryAfterSeconds * 1000, maximum)
+    : backoffWithJitter(baseDelayMs, attempt, multiplier, maximum);
+}
+
+export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(createAbortError());
+      return;
+    }
+
+    const cleanup = () => {
+      signal?.removeEventListener("abort", onAbort);
+    };
+
+    const onAbort = () => {
+      clearTimeout(timer);
+      cleanup();
+      reject(createAbortError());
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 type AttemptResult<T> = { ok: true; value: T } | { ok: false; error: unknown };
 

@@ -1,9 +1,9 @@
 /** Builds event labels, cards, typed detail links, and localized empty states. */
-import { formatEventDate } from "@/localization/dateFormat";
+import type { SortDirection } from "@/design-system/SortButton";
+import { formatBoardDay, formatBoardTime, formatEventDate, formatRelativeTime, formatSourceHost } from "@/localization/dateFormat";
+import type { ResourceListContent } from "@/design-system/ResourceListItem";
 import type { PublicEvent } from "@concourse/contracts";
 import type { TranslationKey } from "@/localization/dictionaries";
-
-export type SortDirection = "asc" | "desc";
 
 /** Sorts a copied event array by timestamp so callers never mutate cached response data. */
 export function sortEventsByDate(events: PublicEvent[], direction: SortDirection): PublicEvent[] {
@@ -19,17 +19,22 @@ export function getEventHref(event: PublicEvent): { pathname: "/events/[id]"; pa
   return { pathname: "/events/[id]", params: { id: event.id } };
 }
 
-/** Shapes an event into localized title and date text for a resource row. */
-export function getEventCard(event: PublicEvent, locale: string, timeZone: string): { title: string; subtitle: string } {
+/** Shapes an event into a board row: day cell (blank when repeating the previous day), time and source host, relative aside. */
+export function getEventCard(event: PublicEvent, locale: string, timeZone: string, showDay = true): ResourceListContent {
+  const { weekday, day } = formatBoardDay(event.date, locale, timeZone);
+  const host = formatSourceHost(event.sourceUrl);
   return {
     title: event.title,
-    subtitle: formatEventDate(event.date, locale, timeZone)
+    subtitle: [formatBoardTime(event.date, locale, timeZone), host].filter(Boolean).join(" · "),
+    subtitleIsData: true,
+    day: showDay ? { weekday, day } : null,
+    aside: formatRelativeTime(event.date, locale),
   };
 }
 
 /** Produces the spoken event summary for accessible result-list navigation. */
 export function getEventAccessibilityLabel(event: PublicEvent, locale: string, timeZone: string): string {
-  return `${event.title}. ${formatEventDate(event.date, locale, timeZone)}.`;
+  return `${event.title}. ${formatEventDate(event.date, locale, timeZone)}. ${formatRelativeTime(event.date, locale)}.`;
 }
 
 /** Selects search-specific empty copy when an active filter has no event matches. */

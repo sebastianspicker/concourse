@@ -1,42 +1,60 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "expo-router";
+import { Platform } from "react-native";
 import { useSetChromeStatus } from "@/shell/ChromeStatusContext";
 import { getInstitutionTimeZone } from "@/platform/env/institution";
-import { useSchedule } from "@/data/public/useSchedule";
-import { useToday } from "@/data/public/useToday";
+import { useSchedule, useToday } from "@/data/public/resources";
 import { useLocale } from "@/localization/LocaleContext";
+import { useMinuteTick } from "@/localization/useMinuteTick";
 import { SignalStage } from "./SignalStage";
-import { TodayStateNotices } from "./TodayStateNotices";
-import { formatCampusTime, formatTodayDate } from "./todayClockFormat";
-import { getTodaySchedule } from "./todaySchedule";
-import { getTodayChromeStatus, getTodaySourceStatus } from "./todaySourceStatus";
-import { TodayAgenda } from "@/features/today/TodayAgenda";
-import type { TodayChromeStatus } from "@/features/today/todaySourceStatus";
+import { TodayAgenda, TodayStateNotices } from "./TodayAgenda";
+import {
+  formatCampusTime,
+  formatTodayDate,
+  getTodayChromeStatus,
+  getTodaySourceStatus,
+  type BoardScheduleState,
+  type TodayChromeStatus,
+} from "./todaySourceStatus";
 import {
   getLocalDayRange,
+  getNowAndNext,
+  getTodaySchedule,
   isScheduleUnavailable,
-  type SortDirection,
-} from "@/features/today/todayScreenHelpers";
+} from "./todayScreenHelpers";
 import { Screen } from "@/design-system/Screen";
-import { useTheme } from "@/design-system/ThemeContext";
+import { getErrorMessageKey } from "@/design-system/errorStatePresentation";
+import { CONTENT_MAX_WIDTH } from "@/design-system/theme";
+import type { SortDirection } from "@/design-system/SortButton";
+import { useTheme } from "@/design-system/ThemeProvider";
 import { useHydratedWindowWidth } from "@/design-system/useHydratedWindowWidth";
-import { isStaticDemo } from "@/data/public/staticDemo";
 
 const WIDE_BREAKPOINT = 900;
 
-/** Prevents static clock markup from becoming stale before the demo hydrates. */
-function useDemoSafeCampusClock(locale: string, timeZone: string, loadingLabel: string) {
-  const staticDemo = isStaticDemo();
-  const [demoHydrated, setDemoHydrated] = useState(!staticDemo);
+/** The board only names entries it has; while loading or failing it says so instead. */
+function getBoardScheduleState(
+  scheduleState: ReturnType<typeof useSchedule>,
+  scheduleUnavailable: boolean,
+  t: ReturnType<typeof useLocale>["t"],
+): BoardScheduleState {
+  if (scheduleState.data) return { kind: "ready" };
+  if (scheduleUnavailable) return { kind: "unavailable", reason: t("errorUnavailable") };
+  if (scheduleState.error) return { kind: "unavailable", reason: t(getErrorMessageKey(scheduleState.error)) };
+  return scheduleState.loading ? { kind: "loading" } : { kind: "ready" };
+}
+
+/** Keeps exported web clock markup stable until hydration; native clocks render immediately. */
+function useHydratedCampusClock(now: Date, locale: string, timeZone: string, loadingLabel: string) {
+  const [hydrated, setHydrated] = useState(Platform.OS !== "web");
 
   useEffect(() => {
-    if (staticDemo) setDemoHydrated(true);
-  }, [staticDemo]);
+    setHydrated(true);
+  }, []);
 
-  if (!demoHydrated) return { date: loadingLabel, localTime: "--:--" };
+  if (!hydrated) return { date: loadingLabel, localTime: "--:--" };
   return {
-    date: formatTodayDate(locale, timeZone),
-    localTime: formatCampusTime(locale, timeZone),
+    date: formatTodayDate(locale, timeZone, now),
+    localTime: formatCampusTime(locale, timeZone, now),
   };
 }
 
@@ -44,12 +62,12 @@ function usePublishChromeStatus(
   chromeStatus: TodayChromeStatus,
   setChromeStatus: ReturnType<typeof useSetChromeStatus>,
 ): void {
-  // Stack keeps sibling tabs mounted; clear the header chip whenever Today blurs.
+  // Stack keeps sibling tabs mounted; clear the header status whenever Today blurs.
   useFocusEffect(
     useCallback(() => {
-      setChromeStatus({ label: chromeStatus.label, tone: chromeStatus.tone });
+      setChromeStatus({ label: chromeStatus.label, tone: chromeStatus.tone, lamp: chromeStatus.lamp });
       return () => setChromeStatus(null);
-    }, [chromeStatus.label, chromeStatus.tone, setChromeStatus]),
+    }, [chromeStatus.label, chromeStatus.lamp, chromeStatus.tone, setChromeStatus]),
   );
 }
 
@@ -71,13 +89,15 @@ export default function TodayScreen(): JSX.Element {
   const width = useHydratedWindowWidth();
   const isWide = width >= WIDE_BREAKPOINT;
   const timeZone = getInstitutionTimeZone();
-  const clock = useDemoSafeCampusClock(locale, timeZone, t("loading"));
+  const now = useMinuteTick();
+  const clock = useHydratedCampusClock(now, locale, timeZone, t("loading"));
   const todayState = useToday();
-  const scheduleState = useSchedule(getLocalDayRange(new Date(), timeZone));
+  const scheduleState = useSchedule(getLocalDayRange(now, timeZone));
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const setChromeStatus = useSetChromeStatus();
   const scheduleUnavailable = isScheduleUnavailable(scheduleState.error);
   const schedule = getTodaySchedule(scheduleState.data, sortDirection);
+  const selection = useMemo(() => getNowAndNext(scheduleState.data?.schedule ?? [], now), [now, scheduleState.data]);
   const sourceStatus = getTodaySourceStatus({
     cached: [todayState.source, scheduleState.source].includes("persisted-cache"),
     degraded: [todayState.data?._degraded, scheduleState.data?._degraded, scheduleUnavailable].some(Boolean),
@@ -85,9 +105,8 @@ export default function TodayScreen(): JSX.Element {
     unavailable: todayState.error !== null || (!scheduleUnavailable && scheduleState.error !== null),
     theme,
     t,
-    locale,
   });
-  const chromeStatus = getTodayChromeStatus(sourceStatus, locale, theme.colors, !isWide);
+  const chromeStatus = getTodayChromeStatus(sourceStatus, t, theme.colors, !isWide);
   usePublishChromeStatus(chromeStatus, setChromeStatus);
   const refreshAll = useRefreshAll(todayState, scheduleState, scheduleUnavailable);
 
@@ -95,25 +114,27 @@ export default function TodayScreen(): JSX.Element {
     <Screen
       refreshing={todayState.refreshing || scheduleState.refreshing}
       onRefresh={() => void refreshAll()}
-      maxWidth={1400}
+      maxWidth={CONTENT_MAX_WIDTH}
       testID="today-screen"
     >
       <SignalStage
         date={clock.date}
         localTime={clock.localTime}
-        nextItem={schedule.items[0]}
-        sourceStatus={sourceStatus}
+        current={selection.current}
+        next={selection.next}
+        schedule={getBoardScheduleState(scheduleState, scheduleUnavailable, t)}
+        scheduleSource={scheduleState.source}
         locale={locale}
         timeZone={timeZone}
         isWide={isWide}
-        showFreshnessChip={false}
       />
       <TodayStateNotices todayState={todayState} scheduleState={scheduleState} />
       <TodayAgenda
         isWide={isWide}
-        borderColor={theme.colors.border}
         scheduleUnavailable={scheduleUnavailable}
         schedule={schedule}
+        selection={selection}
+        now={now}
         scheduleState={scheduleState}
         todayState={todayState}
         sortDirection={sortDirection}

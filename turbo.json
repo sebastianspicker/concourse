@@ -5,6 +5,13 @@
     "BFF_PORT",
     "CORS_ORIGINS",
     "BFF_TRUST_PROXY",
+    "BFF_TRUSTED_PROXIES",
+    "BFF_DEFAULT_CACHE_TTL",
+    "BFF_REQUIRE_AUTH",
+    "BFF_AUTH_TOKEN",
+    "RRULE_EXPANSION_HORIZON_DAYS",
+    "APP_VERSION",
+    "CONCOURSE_STATIC_DEMO",
     "EXPO_PUBLIC_BFF_BASE_URL",
     "PUBLIC_EVENTS_MODE",
     "PUBLIC_EVENTS_DATE"
@@ -26,5 +33,9 @@
     "test": {
       "dependsOn": ["^build"]
     }
-  }
+  },
+  "globalDependencies": [
+    "scripts/clean-package-dist.mjs",
+    "tsconfig.base.json"
+  ]
 }

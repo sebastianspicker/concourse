@@ -1,106 +1,131 @@
 # Concourse Campus Kit
 
-Concourse is a TypeScript workspace for presenting public university information. A Node.js API reads a selected institution pack, normalizes public campus web pages and ICS feeds, and returns validated JSON to an Expo client for native and web. The client retains public data locally and makes its current, cached, degraded, offline, empty, unavailable, and error states visible.
+Public university events, calendars, and rooms in one campus app.
 
-[Open the static demo](https://sebastianspicker.github.io/concourse-campus-kit/). It uses the fictional example pack only. It does not call the API, campus services, or external sources; controls marked “Simulated” do not perform the corresponding real-world action.
+Concourse turns a university's public events pages, calendar feeds, and room
+lists into one calm, accessible campus app: a Node.js backend-for-frontend (BFF)
+and an Expo Router client for iOS, Android, and the web.
 
-## Scope
+This repository is an alpha source candidate. A checkout is not a published
+release, a hosted API, or a signed store build.
 
-The public product includes Today, Events, Rooms, Schedule, Settings, and available detail routes. It supports public HTTP(S) event pages, public ICS calendar feeds, and pack-defined rooms.
+[Open the static demo](https://sebastianspicker.github.io/concourse-campus-kit/) ·
+[Browse the design preview](https://sebastianspicker.github.io/concourse-campus-kit/design-preview/) ·
+[Read the architecture](docs/architecture.md)
 
-It does not include protected connectors, credentials, SSO, user accounts, personalized schedules, room occupancy, hosted infrastructure, EAS project linkage, signing material, or store submissions. The API is the client's only campus-data boundary; the client does not fetch campus sources directly.
+[![ci](https://github.com/sebastianspicker/concourse-campus-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/sebastianspicker/concourse-campus-kit/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/sebastianspicker/concourse-campus-kit/actions/workflows/codeql.yml/badge.svg)](https://github.com/sebastianspicker/concourse-campus-kit/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Requirements and setup
+Both demos use the fictional `example` institution pack and local fixtures. They
+never call the API, campus services, or the network, so you can explore them
+offline.
 
-- Node.js 22.13 or newer (the exact CI version is in [.nvmrc](.nvmrc))
-- Corepack and pnpm 9.15.0
-- Expo Go or an institution-owned development client for device testing
-- Docker only for container workflows
+## Screenshot tour
+
+These screenshots come from the real client in the static demo.
+
+| Today | Events |
+|---|---|
+| ![Today view showing the campus clock, current status, schedule, and upcoming events](docs/screenshots/desktop/today.png) | ![Events list with search, sorting, and dated rows](docs/screenshots/desktop/events.png) |
+
+| Rooms | Settings |
+|---|---|
+| ![Room directory with search](docs/screenshots/desktop/rooms.png) | ![Settings for appearance, language, and saved data](docs/screenshots/desktop/settings.png) |
+
+| Event detail | On a phone |
+|---|---|
+| ![Event detail with date, source link, and share action](docs/screenshots/desktop/event-detail.png) | ![Mobile Today view](docs/screenshots/mobile/today.png) |
+
+After a UI change, regenerate the tour with `pnpm capture:screenshots`. It
+expects the demo served at <http://127.0.0.1:8082/concourse-campus-kit/>; the
+[runbook](docs/runbook.md) has the details.
+
+## What it does
+
+The client offers Today, Events, Rooms, Schedule, Settings, and detail views.
+The API normalizes public HTTP(S) event pages, public ICS feeds, and
+pack-defined rooms. Every response is validated against a shared schema, and the
+client always tells the user whether its data is current, cached, degraded,
+offline, empty, unavailable, or error.
+
+Some things are deliberately out of scope: protected connectors, SSO and user
+accounts, personal schedules, occupancy, credentials, hosted infrastructure, EAS
+project linkage, signing, and store submission. Anything on that list needs a
+separate, reviewed implementation.
+
+## Components
+
+| Path | Purpose | Boundary | Documentation |
+|---|---|---|---|
+| `packages/contracts` | Zod wire schemas, routes, headers, query types, and API error shape | Private workspace library built before consumers | [Contract guide](packages/contracts/README.md) |
+| `packages/institutions` | Public pack schema, branding, bundled packs, and registry | Private workspace library built before the applications | [Institution packs](docs/institutions.md) |
+| `apps/api` | Public-data BFF, source adapters, cache, and HTTP security controls | Independently run Node.js service and release container | [API guide](apps/api/README.md) |
+| `apps/client` | Expo Router application, design system, transport, and persisted cache | Independently run native/web application; owner-managed EAS builds | [Client guide](apps/client/README.md) |
+| `infra`, `scripts` | Development container, setup, verification, demo, and release tooling | Repository support tooling | [Runbook](docs/runbook.md) |
+
+The client only ever talks to the BFF over HTTP; it never imports API source.
+The full dependency graph lives in [Architecture](docs/architecture.md).
+
+## Requirements
+
+- Node.js 22.13 or newer; CI uses the exact version in [.nvmrc](.nvmrc).
+- Corepack and pnpm 9.15.0.
+- Expo Go, or an institution-owned compatible development client for device work.
+- Docker only for container workflows.
+
+## Setup and local run
 
 From the repository root:
 
 ~~~bash
 corepack pnpm@9.15.0 install --frozen-lockfile
-cp apps/api/.env.example apps/api/.env
-cp apps/client/.env.example apps/client/.env
+test -e apps/api/.env || cp apps/api/.env.example apps/api/.env
+test -e apps/client/.env || cp apps/client/.env.example apps/client/.env
 ~~~
 
-pnpm setup:dev performs that frozen install, creates missing environment files without overwriting them, builds the workspace, and type-checks it.
+`pnpm setup:dev` does all of that for you: it installs, creates only the missing
+`.env` files, then builds and type-checks the workspace.
 
-## Run locally
-
-Set a valid INSTITUTION_ID in apps/api/.env and an API URL reachable from the target device in apps/client/.env:
-
-~~~dotenv
-EXPO_PUBLIC_BFF_BASE_URL=http://localhost:4000
-~~~
-
-Start the API and Expo client in separate terminals:
+Set the same `INSTITUTION_ID` for the API and client, and point
+`EXPO_PUBLIC_BFF_BASE_URL` in `apps/client/.env` at an API URL the target
+browser, simulator, emulator, or device can reach. Then start each side in its
+own terminal:
 
 ~~~bash
-INSTITUTION_ID=hfmt pnpm --filter @concourse/api dev
-INSTITUTION_ID=hfmt pnpm --filter @concourse/client start
+INSTITUTION_ID=example pnpm --filter @concourse/api dev
+INSTITUTION_ID=example pnpm --filter @concourse/client start
 ~~~
 
-Use pnpm --filter @concourse/client dev only with an installed compatible development client. Plain HTTP is limited to loopback development; a physical device needs an HTTPS tunnel or a locally trusted HTTPS proxy to the development API.
+Use `pnpm --filter @concourse/client dev` only with a compatible development
+client. On a physical device, expose the API over HTTPS or a locally trusted
+HTTPS proxy instead of a loopback URL.
 
-The API exposes GET /health, /events, /rooms, /schedule, and /today. /today accepts date=YYYY-MM-DD. Data routes return 404 not_found when the selected pack has no supporting source; partial event and schedule results carry _degraded: true and x-data-degraded: true.
+The API serves `GET /health`, `/events`, `/rooms`, `/schedule`, and `/today`.
+Configuration, query behavior, response states, and troubleshooting are all in
+the [runbook](docs/runbook.md).
 
-## Architecture
+## Common commands
 
-~~~text
-public HTML / public ICS / pack-defined rooms
-                 │
-                 ▼
-apps/api ── validates and normalizes ──► typed JSON
-                 │                         │
-packages/institutions ◄────────────────────┘
-                 │
-packages/contracts ◄────────────────────────► apps/client (Expo + local cache)
-~~~
+Run these from the repository root.
 
-| Area | Responsibility |
+| Command | Purpose |
 |---|---|
-| packages/contracts | Zod schemas, public DTOs, and API error contract |
-| packages/institutions | Public pack schema, branding, bundled packs, and registry |
-| apps/api | HTTP API, source fetch/parse, cache, security controls, and health |
-| apps/client | Expo routes, design system, client transport, cache, and status UI |
-| infra / scripts | Local containers, setup, verification, release, and demo tooling |
+| `pnpm dev` | Run workspace development tasks in parallel; the client path needs a development client |
+| `pnpm lint` | Run root and workspace ESLint checks |
+| `pnpm check:architecture` | Test and enforce workspace and source-layer boundaries |
+| `pnpm typecheck` | Type-check root tooling and all workspaces |
+| `pnpm test` | Run all workspace Vitest suites |
+| `pnpm build` | Build workspaces in dependency order with fresh output |
+| `pnpm release:check` | Validate versions, Expo identity, and changelog metadata |
+| `pnpm verify` | Run the complete local source-candidate gate |
 
-The bundled IDs are example, hfmt, and mockuni. Packs live in [packages/institutions/src/packs/](packages/institutions/src/packs/).
+There is no formatter command, and ESLint does not lint Markdown. `pnpm verify`
+is local source evidence only: it does not prove a deployment, public-source
+reachability, an EAS build, a signed artifact, device behavior, or remote
+security checks.
 
-## Configuration
-
-INSTITUTION_ID is required by the API and should match the client build. The client requires EXPO_PUBLIC_BFF_BASE_URL at runtime; preview and production builds require a credential-free HTTPS origin. See [the runbook](docs/runbook.md) for the complete contract.
-
-| API variable | Default | Purpose |
-|---|---:|---|
-| BFF_PORT | 4000 | Listening port |
-| CORS_ORIGINS | none | Comma-separated allowed origins |
-| BFF_DEFAULT_CACHE_TTL | 300 | Public-source cache lifetime in seconds |
-| RRULE_EXPANSION_HORIZON_DAYS | 90 | ICS recurrence window in days |
-| BFF_REQUIRE_AUTH | disabled | Optional bearer guard for private deployments |
-| BFF_AUTH_TOKEN | none | Required only when that guard is enabled |
-| BFF_TRUSTED_PROXIES | none | Exact trusted proxy IPs/CIDRs |
-| BFF_TRUST_PROXY | never | never, always, or implicit trusted mode |
-
-Keep BFF_TRUST_PROXY=never unless the API is behind a reviewed proxy boundary. Prefer exact BFF_TRUSTED_PROXIES values over always.
-
-## Development and verification
-
-| Command | Result |
-|---|---|
-| pnpm lint | Root and workspace ESLint checks |
-| pnpm check:architecture | Enforced workspace dependency and source-import boundaries |
-| pnpm typecheck | Root tooling and workspace TypeScript checks |
-| pnpm test | Workspace tests |
-| pnpm build | Dependency-ordered workspace build with fresh generated dist output |
-| pnpm release:check | Version, Expo identity, and changelog checks |
-| pnpm verify | Source-candidate gate |
-
-pnpm verify checks the public tree, architecture boundaries, release metadata, lint, type checks, tests, and fresh builds. It is local source evidence, not proof of a remote deployment, signed native binary, or device validation.
-
-## Static demo and deployment
+## Static demo
 
 ~~~bash
 pnpm build:demo
@@ -108,15 +133,26 @@ pnpm verify:demo:artifact
 PORT=8082 node scripts/serve-pages-output.mjs dist-pages
 ~~~
 
-Open <http://127.0.0.1:8082/concourse/>. Rebuild dist-pages/ before using it as source evidence.
+Then open <http://127.0.0.1:8082/concourse-campus-kit/>. Rebuild `dist-pages/` before you
+treat it as evidence; generated output is not a source file.
+
+To regenerate the README screenshots, leave that server running and run:
+
+~~~bash
+pnpm capture:screenshots
+~~~
+
+## Documentation
 
 - [Architecture](docs/architecture.md)
-- [Runbook](docs/runbook.md)
-- [Institution packs](docs/institutions.md)
+- [Runbook and configuration](docs/runbook.md)
 - [Public sources](docs/connectors.md)
-- [Client conventions](docs/frontend.md)
-- [API deployment](docs/deploy/bff.md)
-- [Client deployment](docs/deploy/mobile.md)
-- [Release process](docs/release.md)
+- [Product scope](PRODUCT.md), [client conventions](docs/frontend.md), and
+  [design reference](DESIGN.md)
+- [CI](docs/ci.md), [API deployment](docs/deploy/bff.md),
+  [client deployment](docs/deploy/mobile.md), and
+  [release process](docs/release.md)
+- [Contributing](CONTRIBUTING.md), [support](SUPPORT.md), and
+  [security reporting](SECURITY.md)
 
-Report security issues through [SECURITY.md](SECURITY.md). This repository is licensed under the MIT License; see [LICENSE](LICENSE).
+Concourse is licensed under the [MIT License](LICENSE).

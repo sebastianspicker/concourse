@@ -4,13 +4,13 @@
   "version": "1.2.0-alpha.1",
   "main": "index.js",
   "scripts": {
-    "build": "node ../../scripts/clean-package-dist.mjs && tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json",
     "dev": "npx expo start --dev-client",
     "start": "npx expo start",
     "build:preview": "npx --yes eas-cli@20.5.1 build --profile preview",
     "build:production": "npx --yes eas-cli@20.5.1 build --profile production",
     "lint": "eslint app src config --ext .js,.ts,.tsx",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

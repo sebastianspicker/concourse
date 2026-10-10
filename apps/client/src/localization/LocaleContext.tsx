@@ -17,14 +17,19 @@ type LocaleContextValue = {
 export const LANGUAGE_PREFERENCE_STORAGE_ID = "concourse:language-preference";
 const LEGACY_LANGUAGE_PREFERENCE_STORAGE_ID = "campus-app-kit:language-preference";
 const LANGUAGE_PREFERENCES = new Set<LanguagePreference>(["institution", "en", "de"]);
+/** Replaces the first `{name}` placeholder for each provided value. */
+function interpolate(template: string, values?: Record<string, string | number>): string {
+  return Object.entries(values ?? {}).reduce<string>(
+    (message, [name, replacement]) => message.replace(`{${name}}`, String(replacement)),
+    template
+  );
+}
+
 const defaultContext: LocaleContextValue = {
   locale: "en",
   preference: "institution",
   setPreference: async () => undefined,
-  t: (key, values) => Object.entries(values ?? {}).reduce<string>(
-    (message, [name, replacement]) => message.replace(`{${name}}`, String(replacement)),
-    en[key]
-  ),
+  t: (key, values) => interpolate(en[key], values),
 };
 const LocaleContext = createContext<LocaleContextValue>(defaultContext);
 
@@ -64,11 +69,7 @@ export function LocaleProvider({ children }: { children: ReactNode }): JSX.Eleme
         await AsyncStorage.setItem(LANGUAGE_PREFERENCE_STORAGE_ID, next);
       },
       t: (key, values) => {
-        const template = dictionary[key];
-        return Object.entries(values ?? {}).reduce<string>(
-          (message, [name, replacement]) => message.replace(`{${name}}`, String(replacement)),
-          template
-        );
+        return interpolate(dictionary[key], values);
       },
     };
   }, [preference]);

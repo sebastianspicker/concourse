@@ -1,5 +1,6 @@
 /** Enforces the deliberate workspace dependency and source-layer directions. */
 import { readdirSync, readFileSync, statSync } from "node:fs";
+import { builtinModules } from "node:module";
 import { dirname, extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -138,8 +139,12 @@ function clientLayer(root, path) {
   return parts[0] === "src" && parts[1] === "features" ? parts.slice(0, 3).join("/") : parts.slice(0, 2).join("/");
 }
 
+function apiModule(apiRoot, path) {
+  return relative(apiRoot, path).replaceAll("\\", "/").replace(/\.[^./]+$/, "");
+}
+
 function apiLayer(apiRoot, path) {
-  return relative(apiRoot, path).replaceAll("\\", "/").split("/")[0];
+  return apiModule(apiRoot, path).split("/")[0];
 }
 
 function isFeatureLayer(layer) {
@@ -176,27 +181,61 @@ function clientBoundaryViolations(root, graph) {
   return violations;
 }
 
-function apiLayerViolation(fromLayer, toLayer) {
-  if (fromLayer === "application" && ["http", "runtime", "security", "sources"].includes(toLayer)) return `application must not import ${toLayer}`;
-  if (["sources", "runtime"].includes(fromLayer) && ["application", "http"].includes(toLayer)) return `${fromLayer} must not import ${toLayer}`;
+const API_FORBIDDEN_TARGETS = {
+  application: ["http", "runtime", "security", "sources", "server"],
+  sources: ["application", "http", "security", "server"],
+  runtime: ["application", "http", "security", "sources", "server"],
+  security: ["application", "sources", "server"],
+  http: ["server"],
+};
+const API_RESPOND_MODULE = "http/respond";
+const API_CONFIG_MODULE = "runtime/config";
+const API_CONFIG_SECURITY_TARGET = "security/proxyTrust";
+const API_ENV_MODULES = [API_CONFIG_MODULE, "server"];
+
+function isAllowedApiImport(fromModule, toModule) {
+  return fromModule === API_CONFIG_MODULE && toModule === API_CONFIG_SECURITY_TARGET;
+}
+
+function apiLayerViolation(fromModule, toModule) {
+  const fromLayer = fromModule.split("/")[0];
+  const toLayer = toModule.split("/")[0];
+  if (fromModule === API_RESPOND_MODULE && fromModule !== toModule) return `${API_RESPOND_MODULE} must not import ${toModule}`;
+  if (fromLayer === "security" && toLayer === "http" && toModule !== API_RESPOND_MODULE) return `security may import only ${API_RESPOND_MODULE} from http, not ${toModule}`;
+  if (isAllowedApiImport(fromModule, toModule)) return undefined;
+  if (fromLayer !== toLayer && (API_FORBIDDEN_TARGETS[fromLayer] ?? []).includes(toLayer)) return `${fromLayer} must not import ${toLayer}`;
   return undefined;
 }
 
+const nodeBuiltins = new Set(builtinModules);
+
+function isNodeBuiltin(specifier) {
+  return specifier.startsWith("node:") || nodeBuiltins.has(specifier.split("/")[0]);
+}
+
 function applicationSourceViolations(root, from, specifiers) {
-  const violations = specifiers.filter((specifier) => specifier.startsWith("node:")).map((specifier) => `${relative(root, from)}: application must not import Node globals (${specifier})`);
+  const violations = specifiers.filter(isNodeBuiltin).map((specifier) => `${relative(root, from)}: application must not import Node globals (${specifier})`);
   if (/\bprocess\s*\.\s*env\b/.test(readFileSync(from, "utf8"))) violations.push(`${relative(root, from)}: application must not access process.env`);
   return violations;
+}
+
+function apiEnvViolations(root, apiRoot, from) {
+  const module = apiModule(apiRoot, from);
+  if (/\.test$/.test(module) || module.split("/")[0] === "application" || API_ENV_MODULES.includes(module)) return [];
+  const reads = /\bprocess\s*\.\s*env\b/.test(readFileSync(from, "utf8"));
+  return reads ? [`${relative(root, from)}: only ${API_CONFIG_MODULE} and server may access process.env`] : [];
 }
 
 function apiBoundaryViolations(root, apiRoot, graph, imports) {
   const violations = [];
   for (const [from, targets] of graph) {
-    const fromLayer = apiLayer(apiRoot, from);
+    const fromModule = apiModule(apiRoot, from);
     for (const to of targets) {
-      const boundary = apiLayerViolation(fromLayer, apiLayer(apiRoot, to));
+      const boundary = apiLayerViolation(fromModule, apiModule(apiRoot, to));
       if (boundary) violations.push(`${relative(root, from)}: ${boundary}`);
     }
-    if (fromLayer === "application") violations.push(...applicationSourceViolations(root, from, imports.get(from)));
+    if (apiLayer(apiRoot, from) === "application") violations.push(...applicationSourceViolations(root, from, imports.get(from)));
+    violations.push(...apiEnvViolations(root, apiRoot, from));
   }
   return violations;
 }

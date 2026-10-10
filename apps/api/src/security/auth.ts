@@ -2,20 +2,10 @@
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { sendError } from "../http/errors";
-import { setRequestIdHeader } from "../http/requestId";
+import { sendError } from "../http/respond";
+import type { BffConfig } from "../runtime/config";
 
-const AUTH_REQUIRED_VALUES = new Set(["1", "true", "yes", "on"]);
-const AUTH_DISABLED_VALUES = new Set(["0", "false", "no", "off"]);
-
-/** Normalizes supported truthy and falsy settings while preserving an invalid state. */
-function parseAuthRequirement(value: string | undefined): AuthRequirement {
-  const normalized = value?.trim().toLowerCase();
-  if (!normalized) return "disabled";
-  if (AUTH_REQUIRED_VALUES.has(normalized)) return "required";
-  if (AUTH_DISABLED_VALUES.has(normalized)) return "disabled";
-  return "invalid";
-}
+export type AuthConfig = Pick<BffConfig, "authRequirement" | "authToken">;
 
 /** Extracts and trims a Bearer credential, returning empty text for malformed headers. */
 function getBearerToken(req: IncomingMessage): string {
@@ -33,80 +23,49 @@ function bearerTokensEqual(actual: string, expected: string): boolean {
   return timingSafeEqual(actualDigest, expectedDigest);
 }
 
-/** Adds the ingress request ID before sending a stable authentication error payload. */
-function sendAuthError(
-  res: ServerResponse,
-  status: number,
-  code: string,
-  message: string,
-  requestId?: string
-): void {
-  if (requestId) setRequestIdHeader(res, requestId);
-  sendError(res, status, code, message);
-}
-
-type AuthRequirement = "disabled" | "required" | "invalid";
-
 /**
  * Validates the deployment-time bearer-auth configuration.
  *
- * The request guard intentionally repeats this validation so a process remains
- * fail-closed if its environment is changed after startup.
+ * The request guard intentionally repeats these checks so every request
+ * fails closed when authentication is invalid or incomplete.
  */
 /** Fails startup when optional authentication is configured incompletely. */
-export function validateAuthConfiguration(env: NodeJS.ProcessEnv = process.env): void {
-  const authRequirement = parseAuthRequirement(env.BFF_REQUIRE_AUTH);
-  if (authRequirement === "invalid") {
+export function validateAuthConfiguration(config: AuthConfig): void {
+  if (config.authRequirement === "invalid") {
     throw new Error("BFF_REQUIRE_AUTH has an invalid value");
   }
 
-  if (authRequirement === "required" && !env.BFF_AUTH_TOKEN?.trim()) {
+  if (config.authRequirement === "required" && !config.authToken) {
     throw new Error("BFF_AUTH_TOKEN is required when BFF_REQUIRE_AUTH enables authentication");
   }
 }
 
 /** Whether this request should consume the invalid-credential rate-limit bucket. */
-export function isInvalidAuthAttempt(
-  req: IncomingMessage,
-  env: NodeJS.ProcessEnv = process.env
-): boolean {
-  if (parseAuthRequirement(env.BFF_REQUIRE_AUTH) !== "required") return false;
-  const expectedToken = env.BFF_AUTH_TOKEN?.trim();
-  return expectedToken ? !bearerTokensEqual(getBearerToken(req), expectedToken) : false;
+export function isInvalidAuthAttempt(req: IncomingMessage, config: AuthConfig): boolean {
+  if (config.authRequirement !== "required") return false;
+  return config.authToken ? !bearerTokensEqual(getBearerToken(req), config.authToken) : false;
 }
 
 /** Rejects unauthenticated requests when bearer-token protection is enabled. */
-export function guardAuth(
-  req: IncomingMessage,
-  res: ServerResponse,
-  requestId?: string
-): boolean {
-  const authRequirement = parseAuthRequirement(process.env.BFF_REQUIRE_AUTH);
-  if (authRequirement === "disabled") return true;
-  if (authRequirement === "invalid") {
-    sendAuthError(res, 500, "auth_misconfigured", "BFF_REQUIRE_AUTH has an invalid value", requestId);
+export function guardAuth(req: IncomingMessage, res: ServerResponse, config: AuthConfig): boolean {
+  if (config.authRequirement === "disabled") return true;
+  if (config.authRequirement === "invalid") {
+    sendError(res, 500, "auth_misconfigured", "BFF_REQUIRE_AUTH has an invalid value");
     return false;
   }
 
-  const expectedToken = process.env.BFF_AUTH_TOKEN?.trim();
+  const expectedToken = config.authToken;
   if (!expectedToken) {
     // Fail closed for private forks: enabling auth without a token is a
     // deployment error, not a reason to serve public data unauthenticated.
-    sendAuthError(
-      res,
-      500,
-      "auth_misconfigured",
-      "Authentication is required but no token is configured",
-      requestId
-    );
+    sendError(res, 500, "auth_misconfigured", "Authentication is required but no token is configured");
     return false;
   }
 
-  const bearerToken = getBearerToken(req);
-  if (bearerTokensEqual(bearerToken, expectedToken)) {
+  if (bearerTokensEqual(getBearerToken(req), expectedToken)) {
     return true;
   }
 
-  sendAuthError(res, 401, "unauthorized", "Authentication required", requestId);
+  sendError(res, 401, "unauthorized", "Authentication required");
   return false;
 }

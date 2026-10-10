@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-state="live">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Concourse Design Preview 2026, Example University</title>
+<style>
+/* ============================================================
+   CONCOURSE 2026: "Meridian" design direction
+   A softened campus chronograph: warm paper canvas, ink text,
+   one institutional accent, time as the signature element.
+   ============================================================ */
+
+:root {
+  /* spacing scale */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+
+  /* radii */
+  --r-ctrl: 10px;
+  --r-surface: 14px;
+  --r-pill: 999px;
+
+  /* type */
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: "SF Mono", ui-monospace, "Roboto Mono", Menlo, monospace;
+
+  /* motion */
+  --dur-fast: 140ms;
+  --dur-med: 260ms;
+  --ease: cubic-bezier(.2,.7,.2,1);
+}
+
+/* ---- light: warm paper ---- */
+:root, [data-theme="light"] {
+  --paper: #F5F3ED;
+  --paper-2: #EDEAE1;
+  --surface: #FFFFFF;
+  --surface-2: #FAF9F5;
+  --ink: #131C2B;
+  --ink-2: #5A6478;
+  --ink-3: #8B93A4;
+  --line: #E2DED2;
+  --line-strong: #C9C3B2;
+  --accent: #4067D0;
+  --accent-soft: #EAEFFD;
+  --accent-ink: #FFFFFF;
+  --signal: #C97C0B;
+  --signal-soft: #FBF0DA;
+  --ok: #20724A;
+  --ok-soft: #E5F3EB;
+  --err: #B3261E;
+  --err-soft: #FBEAE8;
+  --shadow-1: 0 1px 2px rgba(19,28,43,.05), 0 4px 16px -8px rgba(19,28,43,.08);
+  --shadow-2: 0 2px 6px rgba(19,28,43,.07), 0 16px 40px -16px rgba(19,28,43,.18);
+  --focus: var(--accent);
+}
+
+/* ---- dark: dusk slate ---- */
+[data-theme="dark"] {
+  --paper: #0C121E;
+  --paper-2: #101828;
+  --surface: #151E30;
+  --surface-2: #1A2438;
+  --ink: #ECF0F7;
+  --ink-2: #9CA8BE;
+  --ink-3: #6E7B93;
+  --line: #26314A;
+  --line-strong: #3A4763;
+  --accent: #93AAFF;
+  --accent-soft: #1D2B52;
+  --accent-ink: #0C121E;
+  --signal: #F0BE5C;
+  --signal-soft: #33270F;
+  --ok: #7ED0A4;
+  --ok-soft: #10301F;
+  --err: #FF9D94;
+  --err-soft: #3A1512;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px -8px rgba(0,0,0,.4);
+  --shadow-2: 0 2px 6px rgba(0,0,0,.35), 0 16px 40px -16px rgba(0,0,0,.55);
+  --focus: var(--accent);
+}
+
+/* ---- high contrast ---- */
+[data-theme="hc"] {
+  --paper: #000;
+  --paper-2: #000;
+  --surface: #000;
+  --surface-2: #000;
+  --ink: #FFF;
+  --ink-2: #FFF;
+  --ink-3: #E0E0E0;
+  --line: #FFF;
+  --line-strong: #FFF;
+  --accent: #00D7FF;
+  --accent-soft: #000;
+  --accent-ink: #000;
+  --signal: #FFE600;
+  --signal-soft: #000;
+  --ok: #93FFB5;
+  --ok-soft: #000;
+  --err: #FFB3B3;
+  --err-soft: #000;
+  --shadow-1: none;
+  --shadow-2: none;
+  --focus: #FFE600;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.45;
+  letter-spacing: -0.006em;
+  transition: background var(--dur-med) var(--ease), color var(--dur-med) var(--ease);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.tnum { font-variant-numeric: tabular-nums; }
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+/* ============================ SHELL ============================ */
+
+.topbar {
+  position: sticky; top: 0; z-index: 40;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+[data-theme="hc"] .topbar { background: #000; }
+
+.topbar-inner {
+  max-width: 1120px; margin: 0 auto;
+  padding: 0 var(--s5);
+  height: 64px;
+  display: flex; align-items: center; gap: var(--s5);
+}
+
+.identity { display: flex; align-items: center; gap: var(--s3); min-width: 0; }
+.monogram {
+  width: 34px; height: 34px; flex: none;
+  border-radius: 9px;
+  background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 700; letter-spacing: .02em;
+}
+.identity-text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.identity-inst { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.identity-prod { font-size: 12px; color: var(--ink-2); }
+
+.nav { display: flex; gap: 2px; margin-left: var(--s4); }
+.nav-item {
+  position: relative;
+  padding: 8px 14px;
+  min-height: 44px;
+  display: flex; align-items: center;
+  font-size: 14px; font-weight: 500;
+  color: var(--ink-2);
+  border-radius: var(--r-ctrl);
+  transition: color var(--dur-fast), background var(--dur-fast);
+}
+.nav-item:hover { color: var(--ink); background: var(--paper-2); }
+.nav-item[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.nav-item[aria-current="page"]::after {
+  content: "";
+  position: absolute; left: 14px; right: 14px; bottom: 4px;
+  height: 2px; border-radius: 2px;
+  background: var(--accent);
+}
+
+.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--s3); }
+
+.icon-btn {
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border-radius: var(--r-ctrl);
+  color: var(--ink-2);
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.icon-btn:hover { background: var(--paper-2); color: var(--ink); }
+.icon-btn svg { width: 19px; height: 19px; }
+
+/* demo state switcher */
+.state-switch {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: 4px 6px 4px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-pill);
+  font-size: 12px; color: var(--ink-2);
+}
+.state-switch select {
+  font: inherit; font-size: 12px; color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 4px 10px;
+  min-height: 30px;
+}
+
+/* freshness chip */
+.freshness {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  font-size: 12.5px; font-weight: 550;
+  background: var(--ok-soft); color: var(--ok);
+  white-space: nowrap;
+}
+.freshness .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.freshness[data-tone="live"]    { background: var(--ok-soft);     color: var(--ok); }
+.freshness[data-tone="cached"]  { background: var(--signal-soft); color: var(--signal); }
+.freshness[data-tone="degraded"]{ background: var(--signal-soft); color: var(--signal); }
+.freshness[data-tone="offline"] { background: var(--signal-soft); color: var(--signal); }
+.freshness[data-tone="error"]   { background: var(--err-soft);    color: var(--err); }
+
+/* ============================ LAYOUT ============================ */
+
+.page {
+  max-width: 1120px; margin: 0 auto;
+  padding: var(--s6) var(--s5) calc(var(--s8) + 64px);
+}
+.screen { display: none; }
+.screen.active { display: block; animation: rise var(--dur-med) var(--ease); }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* state banner (inline, non-modal) */
+.banner {
+  display: none;
+  align-items: flex-start; gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-surface);
+  font-size: 14px; line-height: 1.4;
+  margin-bottom: var(--s5);
+}
+.banner.show { display: flex; animation: rise var(--dur-med) var(--ease); }
+.banner svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.banner strong { font-weight: 650; }
+.banner .banner-note { color: inherit; opacity: .82; }
+.banner[data-tone="cached"]   { background: var(--signal-soft); color: var(--signal); }
+.banner[data-tone="degraded"] { background: var(--signal-soft); color: var(--signal); }
+.banner[data-tone="offline"]  { background: var(--signal-soft); color: var(--signal); }
+.banner[data-tone="error"]    { background: var(--err-soft); color: var(--err); }
+
+/* ============================ TODAY ============================ */
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: var(--s6);
+  align-items: stretch;
+  margin-bottom: var(--s7);
+}
+
+.clock-block { display: flex; flex-direction: column; justify-content: center; padding: var(--s4) 0; }
+.clock-date { margin-bottom: var(--s3); }
+.clock-face {
+  font-size: clamp(72px, 9vw, 112px);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  line-height: .95;
+  font-variant-numeric: tabular-nums;
+  display: flex; align-items: baseline;
+}
+.clock-face .colon { color: var(--signal); animation: pulse 2s var(--ease) infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+.clock-meta { margin-top: var(--s3); font-size: 13.5px; color: var(--ink-2); display: flex; align-items: center; gap: var(--s2); }
+.clock-meta .tz { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--ink-2); }
+
+/* day progress line */
+.day-line { margin-top: var(--s5); }
+.day-line-track { position: relative; height: 3px; border-radius: 3px; background: var(--line); }
+.day-line-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--accent); }
+.day-line-now {
+  position: absolute; top: 50%; transform: translate(-50%,-50%);
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--signal); border: 2.5px solid var(--paper);
+}
+.day-line-labels { display: flex; justify-content: space-between; margin-top: var(--s2); font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* now / next board */
+.now-next {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-surface);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.nn-row { padding: var(--s5); flex: 1; display: flex; flex-direction: column; gap: var(--s2); }
+.nn-row + .nn-row { border-top: 1px solid var(--line); }
+.nn-label { display: flex; align-items: center; gap: var(--s2); }
+.nn-label .dot { width: 8px; height: 8px; border-radius: 50%; }
+.nn-row.now .dot { background: var(--signal); }
+.nn-row.next .dot { background: var(--accent); }
+.nn-title { font-size: 21px; font-weight: 650; letter-spacing: -0.02em; }
+.nn-meta { font-size: 13.5px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); }
+.nn-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.nn-meta svg { width: 14px; height: 14px; opacity: .75; }
+.nn-empty { color: var(--ink-3); font-size: 15px; }
+
+/* agenda: the time spine */
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); margin-bottom: var(--s4); }
+.section-head h2 { font-size: 19px; font-weight: 650; letter-spacing: -0.015em; }
+.section-head .count { font-size: 13px; color: var(--ink-2); }
+
+.agenda { position: relative; }
+.agenda-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 64px 28px minmax(0,1fr);
+  padding: var(--s3) 0;
+  border-radius: var(--r-ctrl);
+  transition: background var(--dur-fast);
+}
+.agenda-item:hover { background: var(--surface-2); }
+.agenda-time { text-align: right; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; padding-top: 3px; color: var(--ink); }
+.agenda-time .end { display: block; font-size: 11.5px; font-weight: 500; color: var(--ink-3); }
+
+.spine { position: relative; display: flex; justify-content: center; }
+.spine::before { content: ""; position: absolute; top: 0; bottom: 0; width: 1.5px; background: var(--line); }
+.agenda-item:first-child .spine::before { top: 14px; }
+.agenda-item:last-child .spine::before { bottom: auto; height: 14px; }
+.spine-dot {
+  position: relative; z-index: 1;
+  margin-top: 8px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--paper); border: 2px solid var(--line-strong);
+}
+.agenda-item.live .spine-dot { border-color: var(--signal); background: var(--signal); box-shadow: 0 0 0 4px var(--signal-soft); }
+.agenda-item.past { opacity: .55; }
+.agenda-item.past .spine-dot { background: var(--line-strong); }
+
+.agenda-body { padding: 1px var(--s3) 0 var(--s3); min-width: 0; }
+.agenda-title { font-size: 15.5px; font-weight: 600; letter-spacing: -0.01em; }
+.agenda-item.live .agenda-title::after {
+  content: "Now";
+  margin-left: var(--s2);
+  font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--signal);
+  vertical-align: 2px;
+}
+.agenda-meta { font-size: 13px; color: var(--ink-2); margin-top: 2px; display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); }
+
+/* two-column agenda on wide */
+.agenda-cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s7); }
+
+/* ============================ LIST SCREENS ============================ */
+
+.toolbar { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s5); flex-wrap: wrap; }
+.search {
+  flex: 1; min-width: 220px;
+  display: flex; align-items: center; gap: var(--s2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctrl);
+  padding: 0 var(--s3);
+  height: 44px;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.search svg { width: 17px; height: 17px; color: var(--ink-3); flex: none; }
+.search input { flex: 1; border: 0; background: none; font: inherit; font-size: 15px; color: var(--ink); outline: none; }
+.search input::placeholder { color: var(--ink-3); }
+
+.seg { display: inline-flex; background: var(--paper-2); border-radius: var(--r-ctrl); padding: 3px; gap: 2px; }
+.seg button {
+  padding: 7px 14px; min-height: 38px;
+  font-size: 13.5px; font-weight: 550;
+  color: var(--ink-2);
+  border-radius: 8px;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+[data-theme="hc"] .seg button[aria-pressed="true"] { border: 1px solid #FFF; }
+
+/* event rows: date ticket + content, hairline separated, no boxes */
+.row-list { list-style: none; }
+.row-item {
+  display: flex; align-items: center; gap: var(--s4);
+  padding: var(--s4) var(--s3);
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--r-ctrl);
+  cursor: pointer;
+  transition: background var(--dur-fast);
+  width: 100%; text-align: left;
+}
+.row-item:hover { background: var(--surface-2); }
+.row-item:first-child { border-top: 1px solid var(--line); }
+
+.date-ticket {
+  flex: none; width: 52px;
+  text-align: center;
+  border-right: 2px solid var(--accent);
+  padding-right: var(--s3);
+}
+.date-ticket .dow { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.date-ticket .day { font-size: 24px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+
+.row-main { flex: 1; min-width: 0; }
+.row-title { font-size: 15.5px; font-weight: 600; letter-spacing: -0.01em; }
+.row-meta { font-size: 13px; color: var(--ink-2); margin-top: 2px; display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); }
+.row-chevron { flex: none; color: var(--ink-3); }
+.row-chevron svg { width: 18px; height: 18px; }
+
+.room-mark {
+  flex: none; width: 40px; height: 40px;
+  border-radius: var(--r-ctrl);
+  background: var(--accent-soft); color: var(--accent);
+  display: grid; place-items: center;
+  font-weight: 700; font-size: 14px;
+}
+
+/* ============================ STATES ============================ */
+
+.state-block {
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-surface);
+  padding: var(--s7) var(--s5);
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: var(--s3);
+  background: var(--surface-2);
+}
+.state-block svg { width: 30px; height: 30px; color: var(--ink-3); }
+.state-block h3 { font-size: 17px; font-weight: 650; }
+.state-block p { font-size: 14px; color: var(--ink-2); max-width: 380px; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
+  min-height: 44px; padding: 0 var(--s5);
+  border-radius: var(--r-ctrl);
+  font-size: 14.5px; font-weight: 600;
+  background: var(--accent); color: var(--accent-ink);
+  transition: filter var(--dur-fast), transform var(--dur-fast);
+}
+.btn:hover { filter: brightness(1.06); }
+.btn:active { transform: scale(.98); }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-strong); }
+
+/* skeletons */
+.skel { border-radius: 6px; background: linear-gradient(100deg, var(--paper-2) 40%, var(--surface) 50%, var(--paper-2) 60%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* ============================ SETTINGS ============================ */
+
+.settings-group { border-top: 1px solid var(--line); padding: var(--s5) 0; }
+.settings-group:first-of-type { border-top: 0; }
+.settings-group h3 { font-size: 13px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); margin-bottom: var(--s4); }
+.choice-row { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s2); min-height: 52px; border-radius: var(--r-ctrl); cursor: pointer; transition: background var(--dur-fast); }
+.choice-row:hover { background: var(--surface-2); }
+.choice-row input { accent-color: var(--accent); width: 18px; height: 18px; }
+.choice-row .choice-label { font-size: 15px; font-weight: 550; }
+.choice-row .choice-note { font-size: 13px; color: var(--ink-2); }
+
+/* ============================ DETAIL MODAL ============================ */
+
+.modal-scrim {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(10, 15, 25, .45);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  display: none; align-items: flex-end; justify-content: center;
+}
+.modal-scrim.open { display: flex; animation: fade var(--dur-fast); }
+@keyframes fade { from { opacity: 0; } }
+.modal {
+  background: var(--surface);
+  width: 100%; max-width: 560px;
+  border-radius: var(--r-surface) var(--r-surface) 0 0;
+  padding: var(--s5) var(--s5) calc(var(--s5) + env(safe-area-inset-bottom));
+  box-shadow: var(--shadow-2);
+  animation: sheet 300ms var(--ease);
+  max-height: 85vh; overflow: auto;
+}
+@media (min-width: 700px) {
+  .modal-scrim { align-items: center; }
+  .modal { border-radius: var(--r-surface); animation: pop 240ms var(--ease); }
+}
+@keyframes sheet { from { transform: translateY(40px); opacity: .6; } }
+@keyframes pop { from { transform: scale(.97) translateY(8px); opacity: 0; } }
+.modal-grab { width: 36px; height: 4px; border-radius: 4px; background: var(--line-strong); margin: 0 auto var(--s4); }
+.modal h2 { font-size: 22px; font-weight: 650; letter-spacing: -0.02em; margin-bottom: var(--s2); }
+.modal .modal-meta { font-size: 14px; color: var(--ink-2); display: flex; flex-direction: column; gap: var(--s2); margin: var(--s4) 0; }
+.modal .modal-meta span { display: flex; align-items: center; gap: var(--s2); }
+.modal .modal-meta svg { width: 16px; height: 16px; color: var(--ink-3); }
+.modal-actions { display: flex; gap: var(--s3); margin-top: var(--s5); }
+
+/* ============================ MOBILE TAB BAR ============================ */
+
+.tabbar { display: none; }
+
+@media (max-width: 820px) {
+  .nav { display: none; }
+  .stage { grid-template-columns: 1fr; gap: var(--s5); }
+  .agenda-cols { grid-template-columns: 1fr; gap: var(--s6); }
+  .topbar-inner { padding: 0 var(--s4); height: 56px; }
+  .page { padding: var(--s5) var(--s4) calc(var(--s8) + 76px); }
+  .state-switch .switch-label { display: none; }
+
+  .tabbar {
+    display: flex;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  [data-theme="hc"] .tabbar { background: #000; }
+  .tabbar button {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: var(--s2) 0 calc(var(--s2) + 2px);
+    font-size: 11px; font-weight: 550;
+    color: var(--ink-2);
+    min-height: 52px;
+  }
+  .tabbar button svg { width: 21px; height: 21px; }
+  .tabbar button[aria-current="page"] { color: var(--accent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .clock-face .colon { animation: none; }
+  .skel { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================ SHELL ============================ -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="identity">
+      <div class="monogram" aria-hidden="true">EU</div>
+      <div class="identity-text">
+        <span class="identity-inst">Example University</span>
+        <span class="identity-prod">Concourse</span>
+      </div>
+    </div>
+
+    <nav class="nav" aria-label="Primary">
+      <button class="nav-item" data-nav="today" aria-current="page">Today</button>
+      <button class="nav-item" data-nav="events">Events</button>
+      <button class="nav-item" data-nav="rooms">Rooms</button>
+      <button class="nav-item" data-nav="settings">Settings</button>
+    </nav>
+
+    <div class="topbar-actions">
+      <label class="state-switch" title="Demo control: simulates the app's data states">
+        <span class="switch-label">Data state · simulated</span>
+        <select id="stateSelect" aria-label="Simulated data state">
+          <option value="live">Live</option>
+          <option value="cached">Cached</option>
+          <option value="degraded">Degraded</option>
+          <option value="offline">Offline</option>
+          <option value="empty">Empty</option>
+          <option value="error">Error</option>
+        </select>
+      </label>
+      <span class="freshness" id="freshnessChip" data-tone="live" role="status">
+        <span class="dot" aria-hidden="true"></span><span id="freshnessLabel">Live · updated just now</span>
+      </span>
+      <button class="icon-btn" id="themeBtn" aria-label="Cycle appearance: light, dark, high contrast" title="Appearance">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3 17 7M7 17l-1.7 1.7"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- ============================ TODAY ============================ -->
+  <section class="screen active" id="screen-today" aria-label="Today">
+    <div class="banner" id="banner-today" data-tone="cached" role="status"></div>
+
+    <div class="stage">
+      <div class="clock-block">
+        <p class="eyebrow clock-date">Monday, 14 September 2026 · Main Campus, Cologne</p>
+        <p class="clock-face tnum" aria-label="Campus time 12:42">12<span class="colon">:</span>42</p>
+        <p class="clock-meta">Campus time <span class="tz">Europe/Berlin</span></p>
+        <div class="day-line" role="img" aria-label="Day progress: it is 12:42, between 08:00 and 20:00">
+          <div class="day-line-track">
+            <div class="day-line-fill" style="width:39.2%"></div>
+            <div class="day-line-now" style="left:39.2%"></div>
+          </div>
+          <div class="day-line-labels"><span>08:00</span><span>14:00</span><span>20:00</span></div>
+        </div>
+      </div>
+
+      <div class="now-next" id="nowNext">
+        <div class="nn-row now">
+          <p class="eyebrow nn-label"><span class="dot" aria-hidden="true"></span>Happening now</p>
+          <p class="nn-title">Open rehearsal</p>
+          <p class="nn-meta">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span class="tnum">12:00 - 13:00</span></span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21s-6.5-5.3-6.5-10a6.5 6.5 0 1 1 13 0c0 4.7-6.5 10-6.5 10Z"/><circle cx="12" cy="11" r="2.3"/></svg>Studio A</span>
+          </p>
+        </div>
+        <div class="nn-row next">
+          <p class="eyebrow nn-label"><span class="dot" aria-hidden="true"></span>Up next</p>
+          <p class="nn-title">Welcome concert</p>
+          <p class="nn-meta">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span class="tnum">17:30</span></span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21s-6.5-5.3-6.5-10a6.5 6.5 0 1 1 13 0c0 4.7-6.5 10-6.5 10Z"/><circle cx="12" cy="11" r="2.3"/></svg>Auditorium</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="agenda-cols" id="agendaWrap">
+      <div>
+        <div class="section-head">
+          <h2 id="agendaSchedHead">Today's schedule</h2>
+          <span class="count" id="agendaSchedCount">3 entries</span>
+        </div>
+        <div class="agenda" id="agendaSchedule"></div>
+      </div>
+      <div>
+        <div class="section-head">
+          <h2 id="agendaEvHead">Events</h2>
+          <span class="count" id="agendaEvCount">3 events</span>
+        </div>
+        <div class="agenda" id="agendaEvents"></div>
+      </div>
+    </div>
+    <div id="todayStateBlock"></div>
+  </section>
+
+  <!-- ============================ EVENTS ============================ -->
+  <section class="screen" id="screen-events" aria-label="Events">
+    <div class="banner" id="banner-events" data-tone="cached" role="status"></div>
+    <div class="section-head">
+      <h2>Events</h2><span class="count" id="eventsCount">3 events</span>
+    </div>
+    <div class="toolbar">
+      <label class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>
+        <input type="search" id="eventSearch" placeholder="Search events" aria-label="Search events" />
+      </label>
+      <div class="seg" role="group" aria-label="Sort events">
+        <button aria-pressed="true" id="sortAsc">Soonest first</button>
+        <button aria-pressed="false" id="sortDesc">Latest first</button>
+      </div>
+    </div>
+    <ul class="row-list" id="eventList"></ul>
+    <div id="eventsStateBlock"></div>
+  </section>
+
+  <!-- ============================ ROOMS ============================ -->
+  <section class="screen" id="screen-rooms" aria-label="Rooms">
+    <div class="banner" id="banner-rooms" data-tone="cached" role="status"></div>
+    <div class="section-head">
+      <h2>Rooms</h2><span class="count" id="roomsCount">3 rooms</span>
+    </div>
+    <div class="toolbar">
+      <label class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>
+        <input type="search" id="roomSearch" placeholder="Search rooms" aria-label="Search rooms" />
+      </label>
+    </div>
+    <ul class="row-list" id="roomList"></ul>
+    <div id="roomsStateBlock"></div>
+  </section>
+
+  <!-- ============================ SETTINGS ============================ -->
+  <section class="screen" id="screen-settings" aria-label="Settings">
+    <div class="section-head"><h2>Settings</h2></div>
+    <div class="settings-group" role="radiogroup" aria-label="Appearance">
+      <h3>Appearance</h3>
+      <label class="choice-row"><input type="radio" name="appearance" checked data-apr="light" /><span><span class="choice-label">Light</span><br /><span class="choice-note">Warm paper canvas</span></span></label>
+      <label class="choice-row"><input type="radio" name="appearance" data-apr="dark" /><span><span class="choice-label">Dark</span><br /><span class="choice-note">Dusk slate, tuned contrast</span></span></label>
+      <label class="choice-row"><input type="radio" name="appearance" data-apr="hc" /><span><span class="choice-label">High contrast</span><br /><span class="choice-note">Maximum legibility, fixed palette</span></span></label>
+    </div>
+    <div class="settings-group" role="radiogroup" aria-label="Language">
+      <h3>Language</h3>
+      <label class="choice-row"><input type="radio" name="lang" checked /><span class="choice-label">English</span></label>
+      <label class="choice-row"><input type="radio" name="lang" /><span class="choice-label">Deutsch</span></label>
+    </div>
+    <div class="settings-group">
+      <h3>About</h3>
+      <label class="choice-row" style="cursor:default"><span><span class="choice-label">Example University</span><br /><span class="choice-note">Public campus information · pack <span class="tnum">example</span> · data via Concourse API</span></span></label>
+    </div>
+  </section>
+</main>
+
+<!-- ============================ MOBILE TABS ============================ -->
+<nav class="tabbar" aria-label="Primary">
+  <button data-nav="today" aria-current="page">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Today
+  </button>
+  <button data-nav="events">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v3.4M16 3v3.4"/></svg>Events
+  </button>
+  <button data-nav="rooms">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 21V5.5A1.5 1.5 0 0 1 5.5 4h9A1.5 1.5 0 0 1 16 5.5V21M16 9h3.5A1.5 1.5 0 0 1 21 10.5V21M2.5 21h19M9 8h2M9 12h2M9 16h2"/></svg>Rooms
+  </button>
+  <button data-nav="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.14-1.4l2-1.55-2-3.46-2.36.95a7 7 0 0 0-2.42-1.4L13.7 2.6h-3.4l-.38 2.54a7 7 0 0 0-2.42 1.4l-2.36-.95-2 3.46 2 1.55a7 7 0 0 0 0 2.8l-2 1.55 2 3.46 2.36-.95a7 7 0 0 0 2.42 1.4l.38 2.54h3.4l.38-2.54a7 7 0 0 0 2.42-1.4l2.36.95 2-3.46-2-1.55c.1-.45.14-.92.14-1.4Z"/></svg>Settings
+  </button>
+</nav>
+
+<!-- ============================ DETAIL MODAL ============================ -->
+<div class="modal-scrim" id="scrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-grab" aria-hidden="true"></div>
+    <p class="eyebrow" id="modalKind">Event</p>
+    <h2 id="modalTitle">Welcome concert</h2>
+    <div class="modal-meta" id="modalMeta"></div>
+    <p style="font-size:14.5px;color:var(--ink-2)" id="modalBody"></p>
+    <div class="modal-actions">
+      <a class="btn" href="#" id="modalLink" aria-disabled="true" title="Simulated link. This preview is offline only.">Open source page · Simulated</a>
+      <button class="btn ghost" id="modalClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- fixtures: fictional example pack content ---------- */
+const SCHEDULE = [
+  { id:"orientation",     title:"Campus orientation", start:"08:00", end:"09:30", loc:"Auditorium" },
+  { id:"welcome-session", title:"Welcome session",    start:"10:00", end:"11:00", loc:"Seminar room 204" },
+  { id:"open-rehearsal",  title:"Open rehearsal",     start:"12:00", end:"13:00", loc:"Studio A", live:true },
+];
+const EVENTS = [
+  { id:"welcome-concert", title:"Welcome concert",             date:"Mon 14 Sep", day:"14", dow:"Mon", time:"17:30", loc:"Auditorium", source:"Website Events" },
+  { id:"library-tour",    title:"Library introduction",        date:"Tue 15 Sep", day:"15", dow:"Tue", time:"09:00", loc:"Library", source:"Website Events" },
+  { id:"student-services",title:"Student services open hour",  date:"Wed 16 Sep", day:"16", dow:"Wed", time:"12:00", loc:"Student services", source:"Website Events" },
+];
+const ROOMS = [
+  { id:"auditorium",  name:"Auditorium",       campus:"Main Campus · Cologne" },
+  { id:"library",     name:"Library",          campus:"Main Campus · Cologne" },
+  { id:"seminar-204", name:"Seminar room 204", campus:"Main Campus · Cologne" },
+];
+
+const $  = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => [...el.querySelectorAll(s)];
+
+/* ---------- navigation ---------- */
+function go(key){
+  $$(".screen").forEach(s => s.classList.toggle("active", s.id === "screen-" + key));
+  $$("[data-nav]").forEach(b => b.setAttribute("aria-current", b.dataset.nav === key ? "page" : "false"));
+  window.scrollTo({ top: 0 });
+}
+$$("[data-nav]").forEach(b => b.addEventListener("click", () => go(b.dataset.nav)));
+
+/* ---------- appearance ---------- */
+const THEMES = ["light", "dark", "hc"];
+let themeIx = 0;
+function setTheme(t){
+  document.documentElement.dataset.theme = t;
+  themeIx = THEMES.indexOf(t);
+  $$('input[name="appearance"]').forEach(r => r.checked = r.dataset.apr === t);
+}
+$("#themeBtn").addEventListener("click", () => setTheme(THEMES[(themeIx + 1) % THEMES.length]));
+$$('input[name="appearance"]').forEach(r => r.addEventListener("change", () => setTheme(r.dataset.apr)));
+
+/* ---------- render: agenda ---------- */
+function agendaItem(item){
+  const past = item.end && item.end < "12:42" && !item.live;
+  return `<div class="agenda-item${item.live ? " live" : ""}${past ? " past" : ""}">
+    <div class="agenda-time tnum">${item.start}<span class="end">${item.end ?? ""}</span></div>
+    <div class="spine" aria-hidden="true"><div class="spine-dot"></div></div>
+    <div class="agenda-body">
+      <p class="agenda-title">${item.title}</p>
+      <p class="agenda-meta"><span>${item.loc}</span></p>
+    </div>
+  </div>`;
+}
+function renderAgenda(){
+  $("#agendaSchedule").innerHTML = SCHEDULE.map(agendaItem).join("");
+  $("#agendaEvents").innerHTML = EVENTS.map(e => agendaItem({ title:e.title, start:e.time, end:"", loc:`${e.date} · ${e.loc}` })).join("");
+}
+renderAgenda();
+
+/* ---------- render: event rows ---------- */
+let sortAsc = true;
+function renderEvents(){
+  const q = ($("#eventSearch").value || "").toLowerCase();
+  let list = EVENTS.filter(e => e.title.toLowerCase().includes(q));
+  if (!sortAsc) list = [...list].reverse();
+  $("#eventsCount").textContent = `${list.length} event${list.length === 1 ? "" : "s"}`;
+  $("#eventList").innerHTML = list.map(e => `
+    <li><button class="row-item" data-event="${e.id}">
+      <span class="date-ticket"><span class="dow">${e.dow}</span><span class="day tnum">${e.day}</span></span>
+      <span class="row-main">
+        <span class="row-title">${e.title}</span>
+        <span class="row-meta"><span class="tnum">${e.time}</span><span>${e.loc}</span><span>via ${e.source}</span></span>
+      </span>
+      <span class="row-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg></span>
+    </button></li>`).join("");
+  $$("#eventList [data-event]").forEach(b => b.addEventListener("click", () => openModal(EVENTS.find(e => e.id === b.dataset.event))));
+}
+$("#eventSearch").addEventListener("input", renderEvents);
+$("#sortAsc").addEventListener("click", () => { sortAsc = true;  $("#sortAsc").setAttribute("aria-pressed","true");  $("#sortDesc").setAttribute("aria-pressed","false"); renderEvents(); });
+$("#sortDesc").addEventListener("click",() => { sortAsc = false; $("#sortDesc").setAttribute("aria-pressed","true"); $("#sortAsc").setAttribute("aria-pressed","false"); renderEvents(); });
+renderEvents();
+
+/* ---------- render: room rows ---------- */
+function renderRooms(){
+  const q = ($("#roomSearch").value || "").toLowerCase();
+  const list = ROOMS.filter(r => r.name.toLowerCase().includes(q));
+  $("#roomsCount").textContent = `${list.length} room${list.length === 1 ? "" : "s"}`;
+  $("#roomList").innerHTML = list.map(r => `
+    <li><button class="row-item">
+      <span class="room-mark" aria-hidden="true">${r.name[0]}</span>
+      <span class="row-main">
+        <span class="row-title">${r.name}</span>
+        <span class="row-meta"><span>${r.campus}</span></span>
+      </span>
+      <span class="row-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg></span>
+    </button></li>`).join("");
+}
+$("#roomSearch").addEventListener("input", renderRooms);
+renderRooms();
+
+/* ---------- detail modal ---------- */
+const scrim = $("#scrim");
+let lastFocus = null;
+function openModal(e){
+  lastFocus = document.activeElement;
+  $("#modalKind").textContent = "Event";
+  $("#modalTitle").textContent = e.title;
+  $("#modalMeta").innerHTML = `
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v3.4M16 3v3.4"/></svg>${e.date} · <span class="tnum">${e.time}</span></span>
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21s-6.5-5.3-6.5-10a6.5 6.5 0 1 1 13 0c0 4.7-6.5 10-6.5 10Z"/><circle cx="12" cy="11" r="2.3"/></svg>${e.loc} · Main Campus, Cologne</span>`;
+  $("#modalBody").textContent = "Public event published by Example University. Details are provided by the institution's public events page and may change; check the source page for the latest information.";
+  $("#modalLink").href = "#";
+  scrim.classList.add("open");
+  $("#modalClose").focus();
+}
+function closeModal(){ scrim.classList.remove("open"); lastFocus?.focus(); }
+$("#modalClose").addEventListener("click", closeModal);
+$("#modalLink").addEventListener("click", ev => ev.preventDefault());
+scrim.addEventListener("click", ev => { if (ev.target === scrim) closeModal(); });
+document.addEventListener("keydown", ev => { if (ev.key === "Escape") closeModal(); });
+
+/* ---------- data-state simulation ---------- */
+const STATE_COPY = {
+  live:     { tone:"live",     chip:"Live · updated just now",              banner:null },
+  cached:   { tone:"cached",   chip:"Cached · from 12:31",                  banner:{ icon:"clock",  html:"<strong>Showing cached data.</strong> <span class='banner-note'>Last updated 12:31. A refresh will happen automatically.</span>" } },
+  degraded: { tone:"degraded", chip:"Degraded · partial data",              banner:{ icon:"warn",   html:"<strong>Some sources are unavailable.</strong> <span class='banner-note'>The schedule feed did not respond, so results are partial.</span>" } },
+  offline:  { tone:"offline",  chip:"Offline · showing saved data",         banner:{ icon:"offline",html:"<strong>You are offline.</strong> <span class='banner-note'>Showing the last saved copy from 12:31. It may be out of date.</span>" } },
+  empty:    { tone:"live",     chip:"Live · updated just now",              banner:null },
+  error:    { tone:"error",    chip:"Unavailable",                          banner:{ icon:"error",  html:"<strong>Could not load campus data.</strong> <span class='banner-note'>The information service is not responding. Nothing is shown as current.</span>" } },
+};
+const ICONS = {
+  clock:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+  warn:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4 2.8 19.5h18.4L12 4Z"/><path d="M12 10v4M12 16.8v.2"/></svg>',
+  offline:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12.9a10 10 0 0 1 14 0M8.3 16.2a5.5 5.5 0 0 1 7.4 0M12 19.6v.2M3 3l18 18"/></svg>',
+  error:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v4.5M12 15.8v.2"/></svg>',
+  inbox:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 13.5 6 6h12l2.5 7.5v5a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18.5v-5Z"/><path d="M3.5 13.5H9a3 3 0 0 0 6 0h5.5"/></svg>',
+};
+
+function emptyBlock(kind){
+  const copy = {
+    schedule: ["Nothing scheduled today", "There are no public schedule entries for today at Example University."],
+    events:   ["No upcoming events",      "The public events source currently lists no events. New events appear here automatically."],
+    rooms:    ["No rooms found",          "No public rooms match your search. Try a different name."],
+  }[kind];
+  return `<div class="state-block">${ICONS.inbox}<h3>${copy[0]}</h3><p>${copy[1]}</p></div>`;
+}
+function errorBlock(){
+  return `<div class="state-block">${ICONS.error}<h3>Campus data unavailable</h3><p>The information service is not responding. Your last saved data is kept on this device and will reappear when the connection recovers.</p><button class="btn" onclick="document.getElementById('stateSelect').value='live';document.getElementById('stateSelect').dispatchEvent(new Event('change'))">Try again</button></div>`;
+}
+
+function applyState(state){
+  document.documentElement.dataset.state = state;
+  const cfg = STATE_COPY[state];
+
+  // freshness chip
+  const chip = $("#freshnessChip");
+  chip.dataset.tone = cfg.tone;
+  $("#freshnessLabel").textContent = cfg.chip;
+
+  // per-screen banners
+  ["today", "events", "rooms"].forEach(k => {
+    const el = $("#banner-" + k);
+    if (cfg.banner){
+      el.dataset.tone = cfg.tone;
+      el.innerHTML = ICONS[cfg.banner.icon] + "<div>" + cfg.banner.html + "</div>";
+      el.classList.add("show");
+    } else el.classList.remove("show");
+  });
+
+  // content swapping for empty / error
+  const isEmpty = state === "empty", isError = state === "error";
+  $("#agendaWrap").style.display   = (isEmpty || isError) ? "none" : "";
+  $("#nowNext").style.visibility   = (isEmpty || isError) ? "hidden" : "";
+  $("#todayStateBlock").innerHTML  = isEmpty ? emptyBlock("schedule") : isError ? errorBlock() : "";
+  $("#eventList").style.display    = (isEmpty || isError) ? "none" : "";
+  $(".toolbar", $("#screen-events")).style.visibility = (isEmpty || isError) ? "hidden" : "";
+  $("#eventsStateBlock").innerHTML = isEmpty ? emptyBlock("events") : isError ? errorBlock() : "";
+  if (isEmpty || isError) $("#eventsCount").textContent = "0 events"; else renderEvents();
+  $("#roomList").style.display     = (isEmpty || isError) ? "none" : "";
+  $("#roomsStateBlock").innerHTML  = isEmpty ? emptyBlock("rooms") : isError ? errorBlock() : "";
+  if (isEmpty || isError) $("#roomsCount").textContent = "0 rooms"; else renderRooms();
+}
+$("#stateSelect").addEventListener("change", ev => applyState(ev.target.value));
+applyState("live");
+</script>
+</body>
+</html>

@@ -1,8 +1,7 @@
 /** Preflights the number of eligible recurring ICS events before expansion. */
 
 import { parseIcsDate } from "./recurrenceDate";
-import { isRecurrenceEligible } from "./recurrenceRules";
-import type { RecurrencePreflightOptions } from "./recurrenceTypes";
+import { isRecurrenceEligible, type RecurrencePreflightOptions } from "./recurrenceRules";
 import { forEachValidIcsEvent, type EventAccumulator } from "./icsEventStream";
 
 /** Counts recurrence candidates that can pass preflight without expanding them. */

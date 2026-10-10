@@ -14,18 +14,9 @@ import {
 } from "@concourse/contracts";
 import type { InstitutionPack } from "@concourse/institutions";
 import type { PublicDataSources } from "../application/publicSources";
+import { createTestConfig } from "../testing/config";
+import { listenOnLoopback } from "../testing/loopback";
 import { createRequestListener, type RequestListenerDependencies } from "./listener";
-
-const originalAuthRequirement = process.env.BFF_REQUIRE_AUTH;
-const originalAuthToken = process.env.BFF_AUTH_TOKEN;
-
-function restoreEnvironment(name: "BFF_REQUIRE_AUTH" | "BFF_AUTH_TOKEN", value: string | undefined): void {
-  if (value === undefined) {
-    delete process.env[name];
-    return;
-  }
-  process.env[name] = value;
-}
 
 const contractInstitution: InstitutionPack = {
   id: "contract-university",
@@ -62,11 +53,14 @@ function createContractSources(options: { degraded?: boolean; failEvents?: boole
   };
 }
 
-function createApp(dependencies: RequestListenerDependencies = {}): http.Server {
-  return http.createServer(createRequestListener(dependencies));
+function createApp(
+  dependencies: Partial<RequestListenerDependencies> = {},
+  env: Record<string, string> = {}
+): Promise<http.Server> {
+  return listenOnLoopback(http.createServer(createRequestListener({ config: createTestConfig(env), ...dependencies })));
 }
 
-function createContractApp(options: { degraded?: boolean; failEvents?: boolean; institution?: InstitutionPack } = {}): http.Server {
+function createContractApp(options: { degraded?: boolean; failEvents?: boolean; institution?: InstitutionPack } = {}): Promise<http.Server> {
   return createApp({
     publicDataSources: createContractSources(options),
     now: new Date("2026-08-28T12:00:00.000Z"),
@@ -75,14 +69,12 @@ function createContractApp(options: { degraded?: boolean; failEvents?: boolean; 
 }
 
 afterEach(() => {
-  restoreEnvironment("BFF_REQUIRE_AUTH", originalAuthRequirement);
-  restoreEnvironment("BFF_AUTH_TOKEN", originalAuthToken);
   vi.restoreAllMocks();
 });
 
 describe("createRequestListener HTTP characterization", () => {
   it("preserves valid request IDs on not-found responses with the stable error and security contract", async () => {
-    const response = await request(createApp())
+    const response = await request(await createApp())
       .get("/missing")
       .set("x-request-id", "characterization-request-1")
       .expect(404);
@@ -97,10 +89,9 @@ describe("createRequestListener HTTP characterization", () => {
   });
 
   it("handles OPTIONS before authentication or route loading", async () => {
-    process.env.BFF_REQUIRE_AUTH = "true";
-    process.env.BFF_AUTH_TOKEN = "characterization-token";
+    const authEnv = { BFF_REQUIRE_AUTH: "true", BFF_AUTH_TOKEN: "characterization-token" };
 
-    const response = await request(createApp())
+    const response = await request(await createApp({}, authEnv))
       .options("/today")
       .set("x-request-id", "characterization-request-2")
       .expect(204);
@@ -111,11 +102,10 @@ describe("createRequestListener HTTP characterization", () => {
   });
 
   it("rejects missing authentication before reporting an unsupported method", async () => {
-    process.env.BFF_REQUIRE_AUTH = "true";
-    process.env.BFF_AUTH_TOKEN = "characterization-token";
+    const authEnv = { BFF_REQUIRE_AUTH: "true", BFF_AUTH_TOKEN: "characterization-token" };
 
-    const unauthenticated = await request(createApp()).post("/health").expect(401);
-    const authenticated = await request(createApp())
+    const unauthenticated = await request(await createApp({}, authEnv)).post("/health").expect(401);
+    const authenticated = await request(await createApp({}, authEnv))
       .post("/health")
       .set("authorization", "Bearer characterization-token")
       .expect(405);
@@ -126,7 +116,7 @@ describe("createRequestListener HTTP characterization", () => {
   });
 
   it("serves health without contacting public upstream sources", async () => {
-    const response = await request(createApp())
+    const response = await request(await createApp())
       .get("/health")
       .set("x-request-id", "characterization-request-3")
       .expect(200);
@@ -141,7 +131,7 @@ describe("createRequestListener HTTP characterization", () => {
   });
 
   it("serves schema-valid events, rooms, schedule, and today through injected public sources", async () => {
-    const app = createContractApp({ degraded: true });
+    const app = await createContractApp({ degraded: true });
     const events = await request(app).get("/events?search=lecture&limit=1").expect(200);
     const rooms = await request(app).get("/rooms?campus=south&limit=1").expect(200);
     const schedule = await request(app).get("/schedule?campus=main&limit=1").expect(200);
@@ -168,7 +158,7 @@ describe("createRequestListener HTTP characterization", () => {
 
   it.each(["/events", "/rooms", "/schedule", "/today"])("returns the stable no-source 404 for %s", async (path) => {
     const emptyInstitution: InstitutionPack = { ...contractInstitution, publicSources: {}, publicRooms: [] };
-    const response = await request(createContractApp({ institution: emptyInstitution })).get(path).expect(404);
+    const response = await request(await createContractApp({ institution: emptyInstitution })).get(path).expect(404);
 
     expect(response.body.error.code).toBe("not_found");
     expect(response.headers[PublicResponseHeader.institutionId]).toBe(emptyInstitution.id);
@@ -176,7 +166,7 @@ describe("createRequestListener HTTP characterization", () => {
 
   it("does not leak an injected public-source failure through the events route", async () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    const response = await request(createContractApp({ failEvents: true })).get("/events").expect(500);
+    const response = await request(await createContractApp({ failEvents: true })).get("/events").expect(500);
 
     expect(response.body).toEqual({
       error: { code: "internal_error", message: "Something went wrong on our end. Please try again in a moment." }

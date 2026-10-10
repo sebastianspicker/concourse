@@ -6,9 +6,8 @@ import {
   StyleSheet,
   View
 } from "react-native";
-import { spacing } from "./theme";
-import { getDesignPreset } from "./designPresets";
-import { useTheme } from "./ThemeContext";
+import { CONTENT_MAX_WIDTH, spacing } from "./theme";
+import { useTheme, useDesignMetrics } from "./ThemeProvider";
 import { useHydratedWindowWidth } from "./useHydratedWindowWidth";
 
 const styles = StyleSheet.create({
@@ -20,13 +19,21 @@ const styles = StyleSheet.create({
   nonScrolling: { flex: 1 },
 });
 
+/** Returns the horizontal gutter for the current width, shared by the header and screen bodies. */
+export function useContentGutter(): number {
+  const width = useHydratedWindowWidth();
+  const metrics = useDesignMetrics();
+  if (width < 600) return metrics.compactGutter;
+  return width < 900 ? metrics.regularGutter : metrics.wideGutter;
+}
+
 /** Provides responsive gutters, optional scrolling, and native pull-to-refresh for a screen body. */
 export function Screen({
   children,
   scroll = true,
   refreshing = false,
   onRefresh,
-  maxWidth = 760,
+  maxWidth = CONTENT_MAX_WIDTH,
   backgroundColor,
   contentPadding,
   testID,
@@ -41,8 +48,8 @@ export function Screen({
   testID?: string;
 }): JSX.Element {
   const theme = useTheme();
-  const width = useHydratedWindowWidth();
-  const metrics = getDesignPreset(theme.designPreset).metrics;
+  const metrics = useDesignMetrics();
+  const gutter = useContentGutter();
 
   const refreshControl = onRefresh ? (
     <RefreshControl
@@ -54,11 +61,7 @@ export function Screen({
     />
   ) : undefined;
 
-  const resolvedContentPadding = contentPadding ?? (width < 600
-    ? metrics.compactGutter
-    : width < 900
-      ? metrics.regularGutter
-      : metrics.wideGutter);
+  const resolvedContentPadding = contentPadding ?? gutter;
 
   const contentStyle = [
     styles.content,
@@ -67,8 +70,8 @@ export function Screen({
       maxWidth,
       alignSelf: "center" as const,
       paddingHorizontal: resolvedContentPadding,
-      paddingTop: resolvedContentPadding,
-      paddingBottom: resolvedContentPadding + spacing.xxl,
+      paddingTop: Math.min(resolvedContentPadding, spacing.xxl),
+      paddingBottom: resolvedContentPadding + spacing.huge,
       gap: metrics.contentGap,
     },
   ];

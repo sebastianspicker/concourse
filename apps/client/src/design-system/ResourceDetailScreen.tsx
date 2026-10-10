@@ -7,9 +7,8 @@ import { ErrorState } from "./ErrorState";
 import { Screen } from "./Screen";
 import { SkeletonDetail } from "./Skeleton";
 import { StatusBanner } from "./StatusBanner";
-import { getDesignPreset } from "./designPresets";
-import { spacing, typography } from "./theme";
-import { useTheme } from "./ThemeContext";
+import { CONTENT_MAX_WIDTH, spacing, typography } from "./theme";
+import { useTheme, useDesignMetrics } from "./ThemeProvider";
 import { useLocale } from "@/localization/LocaleContext";
 import { useHydratedWindowWidth } from "./useHydratedWindowWidth";
 import { getErrorMessage } from "./errorStatePresentation";
@@ -19,9 +18,14 @@ export type ResourceDetailScreenProps<T> = {
   error: UiError | null;
   item: T | null;
   notFoundMessage: string;
+  /** Small label naming the record type, e.g. "Event". */
+  kicker?: string;
   cardTitle: string;
+  /** The record's key fact (usually its time), set under the title. */
   cardSubtitle?: string;
   renderMeta?: () => ReactNode;
+  /** Actions shown under the fact table. */
+  renderActions?: () => ReactNode;
   footnote?: string;
   cached?: boolean;
   cacheAge?: number | null;
@@ -32,150 +36,81 @@ export type ResourceDetailScreenProps<T> = {
 
 type DetailContentProps = Pick<
   ResourceDetailScreenProps<unknown>,
-  "error" | "cardTitle" | "cardSubtitle" | "renderMeta" | "footnote" | "cached" | "cacheAge" | "degraded"
-> & {
-  t: ReturnType<typeof useLocale>["t"];
-  theme: ReturnType<typeof useTheme>;
-  metrics: ReturnType<typeof getDesignPreset>["metrics"];
-  isWide: boolean;
-};
+  "error" | "kicker" | "cardTitle" | "cardSubtitle" | "renderMeta" | "renderActions" | "footnote" | "cached" | "cacheAge" | "degraded"
+> & { isWide: boolean };
 
-/** Displays caller-provided metadata beneath the resource card with consistent spacing. */
-const DetailMetadata = ({
-  renderMeta,
-  theme,
-  metrics
-}: Pick<DetailContentProps, "renderMeta" | "theme" | "metrics">): JSX.Element | null => {
-  if (!renderMeta) return null;
-
+/** Renders the title block: record kind, title, and key fact. */
+function DetailHeading({ kicker, cardTitle, cardSubtitle, isWide }: Pick<DetailContentProps, "kicker" | "cardTitle" | "cardSubtitle" | "isWide">): JSX.Element {
+  const theme = useTheme();
   return (
-    <View
-      style={[
-        styles.meta,
-        {
-          backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.border,
-          borderTopWidth: theme.ui.borderWidth,
-          borderBottomWidth: theme.ui.borderWidth,
-          paddingHorizontal: metrics.compactGutter
-        }
-      ]}
-    >
-      {renderMeta()}
+    <View style={styles.heading}>
+      {kicker ? <Text style={[styles.kicker, { color: theme.colors.muted }]}>{kicker}</Text> : null}
+      <Text selectable accessibilityRole="header" style={[isWide ? styles.titleWide : styles.title, { color: theme.colors.text }]}>{cardTitle}</Text>
+      {cardSubtitle ? <Text selectable style={[styles.subtitle, { color: theme.colors.text }]}>{cardSubtitle}</Text> : null}
     </View>
   );
-};
+}
 
-/** Chooses loading, failure, missing-record, or resolved detail content from resource state. */
-const DetailContent = ({
-  error,
-  cardTitle,
-  cardSubtitle,
-  renderMeta,
-  footnote,
-  cached,
-  cacheAge,
-  degraded,
-  t,
-  theme,
-  metrics,
-  isWide,
-}: DetailContentProps): JSX.Element => {
+/** Lays out the resolved record in one reading column: heading, state notices, facts, actions. */
+function DetailContent(props: DetailContentProps): JSX.Element {
+  const { error, renderMeta, renderActions, footnote, cached, cacheAge, degraded, isWide } = props;
+  const theme = useTheme();
+  const metrics = useDesignMetrics();
   return (
-    <View
-      style={[
-        styles.layout,
-        isWide && styles.layoutWide,
-        {
-          backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.border,
-          borderTopWidth: theme.ui.borderWidth,
-          borderBottomWidth: theme.ui.borderWidth,
-          gap: metrics.sectionGap,
-          padding: metrics.contentGap,
-        },
-      ]}
-    >
-      <View style={[
-        styles.heading,
-        isWide ? styles.headingWide : styles.headingNarrow,
-        {
-          borderColor: theme.colors.border,
-          paddingBottom: isWide ? 0 : metrics.contentGap,
-          paddingRight: isWide ? metrics.sectionGap : 0,
-        },
-      ]}>
-        <Text selectable accessibilityRole="header" style={[styles.title, isWide && styles.titleWide, { color: theme.colors.text }]}>{cardTitle}</Text>
-        {cardSubtitle ? <Text selectable style={[styles.subtitle, { color: theme.colors.muted }]}>{cardSubtitle}</Text> : null}
-      </View>
-      <View style={styles.body}>
-        <DetailStatuses cached={cached} cacheAge={cacheAge} error={error} degraded={degraded} t={t} />
-        <DetailMetadata renderMeta={renderMeta} theme={theme} metrics={metrics} />
-        {footnote ? <Text selectable style={[styles.footnote, { color: theme.colors.muted }]}>{footnote}</Text> : null}
-      </View>
+    <View style={[styles.layout, { gap: metrics.contentGap + (isWide ? spacing.sm : 0) }]}>
+      <DetailHeading {...props} />
+      <DetailStatuses cached={cached} cacheAge={cacheAge} error={error} degraded={degraded} />
+      {renderMeta ? (
+        <View style={{ borderTopColor: theme.colors.text, borderTopWidth: 1.5 }}>{renderMeta()}</View>
+      ) : null}
+      {renderActions ? <View style={[styles.actions, !isWide && styles.actionsStacked]}>{renderActions()}</View> : null}
+      {footnote ? <Text selectable style={[styles.footnote, { color: theme.colors.muted }]}>{footnote}</Text> : null}
     </View>
   );
-};
+}
 
-/** Coordinates pull-to-refresh and error recovery around the selected detail record. */
-const renderDetailState = <T,>(props: ResourceDetailScreenProps<T>, t: ReturnType<typeof useLocale>["t"], theme: ReturnType<typeof useTheme>, metrics: ReturnType<typeof getDesignPreset>["metrics"], isWide: boolean): JSX.Element => {
-  if (props.item) return <DetailContent {...props} t={t} theme={theme} metrics={metrics} isWide={isWide} />;
-  if (props.loading) return <SkeletonDetail />;
-  if (props.error) return <ErrorState error={props.error} onRetry={props.onRefresh} />;
-  return <EmptyState message={props.notFoundMessage} hint={t("detailUnavailableHint")} />;
-};
-
-/** Selects the localized warning for an incomplete but displayable detail response. */
-const getDegradedMessage = (
-  error: ResourceDetailScreenProps<unknown>["error"],
-  t: ReturnType<typeof useLocale>["t"]
-): string | undefined => {
-  return error ? getErrorMessage(error, undefined, t) : undefined;
-};
-
-/** Renders refresh, cache, degraded-source, and error signals before detail content. */
-const DetailStatuses = ({
-  cached,
-  cacheAge,
-  error,
-  degraded,
-  t
-}: Pick<DetailContentProps, "cached" | "cacheAge" | "error" | "degraded" | "t">): JSX.Element | null => {
+/** Renders cache, degraded-source, and error signals before detail content. */
+function DetailStatuses({ cached, cacheAge, error, degraded }: Pick<DetailContentProps, "cached" | "cacheAge" | "error" | "degraded">): JSX.Element | null {
+  const { t } = useLocale();
   if (!cached && !error && !degraded) return null;
 
   return (
     <View style={styles.statuses}>
       {cached ? <StatusBanner kind="cached" cacheAge={cacheAge} /> : null}
-      {error || degraded ? <StatusBanner kind="degraded" message={getDegradedMessage(error, t)} /> : null}
+      {error || degraded ? <StatusBanner kind="degraded" message={error ? getErrorMessage(error, undefined, t) : undefined} /> : null}
     </View>
   );
-};
+}
+
+/** Chooses loading, failure, missing-record, or resolved detail content from resource state. */
+function DetailState<T>({ props, isWide }: { props: ResourceDetailScreenProps<T>; isWide: boolean }): JSX.Element {
+  const { t } = useLocale();
+  if (props.item) return <DetailContent {...props} isWide={isWide} />;
+  if (props.loading) return <SkeletonDetail />;
+  if (props.error) return <ErrorState error={props.error} onRetry={props.onRefresh} />;
+  return <EmptyState label={t("notFoundLabel")} message={props.notFoundMessage} hint={t("detailUnavailableHint")} />;
+}
 
 /** Handles loading, stale selection, missing records, and refresh retries for detail navigation. */
 export function ResourceDetailScreen<T>(props: ResourceDetailScreenProps<T>): JSX.Element {
-  const theme = useTheme();
   const width = useHydratedWindowWidth();
-  const metrics = getDesignPreset(theme.designPreset).metrics;
-  const { t } = useLocale();
 
   return (
-    <Screen refreshing={props.refreshing} onRefresh={props.onRefresh} maxWidth={1280} testID="detail-screen">
-      {renderDetailState(props, t, theme, metrics, width >= 900)}
+    <Screen refreshing={props.refreshing} onRefresh={props.onRefresh} maxWidth={CONTENT_MAX_WIDTH} testID="detail-screen">
+      <DetailState props={props} isWide={width >= 900} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  layout: {},
-  layoutWide: { flexDirection: "row", alignItems: "stretch" },
-  heading: { gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth },
-  headingNarrow: { borderBottomWidth: StyleSheet.hairlineWidth },
-  headingWide: { width: "38%", borderBottomWidth: 0, borderRightWidth: StyleSheet.hairlineWidth },
-  title: { ...typography.heading },
-  titleWide: { ...typography.display, fontSize: 44, lineHeight: 50, letterSpacing: -1.2 },
-  subtitle: { ...typography.body, maxWidth: 620 },
-  body: { flex: 1, minWidth: 0, gap: spacing.lg },
+  layout: { maxWidth: 760 },
+  heading: { gap: spacing.sm },
+  kicker: { ...typography.action },
+  title: { ...typography.display, fontSize: 34, lineHeight: 36 },
+  titleWide: { ...typography.display },
+  subtitle: { ...typography.dateline, marginTop: spacing.xs },
   statuses: { gap: spacing.sm },
-  meta: {},
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  actionsStacked: { flexDirection: "column", alignItems: "stretch" },
   footnote: { ...typography.caption, maxWidth: 560 },
 });

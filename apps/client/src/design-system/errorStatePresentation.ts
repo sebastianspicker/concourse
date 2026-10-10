@@ -1,9 +1,8 @@
 /** Chooses localized error copy and presentation type from normalized UI failures. */
 import type { UiError, UiErrorKind } from "@/platform/http/uiError";
 import type { TranslationKey } from "@/localization/dictionaries";
-import type { ErrorType } from "./errorStateTypes";
 
-export type { ErrorType } from "./errorStateTypes";
+export type ErrorType = "network" | "notFound" | "generic";
 
 const ERROR_TYPE_BY_KIND: Partial<Record<UiErrorKind, ErrorType>> = {
   unavailableSource: "notFound",

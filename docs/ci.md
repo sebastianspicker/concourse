@@ -1,31 +1,71 @@
-# CI overview
+# Continuous integration
 
-GitHub Actions validates source changes, reviews dependencies, scans for secrets, runs CodeQL, publishes the static demo, and publishes release artifacts from tags.
+GitHub Actions is the source of truth for merge safety. It checks every change,
+scans dependencies and secrets, and publishes the demo and release artifacts.
 
 ## Workflows
 
-- ci runs on main/dev pushes and pull requests. It installs with the frozen lockfile and runs scripts/verify-production-ready.sh, including pnpm check:architecture and fresh package builds.
-- dependency-review runs on pull requests and scans pnpm-lock.yaml with OSV.
-- gitleaks runs on pull requests and main/dev pushes.
-- codeql runs on pull requests, main/dev pushes, and a weekly schedule.
-- pages builds the fixture-only static demo on main and deploys its verified artifact.
-- release runs for v* tags. It checks metadata and the source gate, verifies the apps/api image, pushes it to GHCR, and creates the GitHub Release.
+| Workflow | Runs on | What it does |
+|---|---|---|
+| `ci` | pushes to `main`/`dev`, pull requests | Installs with the frozen lockfile and runs `scripts/verify-production-ready.sh`: tooling tests, a batched public-tree scan, architecture checks, and fresh package builds. The `web` and `containers` jobs must also pass before merge. |
+| `dependency-review` | pull requests | Scans `pnpm-lock.yaml` with OSV. |
+| `gitleaks` | pull requests, pushes to `main`/`dev` | Scans for committed secrets. |
+| `codeql` | pull requests, pushes to `main`/`dev`, weekly | Runs CodeQL analysis. |
+| `pages` | pushes to `main`, manual dispatch | Builds the fixture-only static demo and its design preview, then deploys the verified artifact. |
+| `release` | `v*` tags | Checks metadata and the source gate, verifies the `apps/api` image, pushes it to GHCR, and creates the GitHub Release. |
 
-The release workflow has separate image and release jobs, so publication is not atomic. Verify GHCR and GitHub Releases independently after any failed run. Stable tags receive latest; prerelease tags do not.
+The release workflow runs its image and release jobs separately, so publication
+is not atomic. After a failed run, check GHCR and GitHub Releases independently.
+Stable tags also move the `latest` tag; prerelease tags do not.
 
-## Local reproduction
+## Reproduce CI locally
 
 ~~~bash
-make ci
-make lint
-make typecheck
-make test
-make build
-make gitleaks
+pnpm install --frozen-lockfile
+pnpm verify
+pnpm exec playwright install chromium
+pnpm verify:web
+pnpm verify:containers
+docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.28.0 detect --redact --source=/repo --config=/repo/.gitleaks.toml
 ~~~
 
-scripts/ci-local.sh performs a frozen install followed by the source-candidate gate. pnpm verify does not replace remote OSV, Gitleaks, CodeQL, Docker publication, Pages deployment, EAS, or native accessibility checks.
+`pnpm verify` mirrors the `ci` job; set `SKIP_INSTALL=1` when the frozen install
+already ran.
+`pnpm verify` is not a substitute for the remote checks: OSV, Gitleaks, CodeQL,
+Docker publication, Pages deployment, EAS, and native accessibility checks all
+happen outside it.
 
-## CI policy
+## Policy
 
-No secrets are required for public pull-request workflows. Keep privileged jobs restricted to trusted branches or manual dispatch, pin tools and actions, and use the frozen lockfile. CODEOWNERS protects workflow, security, release, container, contract, and pack surfaces.
+Public pull-request workflows need no secrets. Keep privileged jobs on trusted
+branches or manual dispatch, pin tools and actions, and install with the frozen
+lockfile. `CODEOWNERS` protects the workflow, security, release, container,
+contract, and institution-pack surfaces.
+
+## Browser and container gates
+
+`pnpm verify:web` exports the fixture-only demo, validates the artifact, exports
+the normal client with an intercepted HTTPS fixture origin, then runs pinned
+Playwright 1.63.0 Chromium scenarios against both. No campus service is
+required. The scenarios cover navigation, responsive rendering, cache and
+recovery behavior, and demo network isolation.
+
+For day-to-day work, `pnpm test:web` runs against a prepared demo and the normal
+development server, and `CONCOURSE_WEB_BUILD=production pnpm test:web` uses the
+prepared normal export. `pnpm build:web:client` rebuilds the browser-test
+artifact with the example institution pack and a cleared Metro cache. Playwright
+intercepts the HTTPS fixture origin, so no deployed service is involved. Set
+`CONCOURSE_WEB_RESULTS` to keep results, traces, and screenshots somewhere
+useful; the default is `/tmp/concourse-playwright-results`.
+
+`pnpm verify:containers` builds both API Dockerfiles and runs the shared image
+smoke helper. It checks non-root execution, compiled output, shared and external
+runtime dependencies, health and version on port 4107, invalid startup settings,
+and request draining. The release workflow reuses the same helper before pushing
+the image.
+
+Branch protection should require the `ci`, `web`, and `containers` jobs. Workflow
+files define those jobs; applying branch protection is a separate repository
+administration step. Turbo archives use a revision-specific save key and
+configuration/branch restore prefixes, so new results are saved per commit.
+Changes to the shared cleanup helper invalidate package tasks.

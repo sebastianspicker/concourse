@@ -1,10 +1,11 @@
 /** Supplies sanitized public-campus fixtures to the static GitHub Pages build. */
 import type { EventsResponse, RoomsResponse, ScheduleResponse, TodayResponse } from "@concourse/contracts";
+import { getInstitutionTimeZone } from "@/platform/env/institution";
+import { getCampusDate } from "@/platform/time/campusTime";
 
 export const STATIC_DEMO_EVENT_IDS = ["welcome-concert", "library-tour", "student-services"] as const;
 export const STATIC_DEMO_ROOM_IDS = ["auditorium", "library", "seminar-204"] as const;
 export const STATIC_DEMO_SCHEDULE_IDS = ["orientation", "welcome-session", "open-rehearsal"] as const;
-export const STATIC_DEMO_DATE = "2026-09-14";
 
 const rooms: RoomsResponse["rooms"] = [
   { id: "auditorium", name: "Auditorium", campusId: "main" },
@@ -19,12 +20,16 @@ function datedInstant(date: string, dayOffset: number, time: string): string {
   return instant.toISOString();
 }
 
-/** Selects a valid YYYY-MM-DD query date or the deterministic fixture date. */
+/**
+ * Selects the campus date a query asks for: a plain YYYY-MM-DD value, or the campus date of an
+ * ISO instant (Today sends its schedule range as campus-day bounds in UTC). Anything else falls
+ * back to the current campus date, so Events lists the same upcoming days as Today.
+ */
 function queryDate(query: Record<string, string> | undefined, key: string): string {
   const value = query?.[key];
-  return value && /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? value
-    : STATIC_DEMO_DATE;
+  if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const instant = value ? Date.parse(value) : Number.NaN;
+  return getCampusDate(Number.isFinite(instant) ? new Date(instant) : new Date(), getInstitutionTimeZone());
 }
 
 function demoEvents(date: string): EventsResponse["events"] {

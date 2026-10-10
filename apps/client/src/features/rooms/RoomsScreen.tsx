@@ -1,17 +1,17 @@
-/** Renders searchable campus rooms with accessible result cards. */
+/** Renders the searchable public room directory. */
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { Room } from "@concourse/contracts";
 import { SearchBar } from "@/design-system/SearchBar";
-import { SignalPageHeader } from "@/shell/SignalPageHeader";
-import { useRooms } from "@/data/public/useRooms";
+import { PageHeader } from "@/design-system/PageHeader";
+import { useRooms } from "@/data/public/resources";
 import { useLocale } from "@/localization/LocaleContext";
 import { getRoomAccessibilityLabel, getRoomCard, getRoomHref, getRoomsEmptyHint, getRoomsEmptyMessage } from "@/features/rooms/roomsScreenHelpers";
 import { ResourceList } from "@/design-system/ResourceList";
 import { Screen } from "@/design-system/Screen";
 import { StatusBanner } from "@/design-system/StatusBanner";
-import { spacing, typography } from "@/design-system/theme";
-import { useTheme } from "@/design-system/ThemeContext";
+import { CONTENT_MAX_WIDTH, spacing, typography } from "@/design-system/theme";
+import { useTheme } from "@/design-system/ThemeProvider";
 import { selectedRoomDetails } from "@/data/public/selectedDetailRecords";
 
 /** Presents searchable campus rooms and route-aware resource selection. */
@@ -28,18 +28,21 @@ export default function RoomsScreen(): JSX.Element {
   const onNavigate = useCallback((item: Room) => {
     selectedRoomDetails.remember(item, { authoritative: state.source === "network" });
   }, [state.source]);
+  const count = state.loading ? "" : t(rooms.length === 1 ? "roomResultCountOne" : "roomResultCountOther", { count: rooms.length });
 
   const header = (
     <View style={styles.header}>
-      <SignalPageHeader title={t("rooms")} />
-      <SearchBar value={search} onChangeText={setSearch} label={t("searchRooms")} placeholder={t("searchRooms")} testID="rooms-search" />
-      {!state.loading ? <Text accessibilityLiveRegion="polite" style={[styles.count, { color: theme.colors.muted }]}>{t(rooms.length === 1 ? "roomResultCountOne" : "roomResultCountOther", { count: rooms.length })}</Text> : null}
+      <PageHeader title={t("rooms")} intro={t("roomsIntro")} />
+      <SearchBar value={search} onChangeText={setSearch} label={t("searchRooms")} placeholder={t("roomNamePlaceholder")} testID="rooms-search" />
       {state.source === "persisted-cache" ? <StatusBanner kind="cached" cacheAge={state.cacheAge} /> : null}
+      <View style={styles.head}>
+        <Text accessibilityLiveRegion="polite" style={[styles.count, { color: theme.colors.muted }]}>{count}</Text>
+      </View>
     </View>
   );
 
   return (
-    <Screen scroll={false} maxWidth={1400} testID="rooms-screen">
+    <Screen scroll={false} maxWidth={CONTENT_MAX_WIDTH} testID="rooms-screen">
       <ResourceList
         testID="rooms-list"
         header={header}
@@ -55,10 +58,13 @@ export default function RoomsScreen(): JSX.Element {
         renderCard={renderCard}
         accessibilityLabel={accessibilityLabel}
         onNavigate={onNavigate}
-        variant="route"
       />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({ header: { gap: spacing.xl, paddingBottom: spacing.xl }, count: { ...typography.caption } });
+const styles = StyleSheet.create({
+  header: { gap: spacing.xl },
+  head: { minHeight: 48, justifyContent: "flex-end", paddingBottom: spacing.sm },
+  count: { ...typography.caption },
+});

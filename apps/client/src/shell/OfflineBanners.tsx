@@ -1,26 +1,23 @@
-/** Renders offline and cached-data notices with localized freshness context. */
+/** Renders the offline notice with localized freshness context. */
 import { StyleSheet, Text, View } from "react-native";
+import { StatusLamp } from "@/design-system/StatusLamp";
 import { spacing, typography } from "@/design-system/theme";
-import { useTheme } from "@/design-system/ThemeContext";
-import { formatCacheAge } from "@/design-system/cacheAge";
+import { useTheme } from "@/design-system/ThemeProvider";
 import { useLocale } from "@/localization/LocaleContext";
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    flexWrap: "wrap",
+    columnGap: spacing.sm,
+    rowGap: 2,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
-  text: {
-    ...typography.caption,
-    fontWeight: "700",
-    letterSpacing: 0.2,
-  },
-  subtext: {
-    ...typography.small,
-    marginTop: 2,
-  },
+  text: { ...typography.label },
+  subtext: { ...typography.small },
 });
 
 /** Announces loss of connectivity with a localized, screen-reader-visible status message. */
@@ -38,43 +35,15 @@ export function OfflineBanner({
 
   return (
     <View
-      style={[
-        styles.container,
-        { backgroundColor: theme.colors.errorSurface, paddingTop: topPadding + 8 },
-      ]}
+      style={[styles.container, { backgroundColor: theme.colors.errorSurface, paddingTop: topPadding + spacing.sm }]}
       accessibilityRole="alert"
       accessibilityLiveRegion="assertive"
     >
+      <StatusLamp shape="crossed" color={theme.colors.error} />
       <Text style={[styles.text, { color: theme.colors.error }]}>{t("offline")}</Text>
       {hasOfflineData && showCacheAge && (
-        <Text style={[styles.subtext, { color: theme.colors.error }]}>{t("cachedData")}</Text>
+        <Text style={[styles.subtext, { color: theme.colors.text }]}>{t("offlineShowingSaved")}</Text>
       )}
-    </View>
-  );
-}
-
-/** Explains that displayed content came from saved data instead of a live request. */
-export function CachedDataBanner({
-  topPadding,
-  cacheAge,
-}: {
-  topPadding: number;
-  cacheAge: number | null;
-}): JSX.Element {
-  const theme = useTheme();
-  const { locale, t } = useLocale();
-  const ageText = cacheAge ? formatCacheAge(cacheAge, locale) : "";
-
-  return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: theme.colors.warningSurface, paddingTop: topPadding + 8 },
-      ]}
-    >
-      <Text style={[styles.text, { color: theme.colors.warning }]}>
-        {ageText ? t("cachedDataAge", { age: ageText }) : t("cachedData")}
-      </Text>
     </View>
   );
 }
